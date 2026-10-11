@@ -1,0 +1,20 @@
+{
+  "name": "open-tesseract",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "pnpm db:up && turbo run dev",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker compose -f infra/compose.dev.yml up -d --wait",
+    "db:down": "docker compose -f infra/compose.dev.yml down",
+    "db:migrate": "pnpm --filter @ot/db migrate",
+    "db:seed": "pnpm --filter @ot/db seed"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "turbo": "^2.5.8",
+    "typescript": "~5.9.3"
+  }
+}

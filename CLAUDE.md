@@ -1,0 +1,25 @@
+# Open Tesseract (local mode)
+
+Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript strict, package scope `@ot/`.
+
+## Layout
+- `apps/api` NestJS. In local mode it also runs pg-boss workers and schedules (no separate worker app yet).
+- `apps/web` React + Vite + TanStack Router/Query + Tailwind 4 + shadcn-style components in `src/components/ui`.
+- `packages/config` Zod-validated env, loads `<repo>/.env`.
+- `packages/contracts` Zod schemas + types shared by api and web (the API contract).
+- `packages/core` WorkContext (AsyncLocalStorage correlationId), pino logger, `Queue` (pg-boss wrapper), `ScheduleRegistry`, Nest injection tokens.
+- `packages/db` Kysely client, schema types, migrations (`src/migrations`, registered in `migrations/index.ts`), seed.
+- `packages/modules/*` feature modules (`@ot/mod-*`), each a Nest module with `jobs/` for its pg-boss handlers.
+- `infra/compose.dev.yml` Postgres 16 (pgvector image) on 127.0.0.1:54329.
+
+## Rules
+- Packages are consumed as TS source (no build step). The api runs with `@swc-node/register` (decorator metadata on).
+- Inject infra with tokens from `@ot/core` (`CONFIG`, `DB`, `QUEUE`, `SCHEDULES`) using `@Inject(...)`.
+- Register job handlers / schedules in a module's `onModuleInit`; the queue starts in `InfraModule.onApplicationBootstrap`.
+- New table: add a migration file, register it, extend `Database` in `packages/db/src/schema.ts`. Migrations + seed run when the api boots.
+- New endpoint: define the response schema/type in `@ot/contracts` first, then use it in api and web.
+- Everything binds to 127.0.0.1; no auth in local mode. Never log or store secrets; `.env` is gitignored.
+- Logs: use `createLogger(scope)`; correlationId is added automatically inside a WorkContext (HTTP requests, jobs, bot updates).
+
+## Commands
+`pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down`

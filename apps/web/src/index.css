@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.985 0 0);
+  --foreground: oklch(0.21 0.006 286);
+  --card: oklch(1 0 0);
+  --muted: oklch(0.967 0.001 286);
+  --muted-foreground: oklch(0.552 0.016 286);
+  --border: oklch(0.92 0.004 286);
+  --primary: oklch(0.21 0.006 286);
+  --primary-foreground: oklch(0.985 0 0);
+  --accent: oklch(0.955 0.003 286);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.16 0.005 286);
+    --foreground: oklch(0.96 0 0);
+    --card: oklch(0.2 0.006 286);
+    --muted: oklch(0.25 0.006 286);
+    --muted-foreground: oklch(0.7 0.015 286);
+    --border: oklch(0.3 0.006 286);
+    --primary: oklch(0.92 0.004 286);
+    --primary-foreground: oklch(0.2 0.006 286);
+    --accent: oklch(0.27 0.006 286);
+  }
+}
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+}
+body { @apply bg-background text-foreground antialiased; }
+* { @apply border-border; }
