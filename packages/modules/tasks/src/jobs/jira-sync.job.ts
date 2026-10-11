@@ -12,19 +12,21 @@ export const jiraCredentials = (c: AppConfig): JiraCredentials | null =>
   c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN ? { site: c.JIRA_BASE_URL, email: c.JIRA_EMAIL, token: c.JIRA_API_TOKEN } : null;
 
 /** Ensures the sources row for this Jira site in the configured workspace. */
-export async function ensureJiraSource(db: Db, config: AppConfig, site: string): Promise<{ id: string; workspace_id: string }> {
+export async function ensureJiraSource(db: Db, config: AppConfig, site: string): Promise<{ id: string; workspace_id: string; last_synced_at: Date | null }> {
   const ws = await db.selectFrom('workspaces').select('id').where('slug', '=', config.JIRA_WORKSPACE).executeTakeFirstOrThrow();
   return db
     .insertInto('sources')
     .values({ workspace_id: ws.id, kind: 'jira', name: site, config: JSON.stringify({ site, jql: config.JIRA_JQL ?? null }) })
     .onConflict(oc => oc.columns(['workspace_id', 'kind', 'name']).doUpdateSet({ config: sql`excluded.config` }))
-    .returning(['id', 'workspace_id'])
-    .executeTakeFirstOrThrow();
+    .returning(['id', 'workspace_id', 'last_synced_at'])
+    .executeTakeFirstOrThrow() as Promise<{ id: string; workspace_id: string; last_synced_at: Date | null }>;
 }
 
 export interface SyncResult {
   upserted: number;
   inserted: string[]; // task ids seen for the first time
+  /** First successful sync of this source: everything is "new", so nothing should be auto-started. */
+  firstSync: boolean;
   detailed: number;
   archived: number;
   truncated: boolean;
@@ -43,7 +45,7 @@ export async function syncTaskDetail(db: Db, client: JiraClient, task: { id: str
 
 /** Pulls issues from Jira Cloud (read-only) and upserts them into tasks by (source_id, external_id). */
 export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fetch = fetch): Promise<SyncResult> {
-  const empty: SyncResult = { upserted: 0, inserted: [], detailed: 0, archived: 0, truncated: false };
+  const empty: SyncResult = { upserted: 0, inserted: [], firstSync: false, detailed: 0, archived: 0, truncated: false };
   const creds = jiraCredentials(config);
   if (!creds) return empty;
   const client = new JiraClient(creds, fetchFn);
@@ -100,7 +102,7 @@ export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fet
       .where('archived_at', 'is', null)
       .executeTakeFirst();
     await db.updateTable('sources').set({ last_synced_at: startedAt, last_error: null }).where('id', '=', source.id).execute();
-    const result: SyncResult = { upserted: issues.length, inserted, detailed, archived: Number(archived.numUpdatedRows), truncated };
+    const result: SyncResult = { upserted: issues.length, inserted, firstSync: !source.last_synced_at, detailed, archived: Number(archived.numUpdatedRows), truncated };
     log.info({ upserted: result.upserted, new: inserted.length, detailed, archived: result.archived, truncated }, 'jira sync done');
     return result;
   } catch (err) {

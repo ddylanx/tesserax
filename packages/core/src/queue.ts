@@ -10,7 +10,15 @@ export interface JobEnvelope<T> {
   correlationId?: string;
 }
 
-export type JobHandler<T> = (data: T, meta: { id: string; name: string }) => Promise<void>;
+export interface JobMeta {
+  id: string;
+  name: string;
+  /** Retries already used (0 on the first try). */
+  retryCount: number;
+  retryLimit: number;
+}
+
+export type JobHandler<T> = (data: T, meta: JobMeta) => Promise<void>;
 
 export interface WorkerOptions {
   /** Jobs fetched per poll (each is handled one by one). */
@@ -66,14 +74,14 @@ export class Queue {
       await this.ensureQueue(reg.name);
       await this.boss.work<JobEnvelope<unknown>>(
         reg.name,
-        { batchSize: reg.options.batchSize ?? 1, pollingIntervalSeconds: reg.options.pollingIntervalSeconds ?? 2 },
+        { batchSize: reg.options.batchSize ?? 1, pollingIntervalSeconds: reg.options.pollingIntervalSeconds ?? 2, includeMetadata: true },
         async jobs => {
           for (const job of jobs) {
             const env = (job.data ?? {}) as JobEnvelope<unknown>;
             await WorkContext.run({ correlationId: env.correlationId, origin: `job:${job.name}` }, async () => {
               const started = Date.now();
               try {
-                await reg.handler(env.data, { id: job.id, name: job.name });
+                await reg.handler(env.data, { id: job.id, name: job.name, retryCount: job.retryCount ?? 0, retryLimit: job.retryLimit ?? 0 });
                 log.debug({ jobId: job.id, ms: Date.now() - started }, `job ${job.name} done`);
               } catch (err) {
                 log.error({ err, jobId: job.id }, `job ${job.name} failed`);

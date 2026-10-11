@@ -32,7 +32,7 @@ export class TasksModule implements OnModuleInit {
       enabled,
       handler: async () => {
         const result = await runJiraSync(this.db, this.config);
-        if (result.inserted.length) await this.tasks.notifyNewTasks(result.inserted);
+        if (result.inserted.length && !result.firstSync) await this.tasks.notifyNewTasks(result.inserted);
       },
     });
   }

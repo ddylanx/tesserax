@@ -107,7 +107,51 @@ export interface TasksTable {
   created_at: Generated<Date>;
 }
 
+export type PipelineState =
+  | 'new' | 'classifying' | 'awaiting_decision' | 'rejected' | 'queued' | 'running_playbook'
+  | 'awaiting_verify' | 'verified_true' | 'verified_false' | 'failed' | 'cancelled';
+
+export interface PipelineRunsTable {
+  id: Generated<string>;
+  task_id: string;
+  trigger: string;
+  state: ColumnType<PipelineState, PipelineState | undefined, PipelineState>;
+  attempt: Generated<number>;
+  classification: Json | null;
+  classification_engine: string | null;
+  decision: Json | null;
+  playbook_id: string | null;
+  repo_path: string | null;
+  branch: string | null;
+  worktree_path: string | null;
+  agent_session_id: string | null;
+  process_id: number | null;
+  run_dir: string | null;
+  result: Json | null;
+  error: string | null;
+  error_step: string | null;
+  verify_note: string | null;
+  jira_comment_id: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  state_changed_at: Generated<Date>;
+}
+
+export interface PipelineEventsTable {
+  id: Generated<string>;
+  run_id: string;
+  from_state: string | null;
+  to_state: string | null;
+  actor: string;
+  action: string;
+  detail: Json;
+  correlation_id: string | null;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
+  pipeline_runs: PipelineRunsTable;
+  pipeline_events: PipelineEventsTable;
   tasks: TasksTable;
   workspaces: WorkspacesTable;
   sources: SourcesTable;
@@ -124,3 +168,5 @@ export type AgentSession = Selectable<AgentSessionsTable>;
 export type AgentSessionUpdate = Updateable<AgentSessionsTable>;
 export type Task = Selectable<TasksTable>;
 export type NewTask = Insertable<TasksTable>;
+export type PipelineRun = Selectable<PipelineRunsTable>;
+export type PipelineRunUpdate = Updateable<PipelineRunsTable>;

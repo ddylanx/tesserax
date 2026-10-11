@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ExternalLink, RefreshCw } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { ExternalLink, Play, RefreshCw } from 'lucide-react';
 import { useState } from 'react';
 import type { TaskList, TaskQuery } from '@ot/contracts';
 import { Page, QueryState } from '@/components/page';
@@ -26,6 +27,11 @@ export function TasksPage() {
   const sync = useMutation({
     mutationFn: () => api<{ queued: boolean }>('/api/tasks/sync', { method: 'POST' }),
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
+  });
+  const navigate = useNavigate();
+  const runPipeline = useMutation({
+    mutationFn: (taskId: string) => api<{ run: { id: string }; created: boolean }>(`/api/pipeline/tasks/${taskId}/runs`, { method: 'POST' }),
+    onSuccess: r => navigate({ to: '/inbox', search: { run: r.run.id, group: 'all' } }),
   });
   const d = q.data;
   const tasks = d?.tasks ?? [];
@@ -79,7 +85,7 @@ export function TasksPage() {
         <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && tasks.length === 0} emptyText="No tasks match." />
         {tasks.length > 0 && (
           <Table>
-            <THead><Tr><Th>Key</Th><Th>Title</Th><Th>Status</Th><Th>Priority</Th><Th>Assignee</Th><Th>Due</Th><Th>Updated</Th></Tr></THead>
+            <THead><Tr><Th>Key</Th><Th>Title</Th><Th>Status</Th><Th>Priority</Th><Th>Assignee</Th><Th>Due</Th><Th>Updated</Th><Th></Th></Tr></THead>
             <TBody>
               {tasks.map(t => (
                 <Tr key={t.id} className={t.archived ? 'opacity-60' : ''}>
@@ -95,6 +101,11 @@ export function TasksPage() {
                   <Td className="text-xs whitespace-nowrap">{t.assignee ?? 'Unassigned'}</Td>
                   <Td className="text-xs whitespace-nowrap">{t.dueAt ?? '–'}</Td>
                   <Td className="text-xs whitespace-nowrap text-muted-foreground">{timeAgo(t.updatedAt)}</Td>
+                  <Td>
+                    <Button size="sm" variant="outline" title="Classify this issue and open it in the Inbox" disabled={runPipeline.isPending} onClick={() => runPipeline.mutate(t.id)}>
+                      <Play className="size-3" />Run pipeline
+                    </Button>
+                  </Td>
                 </Tr>
               ))}
             </TBody>
