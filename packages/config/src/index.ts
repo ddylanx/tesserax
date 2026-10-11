@@ -38,6 +38,10 @@ export const envSchema = z.object({
   CLASSIFIER_ENGINE: z.enum(['claude-cli', 'rules']).default('claude-cli'),
   /** Model alias for classification (empty: the CLI's default). */
   CLASSIFIER_MODEL: optional,
+  /** Model alias for playbook runs (empty: the CLI's default). */
+  PLAYBOOK_MODEL: optional,
+  /** Runtime data (worktrees, run logs). Default <repo>/.data */
+  OT_DATA_DIR: optional,
   /** Max seconds for one headless playbook run. */
   PLAYBOOK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(1800),
   /** Base URL of the web app, for links in notifications. */
@@ -76,3 +80,6 @@ export function loadConfig(): AppConfig {
 }
 
 export const jiraConfigured = (c: AppConfig) => Boolean(c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN);
+
+/** Runtime data: worktrees and run logs (gitignored). */
+export const dataDir = (c: AppConfig) => c.OT_DATA_DIR ?? join(findRepoRoot(), '.data');

@@ -6,6 +6,7 @@ import type {
 import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
 import { TasksService } from '@ot/mod-tasks';
+import { isAlive, stopProcess } from './agent/launcher';
 import { RepoMapStore } from './repo-map';
 import { STATE_GROUPS, STEPS, STEP_RETRY, TransitionConflict, canTransition, type StepJobData, type StepName } from './states';
 
@@ -177,9 +178,14 @@ export class PipelineService {
   }
 
   async cancel(runId: string): Promise<PipelineRun> {
-    const run = await this.db.selectFrom('pipeline_runs').select('state').where('id', '=', runId).executeTakeFirst();
+    const run = await this.db.selectFrom('pipeline_runs').select(['state', 'process_id']).where('id', '=', runId).executeTakeFirst();
     if (!run) throw new TransitionConflict(runId, [], null);
-    return this.transition(runId, { from: run.state, to: 'cancelled', actor: 'user', action: 'cancel' });
+    const cancelled = await this.transition(runId, { from: run.state, to: 'cancelled', actor: 'user', action: 'cancel' });
+    if (run.state === 'running_playbook' && isAlive(run.process_id)) {
+      stopProcess(run.process_id);
+      await this.note(runId, 'system', 'agent_stopped', { pid: run.process_id });
+    }
+    return cancelled;
   }
 
   // ---------- reads ----------

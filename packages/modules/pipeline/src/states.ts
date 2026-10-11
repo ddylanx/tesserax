@@ -29,6 +29,7 @@ export const STATE_GROUPS: Record<string, PipelineState[]> = {
 export const STEPS = {
   classify: { queue: 'pipeline.classify', state: 'classifying' as PipelineState },
   run: { queue: 'pipeline.run-playbook', state: 'queued' as PipelineState },
+  finalize: { queue: 'pipeline.finalize', state: 'running_playbook' as PipelineState },
 } as const;
 export type StepName = keyof typeof STEPS;
 
