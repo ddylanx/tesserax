@@ -1,0 +1,16 @@
+{
+  "name": "@ot/mod-agents",
+  "version": "0.0.0",
+  "private": true,
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "scripts": { "typecheck": "tsc -p tsconfig.json", "test": "node --test -r @swc-node/register src/**/*.test.ts" },
+  "dependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@ot/contracts": "workspace:*",
+    "@ot/core": "workspace:*",
+    "@ot/db": "workspace:*",
+    "kysely": "^0.28.17"
+  },
+  "devDependencies": { "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }
+}

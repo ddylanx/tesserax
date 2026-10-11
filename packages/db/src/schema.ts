@@ -22,12 +22,68 @@ export interface SourcesTable {
   created_at: Generated<Date>;
 }
 
+type BigCount = ColumnType<string | null, number | string | null | undefined, number | string | null>;
+
+export interface AgentsTable {
+  id: Generated<string>;
+  kind: string;
+  host: string;
+  name: string;
+  created_at: Generated<Date>;
+  last_seen_at: Generated<Date>;
+}
+
+export type AgentSessionStatus = 'running' | 'waiting' | 'idle' | 'ended';
+
+export interface AgentSessionsTable {
+  id: Generated<string>;
+  agent_id: string;
+  session_id: string;
+  cwd: string | null;
+  branch: string | null;
+  transcript_path: string | null;
+  model: string | null;
+  permission_mode: string | null;
+  status: ColumnType<AgentSessionStatus, AgentSessionStatus | undefined, AgentSessionStatus>;
+  last_event: string | null;
+  last_tool: string | null;
+  last_prompt: string | null;
+  last_message: string | null;
+  prompt_count: Generated<number>;
+  tool_count: Generated<number>;
+  input_tokens: BigCount;
+  output_tokens: BigCount;
+  cache_read_tokens: BigCount;
+  cache_creation_tokens: BigCount;
+  context_tokens: BigCount;
+  usage_updated_at: Timestamp | null;
+  started_at: Generated<Date>;
+  last_event_at: Generated<Date>;
+  ended_at: Timestamp | null;
+  end_reason: string | null;
+}
+
+export interface AgentEventsTable {
+  id: Generated<string>;
+  agent_session_id: string;
+  event: string;
+  tool_name: string | null;
+  detail: Json;
+  correlation_id: string | null;
+  received_at: Generated<Date>;
+}
+
 export interface Database {
   workspaces: WorkspacesTable;
   sources: SourcesTable;
+  agents: AgentsTable;
+  agent_sessions: AgentSessionsTable;
+  agent_events: AgentEventsTable;
 }
 
 export type Workspace = Selectable<WorkspacesTable>;
 export type NewWorkspace = Insertable<WorkspacesTable>;
 export type Source = Selectable<SourcesTable>;
 export type SourceUpdate = Updateable<SourcesTable>;
+export type AgentSession = Selectable<AgentSessionsTable>;
+export type AgentSessionUpdate = Updateable<AgentSessionsTable>;

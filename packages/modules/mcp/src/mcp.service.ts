@@ -2,8 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import type { McpList } from '@ot/contracts';
 import { MCP_STATUS_PROVIDER, type McpStatusProvider } from './provider';
 
-/** Extra project folders to scan, contributed by other modules (e.g. agents' working dirs). */
-export const MCP_PROJECT_DIRS = Symbol('MCP_PROJECT_DIRS');
+/** Extra project folders to scan (e.g. where agents ran). */
 export type ProjectDirsSource = () => Promise<string[]>;
 
 @Injectable()

@@ -49,6 +49,12 @@ export class Queue {
     return this.boss.send(name, envelope as object, options);
   }
 
+  /** At most one job per `key` every `seconds`; a call inside the window still gets one run after it. */
+  async sendDebounced<T>(name: string, data: T, seconds: number, key: string): Promise<string | null> {
+    const envelope: JobEnvelope<T> = { data, correlationId: WorkContext.correlationId() };
+    return this.boss.sendDebounced(name, envelope as object, {}, seconds, key);
+  }
+
   async ensureQueue(name: string): Promise<void> {
     const existing = await this.boss.getQueue(name);
     if (!existing) await this.boss.createQueue(name);
