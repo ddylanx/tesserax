@@ -48,6 +48,17 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 
 Default JQL: issues assigned to you that are not done, plus those updated in the last 14 days. Only reads (`POST /rest/api/3/search/jql`); nothing is written to Jira.
 
+## Telegram bot (read-only)
+
+Long polling with grammY, so no public URL or webhook is needed; the bot runs inside the API process.
+
+1. Create a bot with [@BotFather](https://t.me/BotFather) and copy its token.
+2. In `.env`: `TELEGRAM_BOT_TOKEN=...` and `TELEGRAM_ALLOWED_USER_IDS=<your numeric id>` (comma-separated for several).
+   Don't know your id? Start the bot with the list empty and send it a message: it replies with your id.
+3. Restart `pnpm dev`.
+
+Commands: `/tasks` (open Jira tasks), `/agents` (Claude Code sessions, who needs you), `/mcp` (enabled MCP servers), `/help`. Anyone not on the list gets no data.
+
 ## Connect Claude Code (Agents page)
 
 Claude Code reports each session to `POST http://127.0.0.1:4400/api/agents/events` through hooks: every hook pipes its JSON to `curl`. The command fails silently (2 s timeout, `|| true`), so Claude Code is never blocked when the backoffice is off.
