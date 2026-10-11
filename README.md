@@ -25,6 +25,11 @@ The API migrates and seeds the database (workspaces *Personal* and *Company*) ev
 
 Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume).
 
+## Pages
+
+- **MCP**: every MCP server configured on this machine (Claude Code user/local/project scopes, Cursor, Claude Desktop, Codex, Gemini, Antigravity), on/off, read-only. It reuses the reader in `../agent-cockpit/src/mcp.mjs` (`AGENT_COCKPIT_MCP_PATH` to point elsewhere); without it, a built-in Claude Code-only reader is used. Only names, transport and env key names are read, never values.
+- **System**: health of Postgres and pg-boss, workspaces, schedules, which integrations are configured.
+
 ## Ports
 
 | What | Port |
