@@ -50,3 +50,17 @@ export const taskListSchema = z.object({
   jiraConfigured: z.boolean(),
 });
 export type TaskList = z.infer<typeof taskListSchema>;
+
+export const taskDetailSchema = taskSchema.extend({
+  description: z.string().nullable(),
+  reporter: z.string().nullable(),
+  components: z.array(z.string()),
+  parent: z.string().nullable(),
+  sprint: z.string().nullable(),
+  createdAt: z.string().nullable(),
+  comments: z.array(z.object({ author: z.string().nullable(), created: z.string().nullable(), body: z.string() })),
+  attachments: z.array(
+    z.object({ filename: z.string(), mimeType: z.string().nullable(), size: z.number().nullable(), created: z.string().nullable(), author: z.string().nullable() }),
+  ),
+});
+export type TaskDetailDto = z.infer<typeof taskDetailSchema>;

@@ -86,9 +86,17 @@ export interface TasksTable {
   status_category: ColumnType<TaskStatusCategory, TaskStatusCategory | undefined, TaskStatusCategory>;
   priority: string | null;
   assignee: string | null;
+  reporter: string | null;
   project: string | null;
   type: string | null;
   labels: ColumnType<string[], string[] | undefined, string[]>;
+  components: ColumnType<string[], string[] | undefined, string[]>;
+  description: string | null;
+  parent: string | null;
+  sprint: string | null;
+  comments: Json;
+  attachments: Json;
+  detail_synced_at: Timestamp | null;
   url: string | null;
   due_at: ColumnType<Date | null, string | null | undefined, string | null>;
   created_at_source: Timestamp | null;

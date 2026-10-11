@@ -32,6 +32,13 @@ export const envSchema = z.object({
   JIRA_JQL: optional,
   JIRA_WORKSPACE: z.enum(['personal', 'company']).default('company'),
 
+  /** Claude Code CLI used for classification and playbook runs. */
+  CLAUDE_BIN: z.string().default('claude'),
+  /** Max seconds for one headless playbook run. */
+  PLAYBOOK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(1800),
+  /** Base URL of the web app, for links in notifications. */
+  WEB_BASE_URL: z.string().default('http://127.0.0.1:5180'),
+
   TELEGRAM_BOT_TOKEN: optional,
   TELEGRAM_ALLOWED_USER_IDS: optional.transform(v =>
     (v ?? '')

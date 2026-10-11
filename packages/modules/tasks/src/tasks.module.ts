@@ -18,6 +18,7 @@ export class TasksModule implements OnModuleInit {
     @Inject(DB) private readonly db: Db,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(SCHEDULES) private readonly schedules: ScheduleRegistry,
+    private readonly tasks: TasksService,
   ) {}
 
   onModuleInit() {
@@ -30,7 +31,8 @@ export class TasksModule implements OnModuleInit {
       runOnStart: true,
       enabled,
       handler: async () => {
-        await runJiraSync(this.db, this.config);
+        const result = await runJiraSync(this.db, this.config);
+        if (result.inserted.length) await this.tasks.notifyNewTasks(result.inserted);
       },
     });
   }

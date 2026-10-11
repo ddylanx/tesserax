@@ -1,15 +1,20 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { jiraConfigured, type AppConfig } from '@ot/config';
-import type { TaskList, TaskQuery } from '@ot/contracts';
+import type { TaskDetailDto, TaskDto, TaskList, TaskQuery } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, type Queue } from '@ot/core';
 import type { Db } from '@ot/db';
-import { JIRA_SYNC_JOB } from './jobs/jira-sync.job';
+import { JiraClient } from './jira/client';
+import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
+
+export type NewTasksListener = (taskIds: string[]) => Promise<void>;
 
 const iso = (d: Date | string | null) => (d ? new Date(d).toISOString() : null);
 
 @Injectable()
 export class TasksService {
+  private newTaskListeners: NewTasksListener[] = [];
+
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(QUEUE) private readonly queue: Queue,
@@ -54,24 +59,76 @@ export class TasksService {
         id: s.id, workspace: s.workspace, kind: s.kind, name: s.name,
         lastSyncedAt: iso(s.last_synced_at), lastError: s.last_error, taskCount: s.n,
       })),
-      tasks: rows.map(r => ({
-        id: r.id,
-        workspace: r.workspace,
-        source: r.source,
-        key: r.key,
-        title: r.title,
-        status: r.status,
-        statusCategory: r.status_category,
-        priority: r.priority,
-        assignee: r.assignee,
-        project: r.project,
-        type: r.type,
-        labels: r.labels ?? [],
-        url: r.url,
-        dueAt: r.due_at ? new Date(r.due_at).toISOString().slice(0, 10) : null,
-        updatedAt: iso(r.updated_at_source),
-        archived: r.archived_at != null,
-      })),
+      tasks: rows.map(r => this.toDto(r)),
+    };
+  }
+
+  /** Other modules (pipeline) subscribe to issues seen for the first time. */
+  onNewTasks(fn: NewTasksListener) {
+    this.newTaskListeners.push(fn);
+  }
+
+  async notifyNewTasks(taskIds: string[]) {
+    for (const fn of this.newTaskListeners) await fn(taskIds);
+  }
+
+  jiraClient(): JiraClient | null {
+    const creds = jiraCredentials(this.config);
+    return creds ? new JiraClient(creds) : null;
+  }
+
+  async getTask(id: string): Promise<TaskDetailDto | null> {
+    const r = await this.db
+      .selectFrom('tasks as t')
+      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
+      .innerJoin('sources as s', 's.id', 't.source_id')
+      .selectAll('t')
+      .select(['w.slug as workspace', 's.kind as source'])
+      .where('t.id', '=', id)
+      .executeTakeFirst();
+    return r ? this.toDetail(r) : null;
+  }
+
+  /** Refreshes comments/attachments from Jira when they are missing (best effort). */
+  async ensureDetail(id: string): Promise<void> {
+    const t = await this.db.selectFrom('tasks').select(['id', 'key', 'external_id', 'detail_synced_at']).where('id', '=', id).executeTakeFirst();
+    const client = this.jiraClient();
+    if (!t || t.detail_synced_at || !client) return;
+    await syncTaskDetail(this.db, client, t);
+  }
+
+  private toDetail(r: any): TaskDetailDto {
+    return {
+      ...this.toDto(r),
+      description: r.description,
+      reporter: r.reporter,
+      components: r.components ?? [],
+      parent: r.parent,
+      sprint: r.sprint,
+      comments: (r.comments ?? []) as TaskDetailDto['comments'],
+      attachments: (r.attachments ?? []) as TaskDetailDto['attachments'],
+      createdAt: iso(r.created_at_source),
+    };
+  }
+
+  private toDto(r: any): TaskDto {
+    return {
+      id: r.id,
+      workspace: r.workspace,
+      source: r.source,
+      key: r.key,
+      title: r.title,
+      status: r.status,
+      statusCategory: r.status_category,
+      priority: r.priority,
+      assignee: r.assignee,
+      project: r.project,
+      type: r.type,
+      labels: r.labels ?? [],
+      url: r.url,
+      dueAt: r.due_at ? new Date(r.due_at).toISOString().slice(0, 10) : null,
+      updatedAt: iso(r.updated_at_source),
+      archived: r.archived_at != null,
     };
   }
 

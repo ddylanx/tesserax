@@ -2,61 +2,94 @@ import { sql } from 'kysely';
 import type { AppConfig } from '@ot/config';
 import { createLogger } from '@ot/core';
 import type { Db } from '@ot/db';
-import { DEFAULT_JQL, JiraClient } from '../jira/client';
-import { mapIssue } from '../jira/map';
+import { DEFAULT_JQL, JiraClient, type JiraCredentials } from '../jira/client';
+import { mapDetail, mapIssue } from '../jira/map';
 
 export const JIRA_SYNC_JOB = 'tasks.jira-sync';
 const log = createLogger('tasks.jira');
 
+export const jiraCredentials = (c: AppConfig): JiraCredentials | null =>
+  c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN ? { site: c.JIRA_BASE_URL, email: c.JIRA_EMAIL, token: c.JIRA_API_TOKEN } : null;
+
 /** Ensures the sources row for this Jira site in the configured workspace. */
-export async function ensureJiraSource(db: Db, config: AppConfig): Promise<{ id: string; workspace_id: string }> {
+export async function ensureJiraSource(db: Db, config: AppConfig, site: string): Promise<{ id: string; workspace_id: string }> {
   const ws = await db.selectFrom('workspaces').select('id').where('slug', '=', config.JIRA_WORKSPACE).executeTakeFirstOrThrow();
-  const name = new URL(config.JIRA_BASE_URL!).host;
   return db
     .insertInto('sources')
-    .values({ workspace_id: ws.id, kind: 'jira', name, config: JSON.stringify({ baseUrl: config.JIRA_BASE_URL, jql: config.JIRA_JQL ?? null }) })
+    .values({ workspace_id: ws.id, kind: 'jira', name: site, config: JSON.stringify({ site, jql: config.JIRA_JQL ?? null }) })
     .onConflict(oc => oc.columns(['workspace_id', 'kind', 'name']).doUpdateSet({ config: sql`excluded.config` }))
     .returning(['id', 'workspace_id'])
     .executeTakeFirstOrThrow();
 }
 
+export interface SyncResult {
+  upserted: number;
+  inserted: string[]; // task ids seen for the first time
+  detailed: number;
+  archived: number;
+  truncated: boolean;
+}
+
+/** Fetches comments + attachment metadata for one task (also used on demand before classification). */
+export async function syncTaskDetail(db: Db, client: JiraClient, task: { id: string; key: string | null; external_id: string }): Promise<void> {
+  const issue = await client.getIssue(task.key ?? task.external_id);
+  const d = mapDetail(issue);
+  await db
+    .updateTable('tasks')
+    .set({ comments: JSON.stringify(d.comments), attachments: JSON.stringify(d.attachments), detail_synced_at: new Date() })
+    .where('id', '=', task.id)
+    .execute();
+}
+
 /** Pulls issues from Jira Cloud (read-only) and upserts them into tasks by (source_id, external_id). */
-export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fetch = fetch): Promise<{ upserted: number; archived: number }> {
-  if (!config.JIRA_BASE_URL || !config.JIRA_EMAIL || !config.JIRA_API_TOKEN) return { upserted: 0, archived: 0 };
-  const source = await ensureJiraSource(db, config);
-  const client = new JiraClient({ baseUrl: config.JIRA_BASE_URL, email: config.JIRA_EMAIL, apiToken: config.JIRA_API_TOKEN }, fetchFn);
+export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fetch = fetch): Promise<SyncResult> {
+  const empty: SyncResult = { upserted: 0, inserted: [], detailed: 0, archived: 0, truncated: false };
+  const creds = jiraCredentials(config);
+  if (!creds) return empty;
+  const client = new JiraClient(creds, fetchFn);
+  const source = await ensureJiraSource(db, config, client.site);
   const startedAt = new Date();
   try {
-    const issues = await client.search(config.JIRA_JQL ?? DEFAULT_JQL);
+    const sprintField = await client.findSprintField().catch(() => null);
+    const { issues, truncated } = await client.search(config.JIRA_JQL ?? DEFAULT_JQL, sprintField ? [sprintField] : []);
+    const inserted: string[] = [];
+    const needDetail: { id: string; key: string | null; external_id: string }[] = [];
     for (let i = 0; i < issues.length; i += 200) {
       const rows = issues.slice(i, i + 200).map(issue => {
-        const m = mapIssue(issue);
+        const m = mapIssue(issue, sprintField);
         return { ...m, workspace_id: source.workspace_id, source_id: source.id, url: client.browseUrl(m.key), synced_at: startedAt, archived_at: null };
       });
-      await db
+      const cols = ['key', 'title', 'status', 'status_category', 'priority', 'assignee', 'reporter', 'project', 'type', 'labels', 'components',
+        'description', 'parent', 'sprint', 'url', 'due_at', 'created_at_source', 'updated_at_source', 'raw', 'synced_at'] as const;
+      const result = await db
         .insertInto('tasks')
         .values(rows)
         .onConflict(oc =>
           oc.columns(['source_id', 'external_id']).doUpdateSet(eb => ({
-            key: eb.ref('excluded.key'),
-            title: eb.ref('excluded.title'),
-            status: eb.ref('excluded.status'),
-            status_category: eb.ref('excluded.status_category'),
-            priority: eb.ref('excluded.priority'),
-            assignee: eb.ref('excluded.assignee'),
-            project: eb.ref('excluded.project'),
-            type: eb.ref('excluded.type'),
-            labels: eb.ref('excluded.labels'),
-            url: eb.ref('excluded.url'),
-            due_at: eb.ref('excluded.due_at'),
-            created_at_source: eb.ref('excluded.created_at_source'),
-            updated_at_source: eb.ref('excluded.updated_at_source'),
-            raw: eb.ref('excluded.raw'),
-            synced_at: eb.ref('excluded.synced_at'),
+            ...Object.fromEntries(cols.map(c => [c, eb.ref(`excluded.${c}`)])),
             archived_at: null,
-          })),
+            // a changed issue needs its comments again
+            detail_synced_at: sql`case when tasks.updated_at_source is distinct from excluded.updated_at_source then null else tasks.detail_synced_at end`,
+          }) as never),
         )
+        .returning(['id', 'key', 'external_id', 'detail_synced_at', sql<boolean>`(xmax = 0)`.as('inserted')])
         .execute();
+      for (const r of result) {
+        if (r.inserted) inserted.push(r.id);
+        if (!r.detail_synced_at) needDetail.push(r);
+      }
+    }
+    // Comments + attachments only for new or changed issues, 4 at a time.
+    let detailed = 0;
+    for (let i = 0; i < needDetail.length; i += 4) {
+      await Promise.all(
+        needDetail.slice(i, i + 4).map(t =>
+          syncTaskDetail(db, client, t).then(
+            () => detailed++,
+            err => log.warn({ key: t.key, err: (err as Error).message }, 'issue detail failed'),
+          ),
+        ),
+      );
     }
     // Issues the query no longer returns (reassigned, older than the window) are archived, not deleted.
     const archived = await db
@@ -67,8 +100,8 @@ export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fet
       .where('archived_at', 'is', null)
       .executeTakeFirst();
     await db.updateTable('sources').set({ last_synced_at: startedAt, last_error: null }).where('id', '=', source.id).execute();
-    const result = { upserted: issues.length, archived: Number(archived.numUpdatedRows) };
-    log.info(result, 'jira sync done');
+    const result: SyncResult = { upserted: issues.length, inserted, detailed, archived: Number(archived.numUpdatedRows), truncated };
+    log.info({ upserted: result.upserted, new: inserted.length, detailed, archived: result.archived, truncated }, 'jira sync done');
     return result;
   } catch (err) {
     await db.updateTable('sources').set({ last_error: String((err as Error).message ?? err).slice(0, 500) }).where('id', '=', source.id).execute();

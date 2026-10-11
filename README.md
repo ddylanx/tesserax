@@ -46,7 +46,14 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
    ```
 3. Restart `pnpm dev`. The System page shows "Jira Cloud: configured" and the `tasks.jira-sync` schedule turns on.
 
-Default JQL: issues assigned to you that are not done, plus those updated in the last 14 days. Only reads (`POST /rest/api/3/search/jql`); nothing is written to Jira.
+Default JQL: issues assigned to you that are not done, plus those updated in the last 14 days. Reads with `GET /rest/api/3/search/jql`; for new or changed issues it also reads comments (last 20, text) and attachment metadata (never the files). Both plain API tokens and "API tokens with scopes" work (the latter through Atlassian's api.atlassian.com gateway). The only write is a comment, and only after you confirm it in the Inbox.
+
+### Testing without a Jira account
+
+```bash
+pnpm fake-jira    # fake Jira on http://127.0.0.1:4499 serving fixtures/jira/issues.json
+```
+and in `.env`: `JIRA_BASE_URL=http://127.0.0.1:4499`, `JIRA_EMAIL=dev@example.com`, `JIRA_API_TOKEN=fake`.
 
 ## Telegram bot (read-only)
 

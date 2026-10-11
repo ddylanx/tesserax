@@ -15,7 +15,8 @@
     "db:seed": "pnpm --filter @ot/db seed",
     "hooks:print": "node scripts/claude-hooks.mjs print",
     "hooks:install": "node scripts/claude-hooks.mjs install",
-    "hooks:uninstall": "node scripts/claude-hooks.mjs uninstall"
+    "hooks:uninstall": "node scripts/claude-hooks.mjs uninstall",
+    "fake-jira": "node scripts/fake-jira.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
