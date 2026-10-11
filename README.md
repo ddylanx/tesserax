@@ -28,8 +28,25 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 ## Pages
 
 - **MCP**: every MCP server configured on this machine (Claude Code user/local/project scopes, Cursor, Claude Desktop, Codex, Gemini, Antigravity), on/off, read-only. It reuses the reader in `../agent-cockpit/src/mcp.mjs` (`AGENT_COCKPIT_MCP_PATH` to point elsewhere); without it, a built-in Claude Code-only reader is used. Only names, transport and env key names are read, never values.
+- **Tasks**: your Jira Cloud issues, read-only, synced every ~2 minutes (pg-boss schedule with up to 30 s jitter) and on start; "Sync now" queues one right away. Filters: text, workspace, status, project, archived. Issues the query stops returning are archived, not deleted.
 - **Agents**: Claude Code sessions on this machine: running / needs you / idle / ended, folder, git branch, last activity, prompt and tool counts, token usage. Click a row for its recent events. Fed by Claude Code hooks (below).
 - **System**: health of Postgres and pg-boss, workspaces, schedules, which integrations are configured.
+
+## Connect Jira Cloud (Tasks page)
+
+1. Create an API token at https://id.atlassian.com/manage-profile/security/api-tokens
+2. In `.env`:
+   ```
+   JIRA_BASE_URL=https://your-site.atlassian.net
+   JIRA_EMAIL=you@company.com
+   JIRA_API_TOKEN=...
+   # optional
+   JIRA_JQL=project = PAY AND statusCategory != Done ORDER BY updated DESC
+   JIRA_WORKSPACE=company
+   ```
+3. Restart `pnpm dev`. The System page shows "Jira Cloud: configured" and the `tasks.jira-sync` schedule turns on.
+
+Default JQL: issues assigned to you that are not done, plus those updated in the last 14 days. Only reads (`POST /rest/api/3/search/jql`); nothing is written to Jira.
 
 ## Connect Claude Code (Agents page)
 

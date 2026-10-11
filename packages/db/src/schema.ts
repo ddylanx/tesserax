@@ -73,7 +73,34 @@ export interface AgentEventsTable {
   received_at: Generated<Date>;
 }
 
+export type TaskStatusCategory = 'todo' | 'in_progress' | 'done';
+
+export interface TasksTable {
+  id: Generated<string>;
+  workspace_id: string;
+  source_id: string;
+  external_id: string;
+  key: string | null;
+  title: string;
+  status: string | null;
+  status_category: ColumnType<TaskStatusCategory, TaskStatusCategory | undefined, TaskStatusCategory>;
+  priority: string | null;
+  assignee: string | null;
+  project: string | null;
+  type: string | null;
+  labels: ColumnType<string[], string[] | undefined, string[]>;
+  url: string | null;
+  due_at: ColumnType<Date | null, string | null | undefined, string | null>;
+  created_at_source: Timestamp | null;
+  updated_at_source: Timestamp | null;
+  raw: Json;
+  synced_at: Timestamp;
+  archived_at: Timestamp | null;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
+  tasks: TasksTable;
   workspaces: WorkspacesTable;
   sources: SourcesTable;
   agents: AgentsTable;
@@ -87,3 +114,5 @@ export type Source = Selectable<SourcesTable>;
 export type SourceUpdate = Updateable<SourcesTable>;
 export type AgentSession = Selectable<AgentSessionsTable>;
 export type AgentSessionUpdate = Updateable<AgentSessionsTable>;
+export type Task = Selectable<TasksTable>;
+export type NewTask = Insertable<TasksTable>;

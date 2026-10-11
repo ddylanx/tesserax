@@ -17,6 +17,7 @@
     "@ot/db": "workspace:*",
     "@ot/mod-agents": "workspace:*",
     "@ot/mod-mcp": "workspace:*",
+    "@ot/mod-tasks": "workspace:*",
     "kysely": "^0.28.17",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"

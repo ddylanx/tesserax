@@ -47,6 +47,9 @@ importers:
       '@ot/mod-mcp':
         specifier: workspace:*
         version: link:../../packages/modules/mcp
+      '@ot/mod-tasks':
+        specifier: workspace:*
+        version: link:../../packages/modules/tasks
       kysely:
         specifier: ^0.28.17
         version: 0.28.17
@@ -204,6 +207,34 @@ importers:
       '@ot/core':
         specifier: workspace:*
         version: link:../../core
+    devDependencies:
+      '@swc-node/register':
+        specifier: ^1.10.10
+        version: 1.12.1(@swc/core@1.16.18)(@swc/types@0.1.28)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.16.18
+
+  packages/modules/tasks:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.1.6
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@ot/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@ot/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ot/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@ot/db':
+        specifier: workspace:*
+        version: link:../../db
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.17
     devDependencies:
       '@swc-node/register':
         specifier: ^1.10.10
