@@ -26,7 +26,10 @@ export const envSchema = z.object({
   WEB_PORT: z.coerce.number().int().default(5180),
   DATABASE_URL: z.string().url().default('postgres://ot:ot@127.0.0.1:54329/open_tesseract'),
 
-  JIRA_BASE_URL: optional.pipe(z.string().url().optional()),
+  /** https://your-site.atlassian.net, or just your-site.atlassian.net (https:// is added). */
+  JIRA_BASE_URL: optional
+    .transform(v => (v ? (/^https?:\/\//i.test(v) ? v : `https://${v}`).replace(/\/+$/, '') : v))
+    .pipe(z.string().url().optional()),
   JIRA_EMAIL: optional,
   JIRA_API_TOKEN: optional,
   JIRA_JQL: optional,

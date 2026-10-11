@@ -81,3 +81,10 @@ test('falls back to the api.atlassian.com gateway for scoped tokens', async () =
   assert.ok(calls.some(k => k.url.href.startsWith('https://api.atlassian.com/ex/jira/cid/rest/api/3/search/jql')));
   assert.equal(c.browseUrl('A-1'), 'https://x.atlassian.net/browse/A-1');
 });
+
+test('a token cut at 128 characters is reported clearly; quotes and spaces are trimmed', async () => {
+  assert.throws(() => new JiraClient({ site: 'x.atlassian.net', email: 'a', token: `ATATT${'x'.repeat(123)}` }), /128 characters/);
+  const { fn, calls } = fakeJira(() => Response.json({ issues: [], isLast: true }));
+  await new JiraClient({ site: 'x.atlassian.net', email: ' "a@b.c" ', token: " 'tok' " }, fn).search('x');
+  assert.equal((calls[0]!.init.headers as Record<string, string>).authorization, `Basic ${Buffer.from('a@b.c:tok').toString('base64')}`);
+});

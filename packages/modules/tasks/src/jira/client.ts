@@ -53,7 +53,16 @@ export class JiraClient {
   private baseResolved = false;
   private readonly auth: string;
 
-  constructor(private readonly creds: JiraCredentials, private readonly fetchFn: typeof fetch = fetch) {
+  private creds: JiraCredentials;
+
+  constructor(creds: JiraCredentials, private readonly fetchFn: typeof fetch = fetch) {
+    // Pasted values often carry quotes or spaces.
+    creds = { ...creds, email: creds.email.trim().replace(/^["']|["']$/g, ''), token: creds.token.trim().replace(/^["']|["']$/g, '') };
+    this.creds = creds;
+    // From agent-cockpit: its old setup (macOS password prompt) cut tokens at 128 characters; Atlassian tokens are ~190.
+    if (creds.token.length === 128 && creds.token.startsWith('ATATT')) {
+      throw new JiraError('The Jira API token is cut off at 128 characters (agent-cockpit\'s old setup stored it truncated). Create a new token and paste it in full.', 401);
+    }
     this.site = normalizeSite(creds.site);
     const m = creds.site.match(/^(https?:\/\/[^/]+)/i);
     this.base = m ? m[1]! : `https://${this.site}`;
