@@ -6,7 +6,7 @@
   "types": "src/index.ts",
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test -r @swc-node/register src/**/*.test.ts"
+    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",

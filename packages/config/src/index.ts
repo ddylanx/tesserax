@@ -34,6 +34,10 @@ export const envSchema = z.object({
 
   /** Claude Code CLI used for classification and playbook runs. */
   CLAUDE_BIN: z.string().default('claude'),
+  /** claude-cli (default; falls back to rules on any failure) | rules */
+  CLASSIFIER_ENGINE: z.enum(['claude-cli', 'rules']).default('claude-cli'),
+  /** Model alias for classification (empty: the CLI's default). */
+  CLASSIFIER_MODEL: optional,
   /** Max seconds for one headless playbook run. */
   PLAYBOOK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(1800),
   /** Base URL of the web app, for links in notifications. */

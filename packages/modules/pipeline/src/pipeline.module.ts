@@ -1,7 +1,9 @@
 import { Module, type OnModuleInit, Inject } from '@nestjs/common';
-import { QUEUE, createLogger, type Queue } from '@ot/core';
+import type { AppConfig } from '@ot/config';
+import { CONFIG, QUEUE, createLogger, type Queue } from '@ot/core';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
 import { ClassificationService } from './classify/classification.service';
+import { ClaudeCliClassifier } from './classify/claude-cli.classifier';
 import { runClassifyJob } from './jobs/classify.job';
 import { PipelineController } from './pipeline.controller';
 import { PipelineService } from './pipeline.service';
@@ -18,6 +20,7 @@ const log = createLogger('pipeline');
 })
 export class PipelineModule implements OnModuleInit {
   constructor(
+    @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(QUEUE) private readonly queue: Queue,
     private readonly pipeline: PipelineService,
     private readonly tasks: TasksService,
@@ -26,6 +29,10 @@ export class PipelineModule implements OnModuleInit {
   ) {}
 
   onModuleInit() {
+    if (this.config.CLASSIFIER_ENGINE === 'claude-cli') {
+      this.classifier.usePrimary(new ClaudeCliClassifier({ bin: this.config.CLAUDE_BIN, model: this.config.CLASSIFIER_MODEL }));
+    }
+    log.info({ engine: this.config.CLASSIFIER_ENGINE, bin: this.config.CLAUDE_BIN }, 'classifier');
     this.queue.work<StepJobData>(STEPS.classify.queue, (data, meta) =>
       runClassifyJob({ pipeline: this.pipeline, tasks: this.tasks, classifier: this.classifier, playbooks: this.playbooks }, data, meta),
     );
