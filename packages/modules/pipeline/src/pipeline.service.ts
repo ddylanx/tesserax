@@ -1,10 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type {
-  Classification, DecisionInput, PipelineEventDto, PipelineList, PipelineRunDetail, PipelineRunDto, RunResult,
+  Classification, DecisionInput, FeedbackStats, PipelineEventDto, PipelineList, PipelineRunDetail, PipelineRunDto, RunResult,
 } from '@ot/contracts';
 import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
-import type { Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
+import type { Database, Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
+import type { Transaction } from 'kysely';
 import { TasksService } from '@ot/mod-tasks';
 import { isAlive, stopProcess } from './agent/launcher';
 import { RepoMapStore } from './repo-map';
@@ -22,6 +23,8 @@ export interface TransitionArgs {
   action: string;
   patch?: PipelineRunUpdate;
   detail?: Record<string, unknown>;
+  /** Extra writes that must commit together with the transition. */
+  within?: (trx: Transaction<Database>, run: PipelineRun) => Promise<void>;
 }
 
 @Injectable()
@@ -53,6 +56,7 @@ export class PipelineService {
         .returningAll()
         .executeTakeFirst();
       if (!updated) throw new TransitionConflict(runId, from, before?.state ?? null);
+      if (t.within) await t.within(trx, updated);
       await trx
         .insertInto('pipeline_events')
         .values({
@@ -171,6 +175,67 @@ export class PipelineService {
     if (!run) throw new TransitionConflict(runId, ['failed'], null);
     if (run.error_step === 'classify' || !run.decision) await this.startStep(runId, 'classify', ['failed'], 'user', 'retry');
     else await this.startStep(runId, 'run', ['failed'], 'user', 'retry');
+  }
+
+  /** awaiting_verify -> verified_true | verified_false, and one labeled feedback row, in one transaction. */
+  async verify(runId: string, outcome: boolean, note?: string) {
+    await this.transition(runId, {
+      from: 'awaiting_verify',
+      to: outcome ? 'verified_true' : 'verified_false',
+      actor: 'user',
+      action: 'verify',
+      patch: { verify_note: note ?? null },
+      detail: { outcome, note },
+      within: async (trx, run) => {
+        const task = await trx.selectFrom('tasks').select(['key', 'type']).where('id', '=', run.task_id).executeTakeFirstOrThrow();
+        const c = (run.classification ?? null) as Classification | null;
+        const d = (run.decision ?? null) as DecisionInput | null;
+        const r = (run.result ?? null) as RunResult | null;
+        await trx
+          .insertInto('pipeline_feedback')
+          .values({
+            run_id: run.id, task_id: run.task_id, task_key: task.key, issue_type: task.type,
+            classification: c ? JSON.stringify(c) : null, classification_engine: run.classification_engine,
+            decision: d ? JSON.stringify(d) : null, playbook_id: run.playbook_id,
+            classification_accepted: c && d ? c.type === d.type && c.playbook === d.playbookId : null,
+            outcome, note: note ?? null, signal: r?.signal ?? null, cost_usd: r?.costUsd ?? null, files_changed: r?.diff?.files ?? null,
+          })
+          .execute();
+      },
+    });
+  }
+
+  async feedbackStats(): Promise<FeedbackStats> {
+    const rows = await this.db.selectFrom('pipeline_feedback').selectAll().orderBy('created_at', 'desc').execute();
+    const group = <K extends string | null>(key: (r: (typeof rows)[number]) => K) => {
+      const m = new Map<K, typeof rows>();
+      for (const r of rows) m.set(key(r), [...(m.get(key(r)) ?? []), r]);
+      return [...m];
+    };
+    return {
+      total: rows.length,
+      verifiedTrue: rows.filter(r => r.outcome).length,
+      classificationAccepted: rows.filter(r => r.classification_accepted).length,
+      byPlaybook: group(r => r.playbook_id).map(([playbookId, rs]) => ({ playbookId, total: rs.length, verifiedTrue: rs.filter(r => r.outcome).length })),
+      byEngine: group(r => r.classification_engine).map(([engine, rs]) => ({ engine, total: rs.length, accepted: rs.filter(r => r.classification_accepted).length })),
+      recent: rows.slice(0, 20).map(r => ({ runId: r.run_id, taskKey: r.task_key, playbookId: r.playbook_id, outcome: r.outcome, note: r.note, createdAt: r.created_at.toISOString() })),
+    };
+  }
+
+  /** The only Jira write. The controller only calls this with an explicit confirmation from the user. */
+  async postJiraComment(runId: string, text: string): Promise<{ commentId: string }> {
+    const run = await this.getRun(runId);
+    if (!run) throw new TransitionConflict(runId, [], null);
+    if (!['awaiting_verify', 'verified_true', 'verified_false'].includes(run.state)) {
+      throw new TransitionConflict(runId, ['awaiting_verify', 'verified_true', 'verified_false'], run.state);
+    }
+    const client = this.tasks.jiraClient();
+    if (!client) throw new Error('Jira is not configured (JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN).');
+    if (!run.task.key) throw new Error('This task has no Jira key.');
+    const { id } = await client.addComment(run.task.key, text);
+    await this.patch(runId, { jira_comment_id: id });
+    await this.note(runId, 'user', 'jira_comment_posted', { commentId: id, chars: text.length });
+    return { commentId: id };
   }
 
   async rerun(runId: string) {

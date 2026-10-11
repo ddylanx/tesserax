@@ -1,10 +1,11 @@
 import {
   BadRequestException, Body, ConflictException, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query,
 } from '@nestjs/common';
-import { decisionSchema, type PipelineList, type PipelineRunDetail, type PlaybookDto, type RepoMap } from '@ot/contracts';
+import { decisionSchema, postCommentSchema, verifySchema, type FeedbackStats, type PipelineList, type PipelineRunDetail, type PlaybookDto, type RepoMap, type RunDiff } from '@ot/contracts';
 import { TasksService } from '@ot/mod-tasks';
 import { PipelineService } from './pipeline.service';
 import { PlaybookRegistry } from './playbooks';
+import { diffPatch } from './agent/git';
 import { checkRepoPath } from './repo-map';
 import { TransitionConflict } from './states';
 
@@ -108,6 +109,47 @@ export class PipelineController {
   async cancel(@Param('id', ParseUUIDPipe) id: string) {
     await guard(() => this.pipeline.cancel(id));
     return { ok: true };
+  }
+
+  @Post('runs/:id/verify')
+  @HttpCode(200)
+  async verify(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = verifySchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues);
+    await guard(() => this.pipeline.verify(id, parsed.data.outcome, parsed.data.note?.trim() || undefined));
+    return { ok: true };
+  }
+
+  @Get('runs/:id/diff')
+  async diff(@Param('id', ParseUUIDPipe) id: string): Promise<RunDiff> {
+    const run = await this.pipeline.getRun(id);
+    if (!run) throw new NotFoundException();
+    const base = (run.result as { base?: string | null } | null)?.base ?? null;
+    if (!run.worktreePath || !base) return { base, patch: '', truncated: false };
+    try {
+      return { base, ...(await diffPatch(run.worktreePath, base)) };
+    } catch (e) {
+      throw new BadRequestException(`Could not read the worktree diff: ${(e as Error).message}`);
+    }
+  }
+
+  /** Posts a comment on the Jira issue. Requires confirm: true, sent only by the confirmation dialog. */
+  @Post('runs/:id/jira-comment')
+  @HttpCode(200)
+  async jiraComment(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = postCommentSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Posting to Jira needs the comment text and an explicit confirmation.');
+    try {
+      return await guard(() => this.pipeline.postJiraComment(id, parsed.data.text));
+    } catch (e) {
+      if (e instanceof Error && !(e instanceof ConflictException) && !(e instanceof NotFoundException)) throw new BadRequestException(e.message);
+      throw e;
+    }
+  }
+
+  @Get('feedback')
+  feedback(): Promise<FeedbackStats> {
+    return this.pipeline.feedbackStats();
   }
 
   @Get('playbooks')

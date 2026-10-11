@@ -130,3 +130,18 @@ export type PlaybookDto = z.infer<typeof playbookSchema>;
 
 export const repoMapSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().min(1));
 export type RepoMap = z.infer<typeof repoMapSchema>;
+
+export const runDiffSchema = z.object({ base: z.string().nullable(), patch: z.string(), truncated: z.boolean() });
+export type RunDiff = z.infer<typeof runDiffSchema>;
+
+export const feedbackStatsSchema = z.object({
+  total: z.number(),
+  verifiedTrue: z.number(),
+  classificationAccepted: z.number(),
+  byPlaybook: z.array(z.object({ playbookId: z.string().nullable(), total: z.number(), verifiedTrue: z.number() })),
+  byEngine: z.array(z.object({ engine: z.string().nullable(), total: z.number(), accepted: z.number() })),
+  recent: z.array(
+    z.object({ runId: z.string(), taskKey: z.string().nullable(), playbookId: z.string().nullable(), outcome: z.boolean(), note: z.string().nullable(), createdAt: z.string() }),
+  ),
+});
+export type FeedbackStats = z.infer<typeof feedbackStatsSchema>;

@@ -12,6 +12,7 @@
     "@ot/core": "workspace:*",
     "@ot/mod-agents": "workspace:*",
     "@ot/mod-mcp": "workspace:*",
+    "@ot/mod-pipeline": "workspace:*",
     "@ot/mod-tasks": "workspace:*",
     "grammy": "^1.37.0"
   },

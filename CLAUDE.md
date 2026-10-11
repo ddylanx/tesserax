@@ -10,6 +10,9 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/core` WorkContext (AsyncLocalStorage correlationId), pino logger, `Queue` (pg-boss wrapper), `ScheduleRegistry`, Nest injection tokens.
 - `packages/db` Kysely client, schema types, migrations (`src/migrations`, registered in `migrations/index.ts`), seed.
 - `packages/modules/*` feature modules (`@ot/mod-*`), each a Nest module with `jobs/` for its pg-boss handlers.
+- `packages/modules/pipeline` the automation pipeline: state machine (`states.ts`, `PipelineService.transition`), step jobs in `jobs/`, classifiers in `classify/`, Claude CLI runner + worktrees in `agent/`.
+- `playbooks/*.md` playbook definitions (frontmatter + prompt template). `config/repos.json` (gitignored) maps Jira project → local repo.
+- `.data/` (gitignored) worktrees and run logs. `scripts/fake-jira.mjs`, `scripts/fake-claude.mjs`, `fixtures/` for testing without accounts.
 - `infra/compose.dev.yml` Postgres 16 (pgvector image) on 127.0.0.1:54329.
 
 ## Rules
@@ -19,6 +22,9 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - New table: add a migration file, register it, extend `Database` in `packages/db/src/schema.ts`. Migrations + seed run when the api boots.
 - New endpoint: define the response schema/type in `@ot/contracts` first, then use it in api and web.
 - Everything binds to 127.0.0.1; no auth in local mode. Never log or store secrets; `.env` is gitignored.
+- Pipeline state only changes through `PipelineService.transition` (guarded UPDATE + event). Steps start via `startStep` and run inside `runStep` (stale-job skip, retries, then failed).
+- Issue text is untrusted: keep it inside `<issue>` delimiters in every prompt. Never write to Jira except `postJiraComment`, which needs an explicit confirmed click.
+- Agent runs never push or merge (see `ALWAYS_DENIED` in `agent/launcher.ts`).
 - Logs: use `createLogger(scope)`; correlationId is added automatically inside a WorkContext (HTTP requests, jobs, bot updates).
 
 ## Commands

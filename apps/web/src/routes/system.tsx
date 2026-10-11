@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { SystemInfo } from '@ot/contracts';
+import type { FeedbackStats, SystemInfo } from '@ot/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { api } from '@/lib/api';
 
 export function SystemPage() {
   const q = useQuery({ queryKey: ['system'], queryFn: () => api<SystemInfo>('/api/system'), refetchInterval: 10_000 });
+  const fb = useQuery({ queryKey: ['pipeline', 'feedback'], queryFn: () => api<FeedbackStats>('/api/pipeline/feedback') });
   const s = q.data;
   return (
     <Page title="System" description="Health of the local backoffice, its schedules and integrations.">
@@ -58,6 +59,28 @@ export function SystemPage() {
               </ul>
             </CardContent>
           </Card>
+          {fb.data && (
+            <Card className="md:col-span-2">
+              <CardHeader><CardTitle>Pipeline feedback (your verifications)</CardTitle></CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                <div className="flex flex-wrap gap-2">
+                  <Badge>{fb.data.total} verified runs</Badge>
+                  <Badge variant="green">{fb.data.verifiedTrue} correct</Badge>
+                  <Badge variant="outline">classification kept as suggested: {fb.data.classificationAccepted}/{fb.data.total}</Badge>
+                </div>
+                {fb.data.byPlaybook.length > 0 && (
+                  <ul className="text-xs">
+                    {fb.data.byPlaybook.map(p => <li key={p.playbookId ?? '-'}>{p.playbookId ?? '(none)'}: {p.verifiedTrue}/{p.total} correct</li>)}
+                  </ul>
+                )}
+                {fb.data.byEngine.length > 0 && (
+                  <ul className="text-xs text-muted-foreground">
+                    {fb.data.byEngine.map(e => <li key={e.engine ?? '-'}>classifier {e.engine ?? '?'}: suggestion kept {e.accepted}/{e.total}</li>)}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
     </Page>

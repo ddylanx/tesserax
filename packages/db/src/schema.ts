@@ -149,7 +149,27 @@ export interface PipelineEventsTable {
   created_at: Generated<Date>;
 }
 
+export interface PipelineFeedbackTable {
+  id: Generated<string>;
+  run_id: string;
+  task_id: string;
+  task_key: string | null;
+  issue_type: string | null;
+  classification: Json | null;
+  classification_engine: string | null;
+  decision: Json | null;
+  playbook_id: string | null;
+  classification_accepted: boolean | null;
+  outcome: boolean;
+  note: string | null;
+  signal: string | null;
+  cost_usd: number | null;
+  files_changed: number | null;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
+  pipeline_feedback: PipelineFeedbackTable;
   pipeline_runs: PipelineRunsTable;
   pipeline_events: PipelineEventsTable;
   tasks: TasksTable;

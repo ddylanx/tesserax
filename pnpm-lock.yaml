@@ -306,6 +306,9 @@ importers:
       '@ot/mod-mcp':
         specifier: workspace:*
         version: link:../mcp
+      '@ot/mod-pipeline':
+        specifier: workspace:*
+        version: link:../pipeline
       '@ot/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
