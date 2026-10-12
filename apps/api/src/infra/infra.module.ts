@@ -1,6 +1,7 @@
 import { Global, Inject, Module, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import { loadConfig, type AppConfig } from '@ot/config';
 import { CONFIG, DB, QUEUE, SCHEDULES, Queue, ScheduleRegistry, createLogger } from '@ot/core';
+import { sql } from 'kysely';
 import { createDb, migrateToLatest, seed, type Db } from '@ot/db';
 
 const log = createLogger('infra');
@@ -18,6 +19,17 @@ const log = createLogger('infra');
       inject: [CONFIG],
       useFactory: async (config: AppConfig) => {
         const db = createDb(config.DATABASE_URL);
+        // Docker may still be starting Postgres (e.g. right after login): wait instead of crashing.
+        for (let i = 1; ; i++) {
+          try {
+            await sql`select 1`.execute(db);
+            break;
+          } catch (err) {
+            if (i >= 60) throw err;
+            if (i === 1 || i % 10 === 0) log.warn(`waiting for Postgres at ${new URL(config.DATABASE_URL).host} (${(err as Error).message})`);
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
         const { results } = await migrateToLatest(db);
         for (const r of results ?? []) log.info(`migration ${r.migrationName}: ${r.status}`);
         await seed(db);
