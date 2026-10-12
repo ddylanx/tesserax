@@ -51,7 +51,10 @@ Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you appr
 - **Skills**: `skills/<name>/SKILL.md` (Claude Code skill format): analyze-requirements, write-spec, implement-from-spec, code-review, project-conventions. Edit them to tune each stage; each node run records the skill's hash.
 - Loops have limits (`maxLoops`) and a fallback (`onLimit`), so a failing test does not loop forever.
 
-Coming next: the canvas editor for workflows and a Skills page (P1b), then ticket docs, Jira comment and Bitbucket PR nodes (P2).
+- **Workflow editor** (`/workflows`): a canvas like n8n/Dify. Add nodes from the palette, drag from a port (the dots on the right of a node) to another node to connect, click a node to edit its settings (a form generated from the node type: skill, prompt, inputs/output, tools, model, budget, commands...), click an edge to set a loop limit and where to go when it is reached. Problems (unreachable node, port connected twice, missing prompt...) are shown live and block saving. Saving writes `workflows/<id>.workflow.json`; runs already in progress keep the version they started with. "New workflow" copies the default.
+- **Skills page** (`/skills`): edit `SKILL.md` files, create new ones, and **try a skill on a ticket** (read-only, in the project's repo) to tune it before a workflow uses it.
+
+Coming next: ticket docs, Jira comment and Bitbucket PR nodes (P2).
 
 ## Automation pipeline (Inbox, older flow)
 

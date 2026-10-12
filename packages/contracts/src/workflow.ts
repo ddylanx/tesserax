@@ -228,3 +228,33 @@ export const evaluateActionSchema = z.object({
   note: z.string().max(4000).optional(),
 });
 export type EvaluateAction = z.infer<typeof evaluateActionSchema>;
+
+// ---------- editor support ----------
+
+/** JSON Schema (input side, defaults included) of each node type's config, for generated forms in the editor. */
+export function nodeConfigJsonSchema(type: NodeType): { properties?: Record<string, any>; required?: string[] } {
+  return z.toJSONSchema(nodeConfigSchemas[type], { io: 'input', unrepresentable: 'any' }) as never;
+}
+
+export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: string }> = {
+  'trigger.jira': { title: 'Jira trigger', description: 'Start: the ticket (description, comments, attachments) is the input.' },
+  'ai.step': { title: 'AI step', description: 'Read-only claude -p with a skill; writes one document.' },
+  'human.gate': { title: 'You review', description: 'Waits for you: edit, approve, send back with feedback, or reject.' },
+  'agent.run': { title: 'Agent run', description: 'Claude Code works in the ticket worktree and commits locally.' },
+  'check.command': { title: 'Checks', description: 'Runs shell commands in the worktree (tests, lint); pass or fail.' },
+  'ai.review': { title: 'AI review', description: 'Reviews the diff against the spec with skills; ends PASS or FAIL.' },
+  evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },
+};
+
+export const skillFileSchema = z.object({
+  content: z
+    .string()
+    .min(1)
+    .max(200_000)
+    .refine(s => /^---\r?\n[\s\S]*?^name:\s*\S+[\s\S]*?^description:\s*\S+[\s\S]*?\r?\n---/m.test(s), 'Needs frontmatter with name: and description:'),
+});
+
+export const trySkillSchema = z.object({
+  taskId: z.string().uuid(),
+  prompt: z.string().min(1).max(20_000).default('Apply the skill to this ticket.\n\n{{issue}}'),
+});

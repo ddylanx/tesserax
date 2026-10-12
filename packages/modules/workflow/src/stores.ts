@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
-import { join, normalize, relative } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname, join, normalize, relative } from 'node:path';
 import { findRepoRoot } from '@ot/config';
 import { validateWorkflow, workflowSchema, type WorkflowDefinition } from '@ot/contracts';
 
@@ -33,6 +33,10 @@ export class WorkflowStore {
     const text = readFileSync(file, 'utf8');
     const def = workflowSchema.parse(JSON.parse(text));
     return { def, hash: sha(text), problems: validateWorkflow(def) };
+  }
+
+  exists(id: string): boolean {
+    return existsSync(join(this.dir, `${id}.workflow.json`));
   }
 
   /** Validates, then writes the file (pretty JSON, atomic). */
@@ -74,6 +78,31 @@ export class SkillStore {
     const fm = m?.[1] ?? '';
     const field = (k: string) => fm.match(new RegExp(`^${k}:\\s*(.+)$`, 'm'))?.[1]?.trim() ?? '';
     return { path, name: field('name') || path, description: field('description'), body: (m?.[2] ?? text).trim(), hash: sha(text) };
+  }
+
+  /** skills/<name>/SKILL.md */
+  pathOf(name: string): string {
+    if (!/^[a-z0-9][a-z0-9-]*$/.test(name)) throw new Error('Skill names use lowercase letters, digits and dashes');
+    return `skills/${name}/SKILL.md`;
+  }
+
+  read(name: string): { path: string; content: string; hash: string } {
+    const path = this.pathOf(name);
+    const abs = this.resolve(path);
+    if (!existsSync(abs)) throw new Error(`Skill ${name} not found`);
+    const content = readFileSync(abs, 'utf8');
+    return { path, content, hash: sha(content) };
+  }
+
+  save(name: string, content: string, create = false): { path: string; hash: string } {
+    const path = this.pathOf(name);
+    const abs = this.resolve(path);
+    if (create && existsSync(abs)) throw new Error(`Skill ${name} already exists`);
+    if (!create && !existsSync(abs)) throw new Error(`Skill ${name} not found`);
+    mkdirSync(dirname(abs), { recursive: true });
+    writeFileSync(`${abs}.tmp`, content.endsWith('\n') ? content : `${content}\n`);
+    renameSync(`${abs}.tmp`, abs);
+    return { path, hash: sha(readFileSync(abs, 'utf8')) };
   }
 
   list(dir = 'skills'): Skill[] {

@@ -51,3 +51,19 @@ test('templates fill issue, artifacts and feedback; issue stays delimited', () =
   assert.equal(renderTemplate('{{feedback}}', { task, artifacts: {} }), '');
   assert.match(withSkills('do it', [{ name: 's', body: 'rules' }]), /# Skill: s[\s\S]*rules[\s\S]*# Task[\s\S]*do it/);
 });
+
+test('skill store creates, reads and saves skills; rejects bad names and paths', async () => {
+  const { mkdtempSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'ot-skills-'));
+  const store = new SkillStore(dir);
+  store.save('my-skill', '---\nname: my-skill\ndescription: d\n---\nBody', true);
+  assert.throws(() => store.save('my-skill', 'x', true), /already exists/);
+  assert.equal(store.get('skills/my-skill/SKILL.md').body, 'Body');
+  const h1 = store.read('my-skill').hash;
+  store.save('my-skill', '---\nname: my-skill\ndescription: d\n---\nBody 2');
+  assert.notEqual(store.read('my-skill').hash, h1);
+  assert.throws(() => store.pathOf('../etc'), /lowercase/);
+  assert.throws(() => store.get('../../etc/passwd'), /outside the repo/);
+  assert.deepEqual(store.list().map(s => s.name), ['my-skill']);
+});
