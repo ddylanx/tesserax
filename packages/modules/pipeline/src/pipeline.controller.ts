@@ -5,7 +5,7 @@ import { decisionSchema, postCommentSchema, verifySchema, type FeedbackStats, ty
 import { TasksService } from '@ot/mod-tasks';
 import { PipelineService } from './pipeline.service';
 import { PlaybookRegistry } from './playbooks';
-import { diffPatch } from './agent/git';
+import { diffPatch, resolveBaseRef } from './agent/git';
 import { checkRepoPath } from './repo-map';
 import { TransitionConflict } from './states';
 
@@ -72,7 +72,14 @@ export class PipelineController {
       throw new BadRequestException((e as Error).message);
     }
     if (d.repoPath && run.task.project) this.pipeline.repos.set(run.task.project, repoPath);
-    await guard(() => this.pipeline.decide(id, d, repoPath!, branchFor(run.task.key, id)));
+    const configuredBase = this.pipeline.repos.entry(run.task.project)?.path === repoPath ? this.pipeline.repos.entry(run.task.project)?.base : undefined;
+    let baseRef: string;
+    try {
+      baseRef = await resolveBaseRef(repoPath, configuredBase);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    await guard(() => this.pipeline.decide(id, { ...d, baseRef }, repoPath!, branchFor(run.task.key, id)));
     return { ok: true };
   }
 

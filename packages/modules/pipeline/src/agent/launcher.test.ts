@@ -36,11 +36,34 @@ test('worktree is created on its own branch, reused on re-run, and the main chec
   assert.equal(g(wt.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'ot/T-1');
   writeFileSync(join(wt.path, 'a.txt'), 'a\nb\n');
   writeFileSync(join(wt.path, 'new.txt'), 'n\n');
-  const d = await diffInfo(wt.path, repo);
+  const d = await diffInfo(wt.path, 'main');
   assert.equal(d.insertions, 1);
   assert.deepEqual(d.untracked, ['new.txt']);
   assert.equal(d.files, 2);
   assert.equal((await ensureWorktree(repo, 'ot/T-1', join(root, 'data'))).created, false);
   assert.equal(g(repo, 'status', '--porcelain'), '');
   assert.equal(g(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
+});
+
+test('new issue branches start from the default branch, not the main checkout\'s current branch', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'ot-base-'));
+  const repo = join(root, 'repo');
+  const g = (cwd: string, ...a: string[]) => execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', ...a], { cwd, encoding: 'utf8' });
+  execFileSync('mkdir', ['-p', repo]);
+  g(repo, 'init', '-q', '-b', 'develop');
+  writeFileSync(join(repo, 'a.txt'), 'a\n');
+  g(repo, 'add', '-A');
+  g(repo, 'commit', '-qm', 'init');
+  const developSha = g(repo, 'rev-parse', 'HEAD').trim();
+  g(repo, 'switch', '-qc', 'bugfix/someone-else');
+  writeFileSync(join(repo, 'b.txt'), 'b\n');
+  g(repo, 'add', '-A');
+  g(repo, 'commit', '-qm', 'wip');
+  const { resolveBaseRef } = await import('./git');
+  assert.equal(await resolveBaseRef(repo, 'develop'), 'develop');
+  await assert.rejects(resolveBaseRef(repo, 'nope'), /not found/);
+  const wt = await ensureWorktree(repo, 'ot/T-2', join(root, 'data'), 'develop');
+  assert.equal(g(wt.path, 'rev-parse', 'HEAD').trim(), developSha);
+  assert.equal((await diffInfo(wt.path, 'develop')).files, 0);
+  assert.equal(g(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'bugfix/someone-else');
 });

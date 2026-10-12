@@ -4,7 +4,7 @@ import { dataDir, type AppConfig } from '@ot/config';
 import type { DecisionInput } from '@ot/contracts';
 import type { JobMeta } from '@ot/core';
 import type { TasksService } from '@ot/mod-tasks';
-import { ensureWorktree } from '../agent/git';
+import { ensureWorktree, fetchBase } from '../agent/git';
 import { launchDetached } from '../agent/launcher';
 import type { PipelineService } from '../pipeline.service';
 import { renderPlaybook, type PlaybookRegistry } from '../playbooks';
@@ -37,9 +37,11 @@ export async function runPlaybookJob(
       await deps.pipeline.patch(run.id, { agent_session_id: sessionId, run_dir: runDir });
     }
 
-    const { path: worktree, created } = await ensureWorktree(run.repo_path, run.branch, dataDir(deps.config));
+    const decisionBase = ((run.decision ?? {}) as Partial<DecisionInput>).baseRef ?? 'HEAD';
+    const fetched = await fetchBase(run.repo_path, decisionBase);
+    const { path: worktree, created } = await ensureWorktree(run.repo_path, run.branch, dataDir(deps.config), decisionBase);
     await deps.pipeline.patch(run.id, { worktree_path: worktree });
-    await deps.pipeline.note(run.id, 'job', created ? 'worktree_created' : 'worktree_reused', { worktree, branch: run.branch });
+    await deps.pipeline.note(run.id, 'job', created ? 'worktree_created' : 'worktree_reused', { worktree, branch: run.branch, base: decisionBase, fetched });
 
     const task = await deps.tasks.getTask(run.task_id);
     if (!task) throw new Error('Task no longer exists');

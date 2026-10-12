@@ -1,4 +1,4 @@
 {
   "PAY": "/Users/you/code/payments",
-  "WEB": "/Users/you/code/web-app"
+  "WEB": { "path": "/Users/you/code/web-app", "base": "develop" }
 }

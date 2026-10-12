@@ -19,10 +19,47 @@ export function checkBranch(name: string): string {
 }
 
 /**
- * The worktree for `branch` of `repoPath`, created under <dataDir>/worktrees when missing.
- * Reuses an existing worktree or branch (re-runs); never touches the main checkout's files or branch.
+ * Where new issue branches start: the configured base (e.g. "develop" -> origin/develop when it exists),
+ * else the remote's default branch (origin/HEAD), else the main checkout's HEAD.
+ * Never the main checkout's current branch when a default is known: that is often someone's feature branch.
  */
-export async function ensureWorktree(repoPath: string, branch: string, dataDir: string): Promise<{ path: string; created: boolean }> {
+export async function resolveBaseRef(repoPath: string, configured?: string | null): Promise<string> {
+  const exists = (ref: string) => git(repoPath, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]).then(() => true, () => false);
+  if (configured) {
+    if (!configured.startsWith('origin/') && (await exists(`origin/${configured}`))) return `origin/${configured}`;
+    if (await exists(configured)) return configured;
+    throw new Error(`Base branch "${configured}" not found in ${repoPath}`);
+  }
+  const head = (await git(repoPath, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD']).catch(() => '')).trim();
+  if (head && (await exists(head))) return head;
+  for (const b of ['origin/develop', 'origin/main', 'origin/master']) if (await exists(b)) return b;
+  return 'HEAD';
+}
+
+/** Best effort: refresh the base branch from the remote (read-only, 30 s, never prompts). */
+export async function fetchBase(repoPath: string, baseRef: string): Promise<boolean> {
+  const m = baseRef.match(/^origin\/(.+)$/);
+  if (!m) return false;
+  try {
+    await execFileTimeout('git', ['fetch', '--quiet', 'origin', m[1]!], repoPath, 30_000);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function execFileTimeout(cmd: string, args: string[], cwd: string, timeout: number) {
+  return exec(cmd, args, {
+    cwd, timeout,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=10' },
+  });
+}
+
+/**
+ * The worktree for `branch` of `repoPath`, created under <dataDir>/worktrees when missing (new branches start at
+ * `baseRef`). Reuses an existing worktree or branch (re-runs); never touches the main checkout's files or branch.
+ */
+export async function ensureWorktree(repoPath: string, branch: string, dataDir: string, baseRef = 'HEAD'): Promise<{ path: string; created: boolean }> {
   checkBranch(branch);
   const list = await git(repoPath, ['worktree', 'list', '--porcelain']);
   for (const block of list.split('\n\n')) {
@@ -35,7 +72,7 @@ export async function ensureWorktree(repoPath: string, branch: string, dataDir: 
   const path = join(dataDir, 'worktrees', repoId, branch.replace(/\//g, '__'));
   mkdirSync(join(dataDir, 'worktrees', repoId), { recursive: true });
   const exists = await git(repoPath, ['rev-parse', '--verify', '--quiet', `refs/heads/${branch}`]).then(() => true, () => false);
-  await git(repoPath, exists ? ['worktree', 'add', path, branch] : ['worktree', 'add', '-b', branch, path, 'HEAD']);
+  await git(repoPath, exists ? ['worktree', 'add', path, branch] : ['worktree', 'add', '--no-track', '-b', branch, path, baseRef]);
   return { path, created: true };
 }
 
@@ -49,10 +86,10 @@ export interface DiffInfo {
   commits: string[];
 }
 
-/** Changes in the worktree relative to where the branch left the main checkout's HEAD (committed + uncommitted). */
-export async function diffInfo(worktree: string, repoPath: string): Promise<DiffInfo> {
-  const mainHead = (await git(repoPath, ['rev-parse', 'HEAD'])).trim();
-  const base = (await git(worktree, ['merge-base', 'HEAD', mainHead]).catch(() => mainHead)).trim();
+/** Changes in the worktree since it left `baseRef` (committed + uncommitted + new files). */
+export async function diffInfo(worktree: string, baseRef: string): Promise<DiffInfo> {
+  const baseSha = (await git(worktree, ['rev-parse', `${baseRef}^{commit}`])).trim();
+  const base = (await git(worktree, ['merge-base', 'HEAD', baseSha]).catch(() => baseSha)).trim();
   const short = await git(worktree, ['diff', '--shortstat', base]);
   const n = (re: RegExp) => Number(short.match(re)?.[1] ?? 0);
   const stat = (await git(worktree, ['diff', '--stat=120', base])).trim();

@@ -33,6 +33,8 @@ export const decisionSchema = z.object({
   playbookId: z.string().min(1),
   repoPath: z.string().min(1).optional(),
   note: z.string().max(2000).optional(),
+  /** Set by the server: where ot/<KEY> branches from. */
+  baseRef: z.string().optional(),
 });
 export type DecisionInput = z.infer<typeof decisionSchema>;
 
@@ -104,6 +106,8 @@ export const pipelineRunDetailSchema = pipelineRunSchema.extend({
   events: z.array(pipelineEventSchema),
   /** Repo path the project maps to (config/repos.json), if any. */
   mappedRepo: z.string().nullable(),
+  /** Branch new issue branches start from (configured, else the repo's origin/HEAD). */
+  baseRef: z.string().nullable(),
   agentSession: z
     .object({ status: z.string(), lastEvent: z.string().nullable(), lastEventAt: z.string(), lastTool: z.string().nullable() })
     .nullable(),
@@ -128,7 +132,9 @@ export const playbookSchema = z.object({
 });
 export type PlaybookDto = z.infer<typeof playbookSchema>;
 
-export const repoMapSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), z.string().min(1));
+/** Jira project key -> repo path, or { path, base } where base is the branch new issue branches start from. */
+export const repoEntrySchema = z.union([z.string().min(1), z.object({ path: z.string().min(1), base: z.string().min(1).optional() })]);
+export const repoMapSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), repoEntrySchema);
 export type RepoMap = z.infer<typeof repoMapSchema>;
 
 export const runDiffSchema = z.object({ base: z.string().nullable(), patch: z.string(), truncated: z.boolean() });

@@ -7,6 +7,7 @@ import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Database, Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
 import type { Transaction } from 'kysely';
 import { TasksService } from '@ot/mod-tasks';
+import { resolveBaseRef } from './agent/git';
 import { isAlive, stopProcess } from './agent/launcher';
 import { RepoMapStore } from './repo-map';
 import { STATE_GROUPS, STEPS, STEP_RETRY, TransitionConflict, canTransition, type StepJobData, type StepName } from './states';
@@ -281,10 +282,14 @@ export class PipelineService {
           .where('session_id', '=', run.agentSessionId)
           .executeTakeFirst()
       : undefined;
+    const entry = this.repos.entry(task?.project ?? null);
+    const decided = (run.decision as { baseRef?: string } | null)?.baseRef;
+    const baseRef = decided ?? (entry ? await resolveBaseRef(entry.path, entry.base).catch(() => null) : null);
     return {
       ...run,
       task: task!,
-      mappedRepo: this.repos.forProject(task?.project ?? null),
+      mappedRepo: entry?.path ?? null,
+      baseRef,
       events: events.map(
         (e): PipelineEventDto => ({
           id: String(e.id), fromState: e.from_state, toState: e.to_state, actor: e.actor, action: e.action,

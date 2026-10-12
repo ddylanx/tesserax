@@ -35,7 +35,8 @@ export async function runFinalizeJob(deps: { pipeline: PipelineService }, data: 
   await deps.pipeline.runStep('finalize', ['running_playbook'], data, meta, async run => {
     const outcome = readOutcome(run.run_dir!, run.process_id, Boolean(data.timedOut));
     if (!outcome.finished) throw new Error('Agent still running'); // retried later
-    const diff = run.worktree_path && run.repo_path ? await diffInfo(run.worktree_path, run.repo_path).catch(() => null) : null;
+    const baseRef = ((run.decision ?? {}) as { baseRef?: string }).baseRef ?? 'HEAD';
+    const diff = run.worktree_path ? await diffInfo(run.worktree_path, baseRef).catch(() => null) : null;
     const r = outcome.result;
     const result: RunResult = {
       exitCode: outcome.exitCode,

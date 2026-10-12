@@ -264,7 +264,8 @@ function DecisionPanel({ run }: { run: PipelineRunDetail }) {
         </label>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Accepting creates a git worktree on branch <code>ot/{run.task.key}</code> and runs Claude Code there headless. Nothing is pushed or merged.
+        Accepting creates a git worktree on a new branch <code>ot/{run.task.key}</code>{run.baseRef ? <> from <code>{run.baseRef}</code></> : null} (your
+        own checkouts are not touched) and runs Claude Code there headless. Nothing is pushed or merged.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button disabled={!d.playbookId || (needsRepo && !repo) || action.isPending}
