@@ -16,7 +16,8 @@
     "hooks:print": "node scripts/claude-hooks.mjs print",
     "hooks:install": "node scripts/claude-hooks.mjs install",
     "hooks:uninstall": "node scripts/claude-hooks.mjs uninstall",
-    "fake-jira": "node scripts/fake-jira.mjs"
+    "fake-jira": "node scripts/fake-jira.mjs",
+    "jira:check": "node scripts/jira-check.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.15.0",
