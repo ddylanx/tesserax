@@ -1,5 +1,6 @@
 export * from './pipeline.module';
 export * from './pipeline.service';
+export * from './classify/classification.service';
 export * from './playbooks';
 export * from './states';
 export * from './repo-map';

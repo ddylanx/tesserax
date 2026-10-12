@@ -8,6 +8,10 @@ const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g
 
 export const nodeConfigSchemas = {
   'trigger.jira': z.object({}).default({}),
+  'ai.classify': z.object({
+    model: z.string().optional(),
+    timeoutSeconds: z.number().int().positive().default(180),
+  }),
   'ai.step': z.object({
     skill: z.string().optional(),
     prompt: z.string().min(1),
@@ -95,6 +99,7 @@ export const NODE_TYPES = Object.keys(nodeConfigSchemas) as NodeType[];
 
 export const NODE_PORTS: Record<NodeType, readonly string[]> = {
   'trigger.jira': ['next'],
+  'ai.classify': ['next'],
   'ai.step': ['next'],
   'human.gate': ['approved', 'changes', 'rejected'],
   'agent.run': ['done', 'failed'],
@@ -112,6 +117,39 @@ export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'git.pr'
 /** Node types that wait for the user instead of running. */
 export const HUMAN_NODE_TYPES: readonly NodeType[] = ['human.gate', 'evaluate'];
 
+// ---------- conditions (skip rules, routing) ----------
+
+export const CONDITION_FIELDS = [
+  'classification.type', 'classification.automation', 'issue.type', 'issue.project', 'issue.priority', 'issue.status', 'issue.labels', 'issue.components',
+] as const;
+export const conditionSchema = z.object({
+  field: z.enum(CONDITION_FIELDS),
+  op: z.enum(['in', 'not_in']),
+  values: z.array(z.string().min(1)).min(1),
+});
+export type Condition = z.infer<typeof conditionSchema>;
+
+export interface ConditionContext {
+  issue: { type?: string | null; project?: string | null; priority?: string | null; status?: string | null; labels?: string[]; components?: string[] };
+  classification?: { type?: string; automation?: string } | null;
+}
+
+/** All conditions must hold. Case-insensitive; list fields (labels, components) match when any element is in the values. */
+export function conditionsMatch(conds: Condition[] | undefined, ctx: ConditionContext): boolean {
+  if (!conds?.length) return false;
+  return conds.every(c => {
+    const [scope, key] = c.field.split('.') as ['issue' | 'classification', string];
+    const raw = (scope === 'issue' ? ctx.issue : ctx.classification ?? {}) as Record<string, unknown>;
+    const v = raw?.[key];
+    const have = (Array.isArray(v) ? v : v == null || v === '' ? [] : [v]).map(x => String(x).toLowerCase());
+    const values = c.values.map(x => x.toLowerCase());
+    const hit = have.some(x => values.includes(x));
+    return c.op === 'in' ? hit : !hit;
+  });
+}
+
+export const describeCondition = (c: Condition) => `${c.field} ${c.op === 'in' ? 'is' : 'is not'} ${c.values.join(' / ')}`;
+
 // ---------- workflow file ----------
 
 export const workflowNodeSchema = z.object({
@@ -120,6 +158,9 @@ export const workflowNodeSchema = z.object({
   label: z.string().min(1),
   position: z.object({ x: z.number(), y: z.number() }).default({ x: 0, y: 0 }),
   config: z.record(z.string(), z.unknown()).default({}),
+  /** Skip this node when all these conditions hold; the run continues through skipPort (default: the node's first port). */
+  skipIf: z.array(conditionSchema).optional(),
+  skipPort: z.string().optional(),
 });
 export type WorkflowNode = z.infer<typeof workflowNodeSchema>;
 
@@ -151,6 +192,8 @@ export function validateWorkflow(w: WorkflowDefinition): string[] {
   for (const n of w.nodes) {
     if (ids.has(n.id)) problems.push(`Duplicate node id "${n.id}"`);
     ids.add(n.id);
+    if (n.skipPort && !NODE_PORTS[n.type].includes(n.skipPort)) problems.push(`Node "${n.label}": skip port "${n.skipPort}" does not exist`);
+    if (n.skipIf?.length && n.type === 'trigger.jira') problems.push('The trigger cannot be skipped');
     const cfg = nodeConfigSchemas[n.type].safeParse(n.config);
     if (!cfg.success) problems.push(`Node "${n.label}": ${cfg.error.issues.map(i => `${i.path.join('.') || 'config'} ${i.message}`).join('; ')}`);
   }
@@ -182,6 +225,19 @@ export function validateWorkflow(w: WorkflowDefinition): string[] {
   return problems;
 }
 
+// ---------- routing: which workflow a ticket starts ----------
+
+export const routingSchema = z.object({
+  default: z.string().default('default'),
+  rules: z.array(z.object({ name: z.string().default(''), when: z.array(conditionSchema).min(1), workflow: z.string() })).default([]),
+});
+export type WorkflowRouting = z.infer<typeof routingSchema>;
+
+/** First matching rule wins (issue fields only: classification is not known yet when a run starts). */
+export function routeWorkflow(r: WorkflowRouting, issue: ConditionContext['issue']): string {
+  return r.rules.find(rule => conditionsMatch(rule.when, { issue }))?.workflow ?? r.default;
+}
+
 // ---------- runs ----------
 
 export const workflowRunStatusSchema = z.enum(['running', 'waiting', 'failed', 'done', 'cancelled']);
@@ -202,6 +258,7 @@ export const workflowRunSchema = z.object({
   worktreePath: z.string().nullable(),
   error: z.string().nullable(),
   costUsd: z.number(),
+  vars: z.record(z.string(), z.unknown()),
   createdAt: z.string(),
   updatedAt: z.string(),
   finishedAt: z.string().nullable(),
@@ -293,6 +350,7 @@ export function nodeConfigJsonSchema(type: NodeType): { properties?: Record<stri
 
 export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: string }> = {
   'trigger.jira': { title: 'Jira trigger', description: 'Start: the ticket (description, comments, attachments) is the input.' },
+  'ai.classify': { title: 'Classify', description: 'AI (rules as fallback) labels the ticket: bug, feature, chore, research or question; later nodes can be skipped by type.' },
   'ai.step': { title: 'AI step', description: 'Read-only claude -p with a skill; writes one document.' },
   'human.gate': { title: 'You review', description: 'Waits for you: edit, approve, send back with feedback, or reject.' },
   'agent.run': { title: 'Agent run', description: 'Claude Code works in the ticket worktree and commits locally.' },

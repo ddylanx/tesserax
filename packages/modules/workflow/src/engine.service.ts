@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { dataDir, type AppConfig } from '@ot/config';
 import {
-  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES,
+  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
   type ArtifactDto, type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@ot/contracts';
@@ -11,7 +11,7 @@ import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from 
 import { RepoMapStore, diffInfo, ensureWorktree, fetchBase, isAlive, resolveBaseRef, stopProcess } from '@ot/mod-pipeline';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
 import { TasksService } from '@ot/mod-tasks';
-import { WorkflowStore } from './stores';
+import { RoutingStore, WorkflowStore } from './stores';
 
 const log = createLogger('workflow');
 const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
@@ -28,6 +28,7 @@ export type RunListener = (run: WorkflowRunDto, event: 'waiting' | 'failed' | 'd
 @Injectable()
 export class WorkflowEngine {
   readonly workflows = new WorkflowStore();
+  readonly routing = new RoutingStore();
   readonly repos = new RepoMapStore();
   private listeners: RunListener[] = [];
 
@@ -76,11 +77,13 @@ export class WorkflowEngine {
   // ---------- lifecycle ----------
 
   /** Starts a run of a workflow for a task. Returns the existing active run if the task already has one. */
-  async startRun(taskId: string, trigger: 'new_issue' | 'manual', workflowId = 'default'): Promise<{ runId: string; created: boolean }> {
-    const { def, hash, problems } = this.workflows.load(workflowId);
-    if (problems.length) throw new Error(`Workflow ${workflowId} is invalid: ${problems.join('; ')}`);
+  /** Starts a run; without a workflow id the routing rules (workflows/routing.json) pick one. */
+  async startRun(taskId: string, trigger: 'new_issue' | 'manual', requested?: string): Promise<{ runId: string; created: boolean; workflowId: string }> {
     const task = await this.tasks.getTask(taskId);
     if (!task) throw new Error('Task not found');
+    const workflowId = requested || routeWorkflow(this.routing.read(), task);
+    const { def, hash, problems } = this.workflows.load(workflowId);
+    if (problems.length) throw new Error(`Workflow ${workflowId} is invalid: ${problems.join('; ')}`);
     const triggerNode = def.nodes.find(n => n.type === 'trigger.jira')!;
     const inserted = await this.db
       .insertInto('workflow_runs')
@@ -96,17 +99,24 @@ export class WorkflowEngine {
       });
     if (!inserted) {
       const existing = await this.db.selectFrom('workflow_runs').select('id').where('task_id', '=', taskId).where('status', 'in', [...ACTIVE]).executeTakeFirstOrThrow();
-      return { runId: existing.id, created: false };
+      return { runId: existing.id, created: false, workflowId };
     }
     await this.event(inserted.id, trigger === 'manual' ? 'user' : 'system', 'run_started', { workflow: def.id, hash });
     await this.enqueue(inserted.id, triggerNode.id, null, {});
-    return { runId: inserted.id, created: true };
+    return { runId: inserted.id, created: true, workflowId };
   }
 
   /** Creates the next node run. Human nodes wait for the user; others are queued as pg-boss jobs. */
   async enqueue(runId: string, nodeId: string, viaEdge: string | null, input: Record<string, unknown>): Promise<NodeRun> {
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
     const node = this.node(run, nodeId);
+    if (node.skipIf?.length) {
+      const task = await this.tasks.getTask(run.task_id);
+      const vars = (run.vars ?? {}) as { classification?: { type?: string; automation?: string } };
+      if (task && conditionsMatch(node.skipIf, { issue: task, classification: vars.classification ?? null })) {
+        return this.skip(run.id, node.id, node.skipPort ?? NODE_PORTS[node.type][0]!, viaEdge, node.skipIf.map(describeCondition).join(' and '));
+      }
+    }
     const human = HUMAN_NODE_TYPES.includes(node.type);
     const nodeRun = await this.db.transaction().execute(async trx => {
       const agg = await trx
@@ -135,6 +145,28 @@ export class WorkflowEngine {
     return nodeRun;
   }
 
+  /** Records a skipped node (done, no work) and moves on through `port`. */
+  private async skip(runId: string, nodeId: string, port: string, viaEdge: string | null, reason: string): Promise<NodeRun> {
+    const nr = await this.db.transaction().execute(async trx => {
+      const agg = await trx
+        .selectFrom('node_runs')
+        .select([sql<number>`coalesce(max(seq), 0)::int`.as('seq'), sql<number>`count(*) filter (where node_id = ${nodeId})::int`.as('n')])
+        .where('run_id', '=', runId)
+        .executeTakeFirstOrThrow();
+      return trx
+        .insertInto('node_runs')
+        .values({
+          run_id: runId, seq: agg.seq + 1, node_id: nodeId, node_type: this.node(await trx.selectFrom('workflow_runs').select('workflow_snapshot').where('id', '=', runId).executeTakeFirstOrThrow(), nodeId).type,
+          attempt: agg.n + 1, via_edge: viaEdge, status: 'done', port, output: JSON.stringify({ skipped: true, reason }), started_at: new Date(), ended_at: new Date(),
+        })
+        .returningAll()
+        .executeTakeFirstOrThrow();
+    });
+    await this.event(runId, 'system', 'node_skipped', { node: nodeId, port, reason }, nr.id);
+    await this.route(runId, nodeId, port, {});
+    return nr;
+  }
+
   /** Finishes a node run through `port` and moves the run along the matching edge (loop limits applied). */
   async complete(nodeRunId: string, port: string, output: Record<string, unknown>, actor: 'job' | 'user', from: string[] = ['running', 'waiting']) {
     const nr = await this.db
@@ -148,11 +180,15 @@ export class WorkflowEngine {
       .returningAll()
       .executeTakeFirst();
     if (!nr) throw new RunConflict('This step is no longer active (it finished or was cancelled). Refresh the page.');
-    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', nr.run_id).executeTakeFirstOrThrow();
-    await this.event(run.id, actor, 'node_done', { node: nr.node_id, port }, nr.id);
-    if (run.status === 'cancelled') return;
+    await this.event(nr.run_id, actor, 'node_done', { node: nr.node_id, port }, nr.id);
+    await this.route(nr.run_id, nr.node_id, port, output);
+  }
 
-    const edge = this.graph(run).edges.find(e => e.source === nr.node_id && e.port === port);
+  /** Follows the edge leaving `nodeId` through `port`: next node, loop fallback, or the end of the run. */
+  private async route(runId: string, nodeId: string, port: string, output: Record<string, unknown>) {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    if (run.status === 'cancelled') return;
+    const edge = this.graph(run).edges.find(e => e.source === nodeId && e.port === port);
     if (!edge) return this.finish(run.id, port === 'rejected' ? 'rejected' : 'completed');
     const next = await this.followEdge(run.id, edge);
     if (!next) return;
@@ -464,6 +500,7 @@ export class WorkflowEngine {
       currentNodeLabel: def.nodes.find(n => n.id === r.current_node_id)?.label ?? null,
       repoPath: r.repo_path, baseRef: r.base_ref, branch: r.branch, worktreePath: r.worktree_path, error: r.error,
       costUsd: Number(r.cost ?? 0),
+      vars: (r.vars ?? {}) as Record<string, unknown>,
       createdAt: iso(r.created_at)!, updatedAt: iso(r.updated_at)!, finishedAt: iso(r.finished_at),
     };
   }

@@ -8,6 +8,7 @@ import '@xyflow/react/dist/style.css';
 import { AlertTriangle, Plus, Save, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { validateWorkflow, type NodeType, type WorkflowDefinition, type WorkflowEdge, type WorkflowNode } from '@ot/contracts';
+import { ConditionEditor } from '@/components/conditions';
 import { QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -34,7 +35,7 @@ interface JsonProp {
 interface SkillInfo { path: string; name: string; description: string }
 
 const TYPE_COLOR: Record<string, string> = {
-  'trigger.jira': 'border-slate-400', 'ai.step': 'border-violet-500', 'human.gate': 'border-amber-500', 'agent.run': 'border-sky-500',
+  'trigger.jira': 'border-slate-400', 'ai.classify': 'border-slate-500', 'doc.write': 'border-teal-500', 'jira.comment': 'border-blue-500', 'git.pr': 'border-orange-500', 'ai.step': 'border-violet-500', 'human.gate': 'border-amber-500', 'agent.run': 'border-sky-500',
   'check.command': 'border-emerald-500', 'ai.review': 'border-fuchsia-500', evaluate: 'border-rose-500',
 };
 
@@ -47,6 +48,7 @@ function EditorNode({ data, selected }: NodeProps<Node<EditorData>>) {
       {data.node.type !== 'trigger.jira' && <Handle type="target" position={Position.Left} className="!size-3 !bg-muted-foreground" />}
       <div className="text-[10px] tracking-wide text-muted-foreground uppercase">{data.info?.title ?? data.node.type}</div>
       <div className="text-sm leading-tight font-medium">{data.node.label}</div>
+      {!!data.node.skipIf?.length && <div className="mt-0.5 text-[10px] text-amber-600">skippable</div>}
       <div className="mt-1 flex flex-col items-end gap-1">
         {ports.map(p => (
           <div key={p} className="relative pr-2 text-[10px] text-muted-foreground">
@@ -371,6 +373,20 @@ function NodeForm({ node, info, skills, onChange, onDelete }: {
             </label>
           );
         })}
+        {node.type !== 'trigger.jira' && (
+          <div className="flex flex-col gap-1.5 rounded-md border p-2">
+            <div className="text-xs font-medium">Skip this node when (all hold)</div>
+            <ConditionEditor value={node.skipIf ?? []} onChange={v => onChange({ skipIf: v.length ? v : undefined })} />
+            {!!node.skipIf?.length && (
+              <label className="flex items-center gap-1.5 text-xs">and continue through
+                <select className="h-7 rounded border bg-card px-1" value={node.skipPort ?? info?.ports[0] ?? ''} onChange={e => onChange({ skipPort: e.target.value })}>
+                  {(info?.ports ?? []).map(p => <option key={p}>{p}</option>)}
+                </select>
+              </label>
+            )}
+            <p className="text-[11px] text-muted-foreground">AI type needs a “Classify” node earlier in the workflow.</p>
+          </div>
+        )}
         {onDelete && <Button size="sm" variant="ghost" onClick={onDelete}><Trash2 className="size-3.5" />Delete node</Button>}
       </CardContent>
     </Card>

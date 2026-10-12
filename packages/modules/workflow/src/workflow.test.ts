@@ -72,3 +72,23 @@ test('skill store creates, reads and saves skills; rejects bad names and paths',
   assert.throws(() => store.get('../../etc/passwd'), /outside the repo/);
   assert.deepEqual(store.list().map(s => s.name), ['my-skill']);
 });
+
+test('conditions: case-insensitive, list fields, not_in; routing picks the first matching rule', async () => {
+  const { conditionsMatch, routeWorkflow } = await import('@ot/contracts');
+  const issue = { type: 'Bug', project: 'TC', labels: ['Frontend', 'p1'] };
+  assert.ok(conditionsMatch([{ field: 'issue.type', op: 'in', values: ['bug'] }], { issue }));
+  assert.ok(conditionsMatch([{ field: 'issue.labels', op: 'in', values: ['frontend'] }], { issue }));
+  assert.ok(conditionsMatch([{ field: 'issue.project', op: 'not_in', values: ['SHOP'] }], { issue }));
+  assert.ok(!conditionsMatch([{ field: 'classification.type', op: 'in', values: ['question'] }], { issue, classification: null }));
+  assert.ok(conditionsMatch([{ field: 'classification.type', op: 'in', values: ['question'] }], { issue, classification: { type: 'question' } }));
+  assert.ok(!conditionsMatch([], { issue }), 'no conditions never skips');
+  const r = { default: 'default', rules: [{ name: 'shop', when: [{ field: 'issue.project' as const, op: 'in' as const, values: ['SHOP'] }], workflow: 'shop' }] };
+  assert.equal(routeWorkflow(r, { project: 'SHOP' }), 'shop');
+  assert.equal(routeWorkflow(r, { project: 'TC' }), 'default');
+});
+
+test('skip ports are validated', () => {
+  const w = base();
+  w.nodes[1] = { ...w.nodes[1]!, skipIf: [{ field: 'issue.type', op: 'in', values: ['x'] }], skipPort: 'pass' };
+  assert.match(validateWorkflow(w).join(), /skip port "pass" does not exist/);
+});

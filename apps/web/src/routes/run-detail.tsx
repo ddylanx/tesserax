@@ -20,11 +20,12 @@ const NODE_STATE: Record<string, string> = {
   waiting: 'border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/40',
   failed: 'border-red-500 bg-red-500/10',
   cancelled: 'border-border bg-muted opacity-60',
+  skipped: 'border-dashed border-muted-foreground/50 bg-transparent opacity-60',
   idle: 'border-border bg-card',
 };
 
 const TYPE_LABEL: Record<string, string> = {
-  'trigger.jira': 'Trigger', 'ai.step': 'AI step', 'human.gate': 'You review', 'agent.run': 'Agent', 'check.command': 'Checks',
+  'trigger.jira': 'Trigger', 'ai.classify': 'Classify', 'ai.step': 'AI step', 'human.gate': 'You review', 'agent.run': 'Agent', 'check.command': 'Checks',
   'ai.review': 'AI review', evaluate: 'Score', 'doc.write': 'Ticket doc', 'jira.comment': 'Jira comment', 'git.pr': 'Pull request',
 };
 
@@ -79,7 +80,7 @@ export function RunDetailPage() {
       nodes: r.workflow.nodes.map(
         (n): Node<FlowData> => ({
           id: n.id, type: 'step', position: n.position,
-          data: { label: n.label, type: n.type, state: latest.get(n.id)?.status ?? 'idle', runs: count.get(n.id) ?? 0, selected: n.id === selected },
+          data: { label: n.label, type: n.type, state: latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle', runs: count.get(n.id) ?? 0, selected: n.id === selected },
         }),
       ),
       edges: r.workflow.edges.map(
@@ -111,6 +112,9 @@ export function RunDetailPage() {
           </div>
           <div className="truncate text-sm">{r.task.title}</div>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
+            {typeof (r.vars.classification as { type?: string } | undefined)?.type === 'string' && (
+              <span>type: <b>{(r.vars.classification as { type: string }).type}</b></span>
+            )}
             {r.branch && <span className="inline-flex items-center gap-1"><GitBranch className="size-3" />{r.branch}{r.baseRef ? ` from ${r.baseRef}` : ''}</span>}
             {r.worktreePath && <span title={r.worktreePath}>worktree: <code>{r.worktreePath.split('/').slice(-2).join('/')}</code></span>}
             {!r.mappedRepo && <span className="text-amber-600">project {r.task.project} has no repo in config/repos.json</span>}
@@ -210,6 +214,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>
                   {typeof n.input.feedback === 'string' && <div className="text-amber-700 dark:text-amber-400">feedback: {n.input.feedback}</div>}
+                  {n.output.skipped === true && <div className="text-muted-foreground">skipped: {String(n.output.reason)}</div>}
                   {n.error && <div className="text-red-600">{n.error}</div>}
                 </li>
               ))}

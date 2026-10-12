@@ -29,8 +29,11 @@ export function TasksPage() {
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
   });
   const navigate = useNavigate();
+  const [workflowId, setWorkflowId] = useState('');
+  const workflows = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string }[]>('/api/workflows') });
   const startWorkflow = useMutation({
-    mutationFn: (taskId: string) => api<{ runId: string; created: boolean }>(`/api/tasks/${taskId}/workflow-runs`, { method: 'POST', body: '{}' }),
+    mutationFn: (taskId: string) =>
+      api<{ runId: string; created: boolean }>(`/api/tasks/${taskId}/workflow-runs`, { method: 'POST', body: JSON.stringify(workflowId ? { workflowId } : {}) }),
     onSuccess: r => navigate({ to: '/runs/$runId', params: { runId: r.runId } }),
   });
   const runPipeline = useMutation({
@@ -80,6 +83,10 @@ export function TasksPage() {
         <Select value={f.project ?? ''} onChange={e => set('project')(e.target.value)}>
           <option value="">All projects</option>
           {d?.projects.map(p => <option key={p}>{p}</option>)}
+        </Select>
+        <Select value={workflowId} onChange={e => setWorkflowId(e.target.value)} title="Workflow used by “Start workflow”">
+          <option value="">Workflow: by routing rules</option>
+          {workflows.data?.map(w => <option key={w.id} value={w.id}>Workflow: {w.name}</option>)}
         </Select>
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={f.includeArchived === '1'} onChange={e => set('includeArchived')(e.target.checked ? '1' : '')} /> Show archived

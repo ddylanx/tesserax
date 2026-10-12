@@ -19,7 +19,7 @@ const log = createLogger('pipeline');
   imports: [TasksModule],
   controllers: [PipelineController],
   providers: [PipelineService, ClassificationService, { provide: PlaybookRegistry, useFactory: () => new PlaybookRegistry() }],
-  exports: [PipelineService],
+  exports: [PipelineService, ClassificationService],
 })
 export class PipelineModule implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private watcher?: NodeJS.Timeout;

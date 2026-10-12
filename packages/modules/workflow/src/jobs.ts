@@ -3,6 +3,7 @@ import { nodeConfigSchemas, type NodeType } from '@ot/contracts';
 import { createLogger, type JobMeta, type Queue } from '@ot/core';
 import type { Db } from '@ot/db';
 import { diffInfo, isAlive, readOutcome, stopProcess } from '@ot/mod-pipeline';
+import type { ClassificationService } from '@ot/mod-pipeline';
 import type { TasksService } from '@ot/mod-tasks';
 import { FINALIZE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
 import { EXECUTORS } from './executors';
@@ -15,6 +16,7 @@ export interface JobDeps {
   db: Db;
   engine: WorkflowEngine;
   tasks: TasksService;
+  classifier: ClassificationService;
   skills: SkillStore;
   config: AppConfig;
   queue: Queue;
@@ -41,7 +43,7 @@ export async function runNodeJob(d: JobDeps, { nodeRunId }: { nodeRunId: string 
     const config = nodeConfigSchemas[node.type].parse(node.config);
     const input = (nr.input ?? {}) as { feedback?: string };
     const result = await executor({
-      engine: d.engine, tasks: d.tasks, skills: d.skills, appConfig: d.config, run, nodeRun: nr, node, config, task,
+      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: d.skills, appConfig: d.config, run, nodeRun: nr, node, config, task,
       artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null,
     });
     if ('async' in result) return; // finishes later (agent runs)

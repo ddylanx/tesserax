@@ -185,6 +185,7 @@ export interface WorkflowRunsTable {
   branch: string | null;
   worktree_path: string | null;
   error: string | null;
+  vars: ColumnType<unknown, unknown | undefined, unknown>;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
   finished_at: Timestamp | null;

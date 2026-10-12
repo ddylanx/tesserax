@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, normalize, relative } from 'node:path';
 import { findRepoRoot } from '@ot/config';
-import { validateWorkflow, workflowSchema, type WorkflowDefinition } from '@ot/contracts';
+import { routingSchema, validateWorkflow, workflowSchema, type WorkflowDefinition, type WorkflowRouting } from '@ot/contracts';
 
 export const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 
@@ -49,6 +49,24 @@ export class WorkflowStore {
     writeFileSync(`${file}.tmp`, text);
     renameSync(`${file}.tmp`, file);
     return { hash: sha(text), problems: [] };
+  }
+}
+
+/** workflows/routing.json: which workflow a new ticket starts (first matching rule, else the default). */
+export class RoutingStore {
+  constructor(readonly file = join(findRepoRoot(), 'workflows', 'routing.json')) {}
+
+  read(): WorkflowRouting {
+    if (!existsSync(this.file)) return routingSchema.parse({});
+    return routingSchema.parse(JSON.parse(readFileSync(this.file, 'utf8')));
+  }
+
+  save(r: WorkflowRouting, workflowExists: (id: string) => boolean): WorkflowRouting {
+    const parsed = routingSchema.parse(r);
+    for (const id of [parsed.default, ...parsed.rules.map(x => x.workflow)]) if (!workflowExists(id)) throw new Error(`Workflow ${id} does not exist`);
+    writeFileSync(`${this.file}.tmp`, `${JSON.stringify(parsed, null, 2)}\n`);
+    renameSync(`${this.file}.tmp`, this.file);
+    return parsed;
   }
 }
 

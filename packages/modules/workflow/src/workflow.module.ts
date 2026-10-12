@@ -2,6 +2,7 @@ import { Inject, Module, type OnApplicationBootstrap, type OnModuleDestroy, type
 import type { AppConfig } from '@ot/config';
 import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@ot/core';
 import type { Db } from '@ot/db';
+import { ClassificationService, PipelineModule } from '@ot/mod-pipeline';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, WorkflowEngine } from './engine.service';
 import { finalizeAgentJob, runNodeJob, scanAgentNodes, type JobDeps } from './jobs';
@@ -11,7 +12,7 @@ import { WorkflowController } from './workflow.controller';
 const log = createLogger('workflow');
 
 @Module({
-  imports: [TasksModule],
+  imports: [TasksModule, PipelineModule],
   controllers: [WorkflowController],
   providers: [WorkflowEngine, { provide: SkillStore, useFactory: () => new SkillStore() }],
   exports: [WorkflowEngine],
@@ -28,10 +29,11 @@ export class WorkflowModule implements OnModuleInit, OnApplicationBootstrap, OnM
     private readonly engine: WorkflowEngine,
     private readonly tasks: TasksService,
     private readonly skills: SkillStore,
+    private readonly classifier: ClassificationService,
   ) {}
 
   onModuleInit() {
-    this.deps = { db: this.db, engine: this.engine, tasks: this.tasks, skills: this.skills, config: this.config, queue: this.queue };
+    this.deps = { db: this.db, engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: this.skills, config: this.config, queue: this.queue };
     this.queue.work<{ nodeRunId: string }>(NODE_QUEUE, (data, meta) => runNodeJob(this.deps, data, meta), { batchSize: 2 });
     this.queue.work<{ nodeRunId: string; timedOut?: boolean }>(FINALIZE_QUEUE, data => finalizeAgentJob(this.deps, data));
     this.schedules.register({ name: 'wf.watch', cron: '* * * * *', handler: () => scanAgentNodes(this.deps) });

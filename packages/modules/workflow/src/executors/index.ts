@@ -192,7 +192,22 @@ const gitPr: NodeExecutor = async ctx => {
   };
 };
 
+/** Labels the ticket (Claude CLI, rules as fallback) and stores it in the run's vars for skip rules. */
+const aiClassify: NodeExecutor = async ctx => {
+  await ctx.tasks.ensureDetail(ctx.task.id).catch(() => undefined);
+  const task = (await ctx.tasks.getTask(ctx.task.id)) ?? ctx.task;
+  const { classification, engine, fallbackReason } = await ctx.classifier.classify({ task, playbooks: [], mappedRepo: null });
+  const vars = { ...((ctx.run.vars ?? {}) as object), classification: { ...classification, engine } };
+  await ctx.engine.patchRun(ctx.run.id, { vars: JSON.stringify(vars) });
+  const md = [
+    `**${classification.type}** · automation **${classification.automation}** · confidence ${Math.round(classification.confidence * 100)}% · engine ${engine}`,
+    '', classification.reasoning, fallbackReason ? `\n_Fell back to rules: ${fallbackReason}_` : '',
+  ].join('\n');
+  return { port: 'next', artifact: { name: 'classification', content: md }, output: { ...classification, engine } };
+};
+
 export const EXECUTORS: Partial<Record<NodeType, NodeExecutor>> = {
+  'ai.classify': aiClassify,
   'doc.write': docWrite,
   'jira.comment': jiraComment,
   'git.pr': gitPr,

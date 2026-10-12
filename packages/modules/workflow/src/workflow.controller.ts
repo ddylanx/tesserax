@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
-  workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
+  routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG } from '@ot/core';
 import { diffInfo, diffPatch } from '@ot/mod-pipeline';
@@ -64,6 +64,18 @@ export class WorkflowController {
       if (r.problems.length) throw new Error(r.problems.join('; '));
       return { id, ...r };
     });
+  }
+
+  @Get('workflow-routing')
+  routing() {
+    return this.engine.routing.read();
+  }
+
+  @Put('workflow-routing')
+  saveRouting(@Body() body: unknown) {
+    const parsed = routingSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    return guard(async () => this.engine.routing.save(parsed.data, id => this.engine.workflows.exists(id)));
   }
 
   @Get('skills/:name')
@@ -157,7 +169,7 @@ export class WorkflowController {
   /** Start the workflow for a task (returns the active run if there is one). */
   @Post('tasks/:taskId/workflow-runs')
   start(@Param('taskId', ParseUUIDPipe) taskId: string, @Body() body: { workflowId?: string }) {
-    return guard(() => this.engine.startRun(taskId, 'manual', body?.workflowId || 'default'));
+    return guard(() => this.engine.startRun(taskId, 'manual', body?.workflowId || undefined));
   }
 
   @Post('workflow-runs/:id/gate')
