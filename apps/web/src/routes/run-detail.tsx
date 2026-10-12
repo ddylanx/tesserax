@@ -1,10 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
-import { Background, Controls, Handle, Position, ReactFlow, type Edge, type Node, type NodeProps } from '@xyflow/react';
+import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Edge, type Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import type { ArtifactDto, NodeRunDto, RunDiff, WorkflowNode, WorkflowRunDetail } from '@ot/contracts';
+import { NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
+import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
+import { metaOf } from '@/components/flow/meta';
+import { nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
 import { QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,36 +16,7 @@ import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
 import { RUN_STATUS } from './runs';
 
-const NODE_STATE: Record<string, string> = {
-  done: 'border-emerald-500 bg-emerald-500/10',
-  running: 'border-sky-500 bg-sky-500/10 animate-pulse',
-  queued: 'border-sky-400 bg-sky-500/5',
-  waiting: 'border-amber-500 bg-amber-500/15 ring-2 ring-amber-500/40',
-  failed: 'border-red-500 bg-red-500/10',
-  cancelled: 'border-border bg-muted opacity-60',
-  skipped: 'border-dashed border-muted-foreground/50 bg-transparent opacity-60',
-  idle: 'border-border bg-card',
-};
 
-const TYPE_LABEL: Record<string, string> = {
-  'trigger.jira': 'Trigger', 'ai.classify': 'Classify', 'ai.step': 'AI step', 'human.gate': 'You review', 'agent.run': 'Agent', 'check.command': 'Checks',
-  'ai.review': 'AI review', evaluate: 'Score', 'doc.write': 'Ticket doc', 'jira.comment': 'Jira comment', 'git.pr': 'Pull request',
-};
-
-type FlowData = { label: string; type: string; state: string; runs: number; selected: boolean };
-
-function FlowNode({ data }: NodeProps<Node<FlowData>>) {
-  return (
-    <div className={cn('w-44 rounded-lg border-2 px-3 py-2 text-left shadow-sm', NODE_STATE[data.state] ?? NODE_STATE.idle, data.selected && 'outline outline-2 outline-offset-2 outline-primary')}>
-      <Handle type="target" position={Position.Left} className="!bg-muted-foreground" />
-      <div className="text-[10px] tracking-wide text-muted-foreground uppercase">{TYPE_LABEL[data.type] ?? data.type}</div>
-      <div className="text-sm leading-tight font-medium">{data.label}</div>
-      {data.runs > 0 && <div className="mt-1 text-[10px] text-muted-foreground">{data.state}{data.runs > 1 ? ` · ${data.runs} runs` : ''}</div>}
-      <Handle type="source" position={Position.Right} className="!bg-muted-foreground" />
-    </div>
-  );
-}
-const nodeTypes = { step: FlowNode };
 
 function useRunAction(runId: string) {
   const qc = useQueryClient();
@@ -68,28 +42,31 @@ export function RunDetailPage() {
   const action = useRunAction(runId);
 
   const { nodes, edges } = useMemo(() => {
-    if (!r) return { nodes: [] as Node<FlowData>[], edges: [] as Edge[] };
+    if (!r) return { nodes: [] as Node<CardData>[], edges: [] as Edge<InsertEdgeData>[] };
     const latest = new Map<string, NodeRunDto>();
     const count = new Map<string, number>();
     for (const n of r.nodeRuns) {
       latest.set(n.nodeId, n);
       count.set(n.nodeId, (count.get(n.nodeId) ?? 0) + 1);
     }
-    const taken = new Set(r.nodeRuns.filter(n => n.port).map(n => `${n.nodeId}:${n.port}`));
+    const takenPorts = new Map<string, string[]>();
+    for (const n of r.nodeRuns) if (n.port) takenPorts.set(n.nodeId, [...new Set([...(takenPorts.get(n.nodeId) ?? []), n.port])]);
+    const isTaken = (src: string, port: string) => takenPorts.get(src)?.includes(port) ?? false;
     return {
       nodes: r.workflow.nodes.map(
-        (n): Node<FlowData> => ({
-          id: n.id, type: 'step', position: n.position,
-          data: { label: n.label, type: n.type, state: latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle', runs: count.get(n.id) ?? 0, selected: n.id === selected },
+        (n): Node<CardData> => ({
+          id: n.id, type: 'card', position: n.position, selected: n.id === selected,
+          data: {
+            node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id),
+            state: (latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle') as NodeState,
+          },
         }),
       ),
       edges: r.workflow.edges.map(
-        (e): Edge => ({
-          id: e.id, source: e.source, target: e.target,
-          label: `${e.port}${e.maxLoops ? ` (max ${e.maxLoops})` : ''}`,
-          animated: r.currentNodeId === e.target && taken.has(`${e.source}:${e.port}`),
-          style: { strokeWidth: taken.has(`${e.source}:${e.port}`) ? 2 : 1, opacity: taken.has(`${e.source}:${e.port}`) ? 1 : 0.45 },
-          labelStyle: { fontSize: 10 },
+        (e): Edge<InsertEdgeData> => ({
+          id: e.id, source: e.source, target: e.target, sourceHandle: e.port, type: 'insert', markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+          animated: r.currentNodeId === e.target && isTaken(e.source, e.port),
+          data: { port: e.port, maxLoops: e.maxLoops, taken: isTaken(e.source, e.port), dim: !isTaken(e.source, e.port) },
         }),
       ),
     };
@@ -133,10 +110,10 @@ export function RunDetailPage() {
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(340px,2fr)]">
         <Card className="h-[420px] overflow-hidden lg:h-auto">
           <ReactFlow
-            nodes={nodes} edges={edges} nodeTypes={nodeTypes} fitView nodesDraggable={false} nodesConnectable={false} elementsSelectable
-            onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} colorMode="system" minZoom={0.3}
+            nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView nodesDraggable={false} nodesConnectable={false} elementsSelectable
+            onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} colorMode="system" minZoom={0.15}
           >
-            <Background gap={16} />
+            <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} />
             <Controls showInteractive={false} />
           </ReactFlow>
         </Card>
@@ -179,7 +156,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
   return (
     <Card className={waiting ? 'border-amber-500/50' : undefined}>
       <CardHeader>
-        <CardTitle>{node.label} <span className="text-xs font-normal text-muted-foreground">({TYPE_LABEL[node.type] ?? node.type})</span></CardTitle>
+        <CardTitle>{node.label} <span className="text-xs font-normal text-muted-foreground">({metaOf(node.type).title})</span></CardTitle>
         {(cfg.skill || cfg.skills?.length) && <p className="text-xs text-muted-foreground">skills: {[cfg.skill, ...(cfg.skills ?? [])].filter(Boolean).join(', ')}</p>}
         {cfg.commands && <p className="text-xs text-muted-foreground">commands: {cfg.commands.join(' · ')}</p>}
       </CardHeader>
