@@ -9,12 +9,14 @@ import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
-import { CONFIG } from '@ot/core';
+import { CONFIG, DB } from '@ot/core';
+import type { Db } from '@ot/db';
 import { diffInfo, diffPatch } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
 import { askClaude } from './executors/claude';
 import { renderTemplate, withSkills } from './render';
 import { RunConflict, WorkflowEngine } from './engine.service';
+import { computeMetrics } from './metrics';
 import { SkillStore } from './stores';
 
 async function guard<T>(fn: () => Promise<T>): Promise<T> {
@@ -34,7 +36,14 @@ export class WorkflowController {
     private readonly skills: SkillStore,
     private readonly tasks: TasksService,
     @Inject(CONFIG) private readonly config: AppConfig,
+    @Inject(DB) private readonly db: Db,
   ) {}
+
+  @Get('metrics')
+  metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string) {
+    const d = Math.min(365, Math.max(1, Number(days) || 30));
+    return computeMetrics(this.db, this.skills, { days: d, workflowId: workflowId || undefined });
+  }
 
   @Get('node-types')
   nodeTypes() {

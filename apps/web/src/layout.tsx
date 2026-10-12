@@ -1,10 +1,11 @@
 import { Link, Outlet } from '@tanstack/react-router';
-import { Bot, Boxes, Inbox, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
+import { BarChart3, Bot, Boxes, Inbox, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
 
 const nav = [
   { to: '/runs', label: 'Runs', icon: Workflow },
   { to: '/workflows', label: 'Workflows', icon: Network },
   { to: '/skills', label: 'Skills', icon: Sparkles },
+  { to: '/metrics', label: 'Metrics', icon: BarChart3 },
   { to: '/inbox', label: 'Inbox (old)', icon: Inbox },
   { to: '/tasks', label: 'Tasks', icon: ListChecks },
   { to: '/agents', label: 'Agents', icon: Bot },

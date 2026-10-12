@@ -374,3 +374,20 @@ export const trySkillSchema = z.object({
   taskId: z.string().uuid(),
   prompt: z.string().min(1).max(20_000).default('Apply the skill to this ticket.\n\n{{issue}}'),
 });
+
+// ---------- metrics ----------
+
+/** GET /api/metrics: aggregates for tuning workflows and skills. */
+export interface MetricsReport {
+  window: { days: number; workflowId: string | null; runs: number };
+  overview: { done: number; failed: number; cancelled: number; active: number; avgCostUsd: number | null; avgMinutes: number | null; avgWaitMinutes: number | null; avgScore: number | null };
+  versions: { workflowId: string; hash: string; firstRun: string; runs: number; done: number; failed: number; cancelled: number; avgCostUsd: number | null; avgMinutes: number | null; avgScore: number | null; criteria: Record<string, number> }[];
+  nodes: {
+    workflowId: string; nodeId: string; label: string; type: string; runs: number; skipped: number; failed: number; retries: number;
+    avgSeconds: number | null; avgCostUsd: number | null; gate?: { approved: number; edited: number; changes: number; rejected: number; avgWaitMinutes: number | null };
+    review?: { pass: number; fail: number };
+  }[];
+  skills: { path: string; hash: string; current: boolean; nodeIds: string[]; uses: number; avgCostUsd: number | null; acceptedAsIs: number; edited: number; sentBack: number }[];
+  evaluations: { runId: string; taskKey: string | null; workflowHash: string; scores: Record<string, number>; note: string | null; createdAt: string }[];
+}
+
