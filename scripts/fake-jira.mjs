@@ -12,6 +12,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const port = Number(process.argv[2] ?? 4499);
 const issues = () => JSON.parse(readFileSync(join(root, 'fixtures/jira/issues.json'), 'utf8'));
 const posted = [];
+const prs = [];
 
 const pick = (issue, fields) => ({ id: issue.id, key: issue.key, fields: Object.fromEntries(Object.entries(issue.fields).filter(([k]) => !fields || fields.includes(k))) });
 const send = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -27,6 +28,25 @@ createServer((req, res) => {
     return send(res, 200, { issues: issues().map(i => pick(i, searchFields)), isLast: true });
   }
   if (url.pathname === '/_comments') return send(res, 200, posted);
+  // Fake Bitbucket Cloud (BITBUCKET_API_URL=http://127.0.0.1:4499/2.0): list/open pull requests
+  const bb = url.pathname.match(/^\/2\.0\/repositories\/([^/]+)\/([^/]+)\/pullrequests$/);
+  if (bb) {
+    if (req.method === 'GET') {
+      const src = (url.searchParams.get('q') ?? '').match(/source\.branch\.name="([^"]+)"/)?.[1];
+      return send(res, 200, { values: prs.filter(p => p.repo === `${bb[1]}/${bb[2]}` && p.source.branch.name === src && p.state === 'OPEN') });
+    }
+    let body = '';
+    req.on('data', c => (body += c));
+    req.on('end', () => {
+      const b = JSON.parse(body);
+      const pr = { id: prs.length + 1, state: 'OPEN', repo: `${bb[1]}/${bb[2]}`, ...b, links: { html: { href: `https://bitbucket.example/${bb[1]}/${bb[2]}/pull-requests/${prs.length + 1}` } } };
+      prs.push(pr);
+      console.log(`[fake-bitbucket] PR #${pr.id} ${b.source.branch.name} -> ${b.destination.branch.name}: ${b.title}`);
+      send(res, 201, pr);
+    });
+    return;
+  }
+  if (url.pathname === '/_prs') return send(res, 200, prs);
   const m = url.pathname.match(/^\/rest\/api\/3\/issue\/([^/]+)(\/comment)?$/);
   if (m) {
     const issue = issues().find(i => i.key === decodeURIComponent(m[1]) || i.id === m[1]);

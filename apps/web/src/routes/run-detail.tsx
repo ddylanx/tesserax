@@ -25,7 +25,7 @@ const NODE_STATE: Record<string, string> = {
 
 const TYPE_LABEL: Record<string, string> = {
   'trigger.jira': 'Trigger', 'ai.step': 'AI step', 'human.gate': 'You review', 'agent.run': 'Agent', 'check.command': 'Checks',
-  'ai.review': 'AI review', evaluate: 'Score',
+  'ai.review': 'AI review', evaluate: 'Score', 'doc.write': 'Ticket doc', 'jira.comment': 'Jira comment', 'git.pr': 'Pull request',
 };
 
 type FlowData = { label: string; type: string; state: string; runs: number; selected: boolean };
@@ -56,9 +56,14 @@ export function RunDetailPage() {
   const q = useQuery({ queryKey: ['wf', 'run', runId], queryFn: () => api<WorkflowRunDetail>(`/api/workflow-runs/${runId}`), refetchInterval: 3000 });
   const [selected, setSelected] = useState<string | null>(null);
   const r = q.data;
+  const [followed, setFollowed] = useState<string | null>(null);
   useEffect(() => {
-    if (r && !selected) setSelected(r.currentNodeId ?? r.nodeRuns.at(-1)?.nodeId ?? null);
-  }, [r, selected]);
+    if (!r) return;
+    const current = r.currentNodeId ?? r.nodeRuns.at(-1)?.nodeId ?? null;
+    // follow the run while you are looking at its current step; stay put if you picked another node
+    if (!selected || (selected === followed && current && current !== followed)) setSelected(current);
+    setFollowed(current);
+  }, [r, selected, followed]);
   const action = useRunAction(runId);
 
   const { nodes, edges } = useMemo(() => {
@@ -177,8 +182,16 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
       <CardContent className="flex flex-col gap-3 text-sm">
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
+        {waiting && (node.type === 'jira.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type} output={cfg.output ?? ''} />}
+        {!waiting && last?.status === 'done' && typeof last.output.prUrl === 'string' && (
+          <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Pull request #{String(last.output.prId)}{last.output.existingPr ? ' (already open)' : ''} →</a>
+        )}
+        {!waiting && last?.status === 'done' && typeof last.output.commentId === 'string' && <p className="text-xs text-muted-foreground">Posted to {String(last.output.issueKey)} (comment {last.output.commentId}).</p>}
+        {node.type === 'doc.write' && typeof last?.output.path === 'string' && (
+          <p className="text-xs text-muted-foreground">Written to <code>{last.output.path}</code>{last.output.commit ? <> and committed ({String(last.output.commit)})</> : ' (unchanged, no commit)'}.</p>
+        )}
         {!waiting && node.type === 'human.gate' && (cfg.show ?? []).map(n => <ArtifactView key={n} run={run} name={n} />)}
-        {cfg.output && <ArtifactView run={run} name={cfg.output} />}
+        {cfg.output && !(waiting && (node.type === 'jira.comment' || node.type === 'git.pr')) && <ArtifactView run={run} name={cfg.output} />}
         {node.type === 'agent.run' && <DiffToggle runId={run.id} />}
         {node.type === 'evaluate' && run.evaluation && (
           <div className="text-xs">{Object.entries(run.evaluation.scores).map(([k, v]) => <div key={k}>{k}: <b>{v}/5</b></div>)}{run.evaluation.note && <p className="mt-1 text-muted-foreground">“{run.evaluation.note}”</p>}</div>
@@ -238,6 +251,56 @@ function GatePanel({ run, cfg }: { run: WorkflowRunDetail; cfg: { show?: string[
         <Button variant="ghost" onClick={() => confirm('Reject and close this run?') && action.mutate({ path: 'gate', body: { action: 'rejected', feedback: feedback || undefined } })}>Reject</Button>
       </div>
       {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
+    </div>
+  );
+}
+
+function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; nodeRun: NodeRunDto; type: 'jira.comment' | 'git.pr'; output: string }) {
+  const qc = useQueryClient();
+  const o = nodeRun.output as { title?: string; target?: string; source?: string; commits?: string[]; uncommitted?: string[] };
+  const [text, setText] = useState(() => artifactsOf(run, output)[0]?.content ?? '');
+  const [title, setTitle] = useState(o.title ?? '');
+  const [target, setTarget] = useState(o.target ?? '');
+  const [sure, setSure] = useState(false);
+  const act = useMutation({
+    mutationFn: (body: unknown) => api<Record<string, unknown>>(`/api/workflow-runs/${run.id}/confirm`, { method: 'POST', body: JSON.stringify(body) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  const isPr = type === 'git.pr';
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+        {isPr
+          ? <>After you confirm, branch <code>{o.source}</code> is pushed to the remote and a Bitbucket pull request into <code>{target || o.target}</code> is opened with this title and description. Nothing is merged.</>
+          : <>After you confirm, exactly this text is posted as a comment on <b>{run.task.key}</b>. Status, fields and assignee are not changed.</>}
+      </p>
+      {nodeRun.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{nodeRun.error}</p>}
+      {isPr && (
+        <>
+          <label className="flex flex-col gap-1 text-xs">Title<input className="h-8 rounded-md border bg-background px-2 text-sm" value={title} onChange={e => setTitle(e.target.value)} /></label>
+          <label className="flex flex-col gap-1 text-xs">Target branch<input className="h-8 rounded-md border bg-background px-2 text-sm" value={target} onChange={e => setTarget(e.target.value)} /></label>
+          <div className="text-xs">
+            <div className="font-medium">Commits to push ({o.commits?.length ?? 0})</div>
+            <ul className="max-h-32 overflow-auto font-mono text-[11px]">{(o.commits ?? []).map(c => <li key={c}>{c}</li>)}</ul>
+            {!!o.uncommitted?.length && <p className="mt-1 text-amber-700 dark:text-amber-400">Not committed, will not be pushed: {o.uncommitted.join(', ')}</p>}
+          </div>
+          <DiffToggle runId={run.id} />
+        </>
+      )}
+      <label className="flex flex-col gap-1 text-xs">{isPr ? 'Description' : 'Comment'} (edit before confirming)
+        <textarea className="min-h-56 rounded-md border bg-background p-2 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} />
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={sure} onChange={e => setSure(e.target.checked)} />
+        {isPr ? `Push ${o.source} and open the PR` : `Post this comment to ${run.task.key}`}
+      </label>
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={!sure || !text.trim() || act.isPending} onClick={() => act.mutate({ action: 'confirm', confirm: true, text, ...(isPr ? { title, targetBranch: target || undefined } : {}) })}>
+          {act.isPending ? 'Working…' : isPr ? 'Push and open PR' : 'Post comment'}
+        </Button>
+        <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
+      </div>
+      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
     </div>
   );
 }

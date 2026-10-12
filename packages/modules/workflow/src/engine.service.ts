@@ -2,13 +2,14 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { dataDir, type AppConfig } from '@ot/config';
 import {
-  HUMAN_NODE_TYPES,
-  type ArtifactDto, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
+  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES,
+  type ArtifactDto, type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@ot/db';
-import { RepoMapStore, ensureWorktree, fetchBase, isAlive, resolveBaseRef, stopProcess } from '@ot/mod-pipeline';
+import { RepoMapStore, diffInfo, ensureWorktree, fetchBase, isAlive, resolveBaseRef, stopProcess } from '@ot/mod-pipeline';
+import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
 import { TasksService } from '@ot/mod-tasks';
 import { WorkflowStore } from './stores';
 
@@ -241,6 +242,87 @@ export class WorkflowEngine {
       .onConflict(oc => oc.column('run_id').doUpdateSet({ scores: JSON.stringify(a.scores), note: a.note ?? null }))
       .execute();
     await this.complete(nr.id, 'end', { scores: a.scores, note: a.note ?? null }, 'user', ['waiting']);
+  }
+
+  /** A confirm node's draft is ready: the node and the run wait for the user. */
+  async awaitConfirmation(nodeRunId: string, output: Record<string, unknown>, patch: NodeRunUpdate) {
+    const nr = await this.db
+      .updateTable('node_runs')
+      .set({ ...patch, status: 'waiting', output: JSON.stringify(output) })
+      .where('id', '=', nodeRunId)
+      .where('status', '=', 'running')
+      .returning(['run_id', 'node_id'])
+      .executeTakeFirst();
+    if (!nr) return;
+    await this.patchRun(nr.run_id, { status: 'waiting' });
+    await this.event(nr.run_id, 'job', 'waiting_for_confirmation', { node: nr.node_id }, nodeRunId);
+    await this.emit(nr.run_id, 'waiting');
+  }
+
+  /**
+   * The only places that write outside this machine: a Jira comment, or push + Bitbucket PR. They run only on an
+   * explicit confirmation carrying the exact text the user saw. The node is claimed first so a double click cannot
+   * post twice; on failure it goes back to waiting with the error shown.
+   */
+  async confirm(runId: string, a: ConfirmAction): Promise<Record<string, unknown>> {
+    const nr = await this.currentNodeRun(runId, [...CONFIRM_NODE_TYPES]);
+    if (a.action === 'skip') {
+      await this.complete(nr.id, 'skipped', { note: a.note ?? null }, 'user', ['waiting']);
+      return { skipped: true };
+    }
+    const claimed = await this.db.updateTable('node_runs').set({ status: 'running', error: null }).where('id', '=', nr.id).where('status', '=', 'waiting').executeTakeFirst();
+    if (!Number(claimed.numUpdatedRows)) throw new RunConflict('This step is already being confirmed.');
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    const node = this.node(run, nr.node_id);
+    const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : 'jira_comment');
+    try {
+      if ((await this.latestArtifact(runId, outputName))?.content !== a.text) await this.saveArtifact(runId, nr.id, outputName, a.text, 'user');
+      const result = nr.node_type === 'jira.comment' ? await this.postJiraComment(run, a.text) : await this.openPullRequest(run, nr, a);
+      await this.event(runId, 'user', nr.node_type === 'jira.comment' ? 'jira_comment_posted' : 'pull_request_opened', result, nr.id);
+      await this.complete(nr.id, nr.node_type === 'jira.comment' ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
+      return result;
+    } catch (err) {
+      const message = String((err as Error).message ?? err).slice(0, 2000);
+      await this.db.updateTable('node_runs').set({ status: 'waiting', error: message }).where('id', '=', nr.id).where('status', '=', 'running').execute();
+      await this.event(runId, 'user', 'confirm_failed', { error: message }, nr.id);
+      throw err;
+    }
+  }
+
+  private async postJiraComment(run: WorkflowRun, text: string) {
+    const task = await this.tasks.getTask(run.task_id);
+    if (!task?.key) throw new Error('This task has no Jira key.');
+    const client = await this.tasks.jiraClient();
+    if (!client) throw new Error('Jira is not configured (JIRA_* in .env).');
+    const { id } = await client.addComment(task.key, text);
+    return { commentId: id, issueKey: task.key };
+  }
+
+  private async openPullRequest(run: WorkflowRun, nr: NodeRun, a: Extract<ConfirmAction, { action: 'confirm' }>) {
+    if (!run.worktree_path || !run.repo_path || !run.branch || !run.base_ref) throw new Error('This run has no worktree/branch yet.');
+    const out = (nr.output ?? {}) as { title?: string; target?: string };
+    const task = await this.tasks.getTask(run.task_id);
+    const entry = this.repos.entry(task?.project ?? null);
+    const remote = entry?.remote ?? (run.base_ref.includes('/') ? run.base_ref.split('/')[0]! : 'origin');
+    const target = a.targetBranch ?? out.target ?? run.base_ref.replace(/^[^/]+\//, '');
+    const title = a.title ?? out.title ?? `${task?.key ?? ''}`;
+    const commits = (await diffInfo(run.worktree_path, run.base_ref)).commits;
+    if (!commits.length) throw new Error(`Nothing is committed on ${run.branch} compared with ${run.base_ref}; there is nothing to open a PR for.`);
+    const repo = entry?.bitbucket
+      ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! }
+      : parseBitbucketRemote(await remoteUrl(run.repo_path, remote));
+    if (!repo) throw new Error(`Remote "${remote}" is not a Bitbucket repository; set "bitbucket": "workspace/repo" for this project in config/repos.json.`);
+    const email = this.config.BITBUCKET_EMAIL ?? this.config.JIRA_EMAIL;
+    if (!this.config.BITBUCKET_API_TOKEN || !email) {
+      throw new Error('Bitbucket is not configured: set BITBUCKET_API_TOKEN (and BITBUCKET_EMAIL if it differs from JIRA_EMAIL) in .env.');
+    }
+    const pushLog = await pushBranch(run.worktree_path, remote, run.branch).catch(e => {
+      throw new Error(`git push failed: ${String((e as { stderr?: string }).stderr ?? (e as Error).message).trim().slice(0, 800)}`);
+    });
+    const pr = await new BitbucketClient({ baseUrl: this.config.BITBUCKET_API_URL, email, token: this.config.BITBUCKET_API_TOKEN }).openPullRequest({
+      ...repo, title, description: a.text, source: run.branch, destination: target,
+    });
+    return { prUrl: pr.url, prId: pr.id, existingPr: pr.existing, target, pushed: run.branch, commits: commits.length, pushLog: pushLog.slice(0, 500) };
   }
 
   /** Re-runs the step that failed (new attempt of the same node). */

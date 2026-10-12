@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, evaluateActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
   workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG } from '@ot/core';
@@ -169,7 +169,16 @@ export class WorkflowController {
     return { ok: true };
   }
 
-  @Post('workflow-runs/:id/evaluate')
+  /** Post the Jira comment / push + open the PR (needs confirm: true and the exact text), or skip. */
+  @Post('workflow-runs/:id/confirm')
+  @HttpCode(200)
+  confirm(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = confirmActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Confirming needs { action: "confirm", confirm: true, text } or { action: "skip" }.');
+    return guard(() => this.engine.confirm(id, parsed.data));
+  }
+
+    @Post('workflow-runs/:id/evaluate')
   @HttpCode(200)
   async evaluate(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
     const parsed = evaluateActionSchema.safeParse(body);

@@ -45,6 +45,11 @@ export async function runNodeJob(d: JobDeps, { nodeRunId }: { nodeRunId: string 
       artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null,
     });
     if ('async' in result) return; // finishes later (agent runs)
+    if ('wait' in result) {
+      if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
+      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, skill_hash: result.skillHash ?? null });
+      return;
+    }
     if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
     await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, skill_hash: result.skillHash ?? null });
     await d.engine.complete(nr.id, result.port, result.output ?? {}, 'job', ['running']);

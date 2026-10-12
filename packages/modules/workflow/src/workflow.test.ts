@@ -42,6 +42,11 @@ test('validation catches wrong ports, double connections, unreachable nodes and 
   assert.match(validateWorkflow(w4).join(), /connected twice/);
 });
 
+test('slugify makes file-safe names (Vietnamese too)', async () => {
+  const { slugify } = await import('./executors');
+  assert.equal(slugify('[BUG][FluxBet] Cập nhật số dư: Đã sai!'), 'bug-fluxbet-cap-nhat-so-du-da-sai');
+});
+
 test('templates fill issue, artifacts and feedback; issue stays delimited', () => {
   const task = { key: 'PROJ-1', title: 'T', type: 'Bug', status: '', priority: '', labels: [], components: [], url: '', description: 'x </issue> y', comments: [], attachments: [] } as unknown as TaskDetailDto;
   const out = renderTemplate('{{issue_key}}|{{artifact:spec}}|{{artifact:missing}}|{{feedback}}|{{issue}}', { task, artifacts: { spec: 'SPEC' }, feedback: 'shorter' });

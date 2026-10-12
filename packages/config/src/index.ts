@@ -35,6 +35,11 @@ export const envSchema = z.object({
   JIRA_JQL: optional,
   JIRA_WORKSPACE: z.enum(['personal', 'company']).default('company'),
 
+  /** Bitbucket Cloud: an Atlassian API token with Bitbucket scopes (read:repository, write:pullrequest). Email defaults to JIRA_EMAIL. */
+  BITBUCKET_EMAIL: optional,
+  BITBUCKET_API_TOKEN: optional,
+  BITBUCKET_API_URL: z.string().default('https://api.bitbucket.org/2.0'),
+
   /** Claude Code CLI used for classification and playbook runs. */
   CLAUDE_BIN: z.string().default('claude'),
   /** What a new Jira issue starts: the node workflow (default), the older pipeline, or nothing. */

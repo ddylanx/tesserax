@@ -54,7 +54,11 @@ Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you appr
 - **Workflow editor** (`/workflows`): a canvas like n8n/Dify. Add nodes from the palette, drag from a port (the dots on the right of a node) to another node to connect, click a node to edit its settings (a form generated from the node type: skill, prompt, inputs/output, tools, model, budget, commands...), click an edge to set a loop limit and where to go when it is reached. Problems (unreachable node, port connected twice, missing prompt...) are shown live and block saving. Saving writes `workflows/<id>.workflow.json`; runs already in progress keep the version they started with. "New workflow" copies the default.
 - **Skills page** (`/skills`): edit `SKILL.md` files, create new ones, and **try a skill on a ticket** (read-only, in the project's repo) to tune it before a workflow uses it.
 
-Coming next: ticket docs, Jira comment and Bitbucket PR nodes (P2).
+- **After your review** the default workflow continues:
+  - **Ticket document** (`doc.write`, skill `ticket-doc`): a detailed document for future readers and AI, written to `docs/<KEY>-<slug>.md` in the repo and committed on the ticket branch (only that file).
+  - **Comment on Jira** (`jira.comment`, skill `jira-comment` for tone and structure): the AI drafts; you edit, tick the confirmation and click **Post comment**, or **Skip**. Only the comment is written; status and fields are untouched.
+  - **Open pull request** (`git.pr`, skill `pr-description`): the AI drafts title and description; the panel shows the commits that will be pushed and anything left uncommitted. After you confirm, the branch is pushed (`git push --set-upstream`, never `--force`, with your own git credentials) and a Bitbucket PR is opened into the base branch (or the one you choose). If a PR is already open for the branch, its link is returned instead. Nothing is merged.
+- Bitbucket setup (`.env`): `BITBUCKET_API_TOKEN` (an Atlassian API token with Bitbucket scopes `read:repository` and `write:pullrequest`, created at https://id.atlassian.com/manage-profile/security/api-tokens) and `BITBUCKET_EMAIL` if it differs from `JIRA_EMAIL`. The repo is read from the push remote's URL (`git@bitbucket.org:<workspace>/<repo>.git`); otherwise add `"bitbucket": "workspace/repo"` (and `"remote"` if it is not `origin`) to the project in `config/repos.json`.
 
 ## Automation pipeline (Inbox, older flow)
 

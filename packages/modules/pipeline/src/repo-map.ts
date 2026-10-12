@@ -14,7 +14,7 @@ export class RepoMapStore {
     return parsed.success ? parsed.data : {};
   }
 
-  entry(project: string | null): { path: string; base?: string } | null {
+  entry(project: string | null): { path: string; base?: string; remote?: string; bitbucket?: string } | null {
     const e = project ? this.read()[project] : undefined;
     if (!e) return null;
     return typeof e === 'string' ? { path: e } : e;
@@ -26,9 +26,9 @@ export class RepoMapStore {
 
   /** Keeps a configured base branch when only the path changes. */
   set(project: string, path: string): RepoMap {
-    const base = this.entry(project)?.base;
+    const { path: _old, ...rest } = this.entry(project) ?? { path: '' };
     const checked = checkRepoPath(path);
-    const map = { ...this.read(), [project]: base ? { path: checked, base } : checked };
+    const map = { ...this.read(), [project]: Object.keys(rest).length ? { path: checked, ...rest } : checked };
     mkdirSync(dirname(this.file), { recursive: true });
     const tmp = `${this.file}.tmp`;
     writeFileSync(tmp, `${JSON.stringify(map, null, 2)}\n`);

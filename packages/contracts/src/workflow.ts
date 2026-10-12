@@ -49,6 +49,42 @@ export const nodeConfigSchemas = {
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(900),
   }),
+  'doc.write': z.object({
+    skill: z.string().optional(),
+    prompt: z.string().min(1),
+    inputs: z.array(artifactName).default([]),
+    output: artifactName.default('ticket_doc'),
+    /** File in the repo, relative to its root. Placeholders: {{issue_key}}, {{slug}}. */
+    path: z.string().min(1).default('docs/{{issue_key}}-{{slug}}.md'),
+    commitMessage: z.string().min(1).default('{{issue_key}}: add ticket document'),
+    allowedTools: tools,
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().positive().optional(),
+    timeoutSeconds: z.number().int().positive().default(600),
+  }),
+  'jira.comment': z.object({
+    skill: z.string().optional(),
+    prompt: z.string().min(1),
+    inputs: z.array(artifactName).default([]),
+    output: artifactName.default('jira_comment'),
+    allowedTools: tools,
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().positive().optional(),
+    timeoutSeconds: z.number().int().positive().default(600),
+  }),
+  'git.pr': z.object({
+    skill: z.string().optional(),
+    prompt: z.string().min(1),
+    inputs: z.array(artifactName).default([]),
+    output: artifactName.default('pr_description'),
+    title: z.string().min(1).default('{{issue_key}}: {{issue_title}}'),
+    /** Target branch; empty = the run's base branch (e.g. develop). */
+    targetBranch: z.string().optional(),
+    allowedTools: tools,
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().positive().optional(),
+    timeoutSeconds: z.number().int().positive().default(600),
+  }),
   evaluate: z.object({
     criteria: z.array(z.string().min(1)).min(1).default(['Meets the requirement', 'Code quality', 'Tests', 'Documentation']),
   }),
@@ -64,8 +100,14 @@ export const NODE_PORTS: Record<NodeType, readonly string[]> = {
   'agent.run': ['done', 'failed'],
   'check.command': ['pass', 'fail'],
   'ai.review': ['pass', 'fail'],
+  'doc.write': ['next'],
+  'jira.comment': ['posted', 'skipped'],
+  'git.pr': ['opened', 'skipped'],
   evaluate: ['end'],
 };
+
+/** Nodes that prepare a draft, then wait for the user's explicit confirmation before writing outside the machine. */
+export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'git.pr'];
 
 /** Node types that wait for the user instead of running. */
 export const HUMAN_NODE_TYPES: readonly NodeType[] = ['human.gate', 'evaluate'];
@@ -223,6 +265,19 @@ export const gateActionSchema = z.object({
 });
 export type GateAction = z.infer<typeof gateActionSchema>;
 
+/** Confirm (post the comment / push + open the PR) or skip a confirm node. The text is exactly what was shown. */
+export const confirmActionSchema = z.discriminatedUnion('action', [
+  z.object({
+    action: z.literal('confirm'),
+    confirm: z.literal(true),
+    text: z.string().min(1).max(60_000),
+    title: z.string().min(1).max(300).optional(),
+    targetBranch: z.string().min(1).max(200).optional(),
+  }),
+  z.object({ action: z.literal('skip'), note: z.string().max(2000).optional() }),
+]);
+export type ConfirmAction = z.infer<typeof confirmActionSchema>;
+
 export const evaluateActionSchema = z.object({
   scores: z.record(z.string(), z.number().int().min(1).max(5)),
   note: z.string().max(4000).optional(),
@@ -243,6 +298,9 @@ export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: stri
   'agent.run': { title: 'Agent run', description: 'Claude Code works in the ticket worktree and commits locally.' },
   'check.command': { title: 'Checks', description: 'Runs shell commands in the worktree (tests, lint); pass or fail.' },
   'ai.review': { title: 'AI review', description: 'Reviews the diff against the spec with skills; ends PASS or FAIL.' },
+  'doc.write': { title: 'Ticket doc', description: 'AI writes the ticket document into the repo (docs/<KEY>-<slug>.md) and commits it on the ticket branch.' },
+  'jira.comment': { title: 'Jira comment', description: 'AI drafts a comment with the Jira-comment skill; posted only after you confirm.' },
+  'git.pr': { title: 'Pull request', description: 'AI drafts the PR; after you confirm, the branch is pushed and a Bitbucket PR is opened.' },
   evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },
 };
 

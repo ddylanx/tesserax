@@ -133,7 +133,17 @@ export const playbookSchema = z.object({
 export type PlaybookDto = z.infer<typeof playbookSchema>;
 
 /** Jira project key -> repo path, or { path, base } where base is the branch new issue branches start from. */
-export const repoEntrySchema = z.union([z.string().min(1), z.object({ path: z.string().min(1), base: z.string().min(1).optional() })]);
+export const repoEntrySchema = z.union([
+  z.string().min(1),
+  z.object({
+    path: z.string().min(1),
+    base: z.string().min(1).optional(),
+    /** Git remote to push to (default: the base branch's remote, usually origin). */
+    remote: z.string().min(1).optional(),
+    /** Bitbucket "workspace/repo" when it cannot be read from the remote URL. */
+    bitbucket: z.string().regex(/^[\w.-]+\/[\w.-]+$/).optional(),
+  }),
+]);
 export const repoMapSchema = z.record(z.string().regex(/^[A-Z][A-Z0-9_]*$/), repoEntrySchema);
 export type RepoMap = z.infer<typeof repoMapSchema>;
 

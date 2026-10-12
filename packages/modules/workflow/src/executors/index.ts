@@ -3,7 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { dataDir } from '@ot/config';
 import type { NodeType } from '@ot/contracts';
-import { cleanEnv, diffInfo, diffPatch, launchDetached } from '@ot/mod-pipeline';
+import { cleanEnv, diffInfo, diffPatch, git, launchDetached } from '@ot/mod-pipeline';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, normalize, relative } from 'node:path';
 import { renderTemplate, withSkills } from '../render';
 import { askClaude } from './claude';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
@@ -132,7 +134,68 @@ const agentRun: NodeExecutor = async ctx => {
   return { async: true };
 };
 
+export const slugify = (s: string) =>
+  s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 50).replace(/-$/, '') || 'ticket';
+
+/** One read-only AI call that drafts a document (shared by doc.write, jira.comment, git.pr). */
+async function draft(ctx: NodeContext) {
+  const c = ctx.config;
+  const wt = await worktree(ctx);
+  const skill = c.skill ? ctx.skills.get(c.skill) : null;
+  const info = await diffInfo(wt.worktree, wt.baseRef).catch(() => null);
+  const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
+  const { text, run } = await askClaude({
+    bin: ctx.appConfig.CLAUDE_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools, timeoutSeconds: c.timeoutSeconds,
+    model: c.model ?? ctx.appConfig.PLAYBOOK_MODEL, maxBudgetUsd: c.maxBudgetUsd,
+  });
+  return { text, wt, info, cost: run.result?.total_cost_usd ?? null, turns: run.result?.num_turns ?? null, skillHash: skill?.hash ?? null };
+}
+
+/** Writes the ticket document into the repo and commits only that file on the ticket branch (local). */
+const docWrite: NodeExecutor = async ctx => {
+  const c = ctx.config;
+  const d = await draft(ctx);
+  const vars = { ...(await renderCtx(ctx, d.wt)) };
+  const rel = renderTemplate(c.path, vars).replace(/\{\{\s*slug\s*\}\}/g, slugify(ctx.task.title));
+  const abs = normalize(`${d.wt.worktree}/${rel}`);
+  if (relative(d.wt.worktree, abs).startsWith('..') || rel.includes('\0')) throw new FatalNodeError(`Document path leaves the repo: ${rel}`);
+  mkdirSync(dirname(abs), { recursive: true });
+  writeFileSync(abs, d.text.endsWith('\n') ? d.text : `${d.text}\n`);
+  const file = relative(d.wt.worktree, abs);
+  await git(d.wt.worktree, ['add', '--', file]);
+  const staged = (await git(d.wt.worktree, ['diff', '--cached', '--name-only', '--', file])).trim();
+  let commit: string | null = null;
+  if (staged) {
+    const msg = renderTemplate(c.commitMessage, vars).replace(/\{\{\s*slug\s*\}\}/g, slugify(ctx.task.title));
+    await git(d.wt.worktree, ['commit', '--no-verify', '-m', msg, '--', file]);
+    commit = (await git(d.wt.worktree, ['rev-parse', '--short', 'HEAD'])).trim();
+  }
+  return { port: 'next', artifact: { name: c.output, content: d.text }, output: { path: file, commit }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
+};
+
+const jiraComment: NodeExecutor = async ctx => {
+  const d = await draft(ctx);
+  return { wait: true, artifact: { name: ctx.config.output, content: d.text }, output: { issueKey: ctx.task.key }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
+};
+
+const gitPr: NodeExecutor = async ctx => {
+  const c = ctx.config;
+  const d = await draft(ctx);
+  const title = renderTemplate(c.title, await renderCtx(ctx, d.wt)).slice(0, 250);
+  const target = c.targetBranch || d.wt.baseRef.replace(/^[^/]+\//, '');
+  const dirty = (await git(d.wt.worktree, ['status', '--porcelain'])).split('\n').filter(Boolean);
+  return {
+    wait: true,
+    artifact: { name: c.output, content: d.text },
+    output: { title, source: d.wt.branch, target, commits: d.info?.commits ?? [], uncommitted: dirty },
+    costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash,
+  };
+};
+
 export const EXECUTORS: Partial<Record<NodeType, NodeExecutor>> = {
+  'doc.write': docWrite,
+  'jira.comment': jiraComment,
+  'git.pr': gitPr,
   'trigger.jira': triggerJira,
   'ai.step': aiStep,
   'ai.review': aiReview,

@@ -29,7 +29,16 @@ export type NodeResult =
       numTurns?: number | null;
       skillHash?: string | null;
     }
-  | { async: true };
+  | { async: true }
+  /** Draft ready; wait for the user's confirmation (jira.comment, git.pr). */
+  | {
+      wait: true;
+      output?: Record<string, unknown>;
+      artifact?: { name: string; content: string };
+      costUsd?: number | null;
+      numTurns?: number | null;
+      skillHash?: string | null;
+    };
 
 /** An error that retrying will not fix (login, quota, missing repo mapping...). */
 export class FatalNodeError extends Error {}

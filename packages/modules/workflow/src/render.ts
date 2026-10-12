@@ -38,6 +38,8 @@ export function renderTemplate(template: string, c: RenderContext): string {
         return issueBlock(c.task);
       case 'issue_key':
         return c.task.key ?? '';
+      case 'issue_title':
+        return c.task.title;
       case 'branch':
         return c.branch ?? '';
       case 'base_ref':
