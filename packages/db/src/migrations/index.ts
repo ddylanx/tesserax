@@ -5,6 +5,7 @@ import * as m003 from './003_tasks';
 import * as m004 from './004_task_detail';
 import * as m005 from './005_pipeline';
 import * as m006 from './006_pipeline_feedback';
+import * as m007 from './007_workflows';
 
 /** Ordered list of migrations. Add new files here; names sort lexically. */
 export const migrations: Record<string, Migration> = {
@@ -14,4 +15,5 @@ export const migrations: Record<string, Migration> = {
   '004_task_detail': m004,
   '005_pipeline': m005,
   '006_pipeline_feedback': m006,
+  '007_workflows': m007,
 };

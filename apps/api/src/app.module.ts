@@ -4,11 +4,12 @@ import { McpModule } from '@ot/mod-mcp';
 import { PipelineModule } from '@ot/mod-pipeline';
 import { TasksModule } from '@ot/mod-tasks';
 import { TelegramModule } from '@ot/mod-telegram';
+import { WorkflowModule } from '@ot/mod-workflow';
 import { InfraModule } from './infra/infra.module';
 import { SystemController } from './system/system.controller';
 
 @Module({
-  imports: [InfraModule, McpModule, AgentsModule, TasksModule, PipelineModule, TelegramModule],
+  imports: [InfraModule, McpModule, AgentsModule, TasksModule, PipelineModule, WorkflowModule, TelegramModule],
   controllers: [SystemController],
 })
 export class AppModule {}

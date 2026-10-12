@@ -6,7 +6,7 @@ import { repoMapSchema, type RepoMap } from '@ot/contracts';
 
 /** config/repos.json (gitignored): Jira project key -> local git repo path. */
 export class RepoMapStore {
-  constructor(readonly file = join(findRepoRoot(), 'config', 'repos.json')) {}
+  constructor(readonly file = process.env.OT_REPOS_FILE || join(findRepoRoot(), 'config', 'repos.json')) {}
 
   read(): RepoMap {
     if (!existsSync(this.file)) return {};

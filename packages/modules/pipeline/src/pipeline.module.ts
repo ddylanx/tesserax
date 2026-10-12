@@ -50,8 +50,8 @@ export class PipelineModule implements OnModuleInit, OnApplicationBootstrap, OnM
     // Backup scan through pg-boss (keeps working if the in-process watcher moves to a separate worker later).
     this.schedules.register({ name: 'pipeline.watch', cron: '* * * * *', handler: () => scanRunningPlaybooks(this.db, this.queue, this.config) });
 
-    // New Jira issues (not the first import of a source) start a run.
-    this.tasks.onNewTasks(async taskIds => {
+    // New Jira issues (not the first import of a source) start a run, when AUTO_START=pipeline.
+    if (this.config.AUTO_START === 'pipeline') this.tasks.onNewTasks(async taskIds => {
       for (const id of taskIds) {
         const task = await this.tasks.getTask(id);
         if (!task || task.statusCategory === 'done') continue;

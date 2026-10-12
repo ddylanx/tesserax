@@ -23,6 +23,23 @@ process.stdin.on('end', async () => {
     if (mode === 'hang') setInterval(() => {}, 1000);
     return;
   }
+  const headless = args.includes('--session-id'); // agent runs pass a session id; read-only AI steps do not
+  if (!headless && input.includes('VERDICT: PASS or VERDICT: FAIL')) {
+    // FAKE_REVIEW=pass (default) | fail | fail-once (fails the first review in this folder, then passes)
+    const want = process.env.FAKE_REVIEW ?? 'pass';
+    let verdict = want === 'fail' ? 'FAIL' : 'PASS';
+    if (want === 'fail-once') {
+      const { existsSync } = await import('node:fs');
+      verdict = existsSync('.ot-fake-reviewed') ? 'PASS' : 'FAIL';
+      writeFileSync('.ot-fake-reviewed', '1');
+    }
+    return out({ subtype: 'success', is_error: false, result: `## Criteria\nFake review.\n\n## Problems\n${verdict === 'FAIL' ? '- Missing test for criterion 1' : 'None'}\n\nVERDICT: ${verdict}` });
+  }
+  if (!headless) {
+    const name = (input.match(/# Skill: ([\w-]+)/) ?? [])[1] ?? 'step';
+    const fb = input.includes('asks for these changes') ? '\n\n(Revised after developer feedback.)' : '';
+    return out({ subtype: 'success', is_error: false, result: `## Summary\nFake output of ${name} for the ticket.${fb}\n\n## Details\n- point one\n- point two` });
+  }
   // playbook run: make a visible change in the working folder
   await new Promise(r => setTimeout(r, Number(process.env.FAKE_CLAUDE_SLEEP ?? 1) * 1000));
   writeFileSync('OT_FAKE_CHANGE.md', `fake agent change\n`);

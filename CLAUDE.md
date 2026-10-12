@@ -11,7 +11,8 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/db` Kysely client, schema types, migrations (`src/migrations`, registered in `migrations/index.ts`), seed.
 - `packages/modules/*` feature modules (`@ot/mod-*`), each a Nest module with `jobs/` for its pg-boss handlers.
 - `packages/modules/pipeline` the automation pipeline: state machine (`states.ts`, `PipelineService.transition`), step jobs in `jobs/`, classifiers in `classify/`, Claude CLI runner + worktrees in `agent/`.
-- `playbooks/*.md` playbook definitions (frontmatter + prompt template). `config/repos.json` (gitignored) maps Jira project → local repo.
+- `packages/modules/workflow` node-based workflow engine (spec: `docs/specs/0001-workflow-engine.md`): `engine.service.ts` (runs, routing, gates, loops), `executors/` (one per node type), `jobs.ts`. Workflows in `workflows/*.workflow.json`, skills in `skills/*/SKILL.md`; node config schemas in `@ot/contracts` (`workflow.ts`).
+- `playbooks/*.md` playbook definitions (older pipeline) (frontmatter + prompt template). `config/repos.json` (gitignored) maps Jira project → local repo.
 - `.data/` (gitignored) worktrees and run logs. `scripts/fake-jira.mjs`, `scripts/fake-claude.mjs`, `fixtures/` for testing without accounts.
 - `infra/compose.dev.yml` Postgres 16 (pgvector image) on 127.0.0.1:54329.
 

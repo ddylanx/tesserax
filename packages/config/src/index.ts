@@ -37,6 +37,8 @@ export const envSchema = z.object({
 
   /** Claude Code CLI used for classification and playbook runs. */
   CLAUDE_BIN: z.string().default('claude'),
+  /** What a new Jira issue starts: the node workflow (default), the older pipeline, or nothing. */
+  AUTO_START: z.enum(['workflow', 'pipeline', 'off']).default('workflow'),
   /** claude-cli (default; falls back to rules on any failure) | rules */
   CLASSIFIER_ENGINE: z.enum(['claude-cli', 'rules']).default('claude-cli'),
   /** Model alias for classification (empty: the CLI's default). */

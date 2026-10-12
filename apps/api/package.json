@@ -19,6 +19,7 @@
     "@ot/mod-mcp": "workspace:*",
     "@ot/mod-pipeline": "workspace:*",
     "@ot/mod-tasks": "workspace:*",
+    "@ot/mod-workflow": "workspace:*",
     "@ot/mod-telegram": "workspace:*",
     "kysely": "^0.28.17",
     "reflect-metadata": "^0.2.2",

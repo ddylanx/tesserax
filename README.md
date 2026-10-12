@@ -34,7 +34,26 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 - **Agents**: Claude Code sessions on this machine: running / needs you / idle / ended, folder, git branch, last activity, prompt and tool counts, token usage. Click a row for its recent events. Fed by Claude Code hooks (below).
 - **System**: health of Postgres and pg-boss, workspaces, schedules, which integrations are configured.
 
-## Automation pipeline (Inbox)
+## Workflows (Runs)
+
+Each ticket runs through a **workflow**: a graph of nodes stored in `workflows/<id>.workflow.json` (see [spec 0001](docs/specs/0001-workflow-engine.md)). The default one:
+
+```
+Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you approve → Implement (agent, worktree ot/<KEY>)
+  → Tests + lint (fail → implement, max 2) → AI review vs spec (fail → implement, max 2) → you review the result → Score
+```
+
+- **Start**: "Start workflow" on the Tasks page, or automatically for new Jira issues (`AUTO_START=workflow`, the default; `pipeline` keeps the older Inbox flow, `off` disables).
+- **Runs page** (`/runs`): runs waiting for you, running, failed, done. A run's page shows the graph with each node's state; click a node for its documents (every version, AI or yours), its attempts, cost and errors.
+- **Gates**: edit the document (your version is what later steps use), approve, send it back with feedback (the AI step re-runs with your feedback), or reject.
+- **Score**: rate the result per criterion (1–5) with a note; stored with the run's workflow and skill versions for later comparison.
+- **Nodes**: `ai.step` (read-only `claude -p` with a skill → a document), `agent.run` (Claude Code in the worktree, commits locally, never pushes), `check.command` (shell commands in the worktree, e.g. `composer test`, `vendor/bin/pint --test`), `ai.review` (the agent reviews the diff against the spec and ends with `VERDICT: PASS/FAIL`), `human.gate`, `evaluate`.
+- **Skills**: `skills/<name>/SKILL.md` (Claude Code skill format): analyze-requirements, write-spec, implement-from-spec, code-review, project-conventions. Edit them to tune each stage; each node run records the skill's hash.
+- Loops have limits (`maxLoops`) and a fallback (`onLimit`), so a failing test does not loop forever.
+
+Coming next: the canvas editor for workflows and a Skills page (P1b), then ticket docs, Jira comment and Bitbucket PR nodes (P2).
+
+## Automation pipeline (Inbox, older flow)
 
 ```
 Jira issue ─▶ AI classifies ─▶ YOU decide ─▶ AI runs a playbook ─▶ result ─▶ YOU verify (true / false)

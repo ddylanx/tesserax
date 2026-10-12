@@ -29,6 +29,10 @@ export function TasksPage() {
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
   });
   const navigate = useNavigate();
+  const startWorkflow = useMutation({
+    mutationFn: (taskId: string) => api<{ runId: string; created: boolean }>(`/api/tasks/${taskId}/workflow-runs`, { method: 'POST', body: '{}' }),
+    onSuccess: r => navigate({ to: '/runs/$runId', params: { runId: r.runId } }),
+  });
   const runPipeline = useMutation({
     mutationFn: (taskId: string) => api<{ run: { id: string }; created: boolean }>(`/api/pipeline/tasks/${taskId}/runs`, { method: 'POST' }),
     onSuccess: r => navigate({ to: '/inbox', search: { run: r.run.id, group: 'all' } }),
@@ -102,9 +106,14 @@ export function TasksPage() {
                   <Td className="text-xs whitespace-nowrap">{t.dueAt ?? '–'}</Td>
                   <Td className="text-xs whitespace-nowrap text-muted-foreground">{timeAgo(t.updatedAt)}</Td>
                   <Td>
-                    <Button size="sm" variant="outline" title="Classify this issue and open it in the Inbox" disabled={runPipeline.isPending} onClick={() => runPipeline.mutate(t.id)}>
-                      <Play className="size-3" />Run pipeline
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button size="sm" title="Start the workflow (analyze → spec → implement → test → review)" disabled={startWorkflow.isPending} onClick={() => startWorkflow.mutate(t.id)}>
+                        <Play className="size-3" />Start workflow
+                      </Button>
+                      <Button size="sm" variant="ghost" title="Older pipeline: classify + playbook (Inbox)" disabled={runPipeline.isPending} onClick={() => runPipeline.mutate(t.id)}>
+                        Pipeline
+                      </Button>
+                    </div>
                   </Td>
                 </Tr>
               ))}

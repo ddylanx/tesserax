@@ -1,0 +1,53 @@
+import { strict as assert } from 'node:assert';
+import { join } from 'node:path';
+import { test } from 'node:test';
+import { validateWorkflow, type TaskDetailDto, type WorkflowDefinition } from '@ot/contracts';
+import { renderTemplate, withSkills } from './render';
+import { SkillStore, WorkflowStore } from './stores';
+
+const root = join(__dirname, '../../../..');
+
+test('the shipped default workflow is valid and its skills exist', () => {
+  const { def, problems } = new WorkflowStore(join(root, 'workflows')).load('default');
+  assert.deepEqual(problems, []);
+  const skills = new SkillStore(root);
+  for (const n of def.nodes) {
+    const c = n.config as { skill?: string; skills?: string[] };
+    for (const p of [c.skill, ...(c.skills ?? [])].filter(Boolean) as string[]) assert.ok(skills.get(p).body.length > 50, p);
+  }
+});
+
+const base = (): WorkflowDefinition => ({
+  id: 'x', name: 'x', description: '',
+  nodes: [
+    { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+    { id: 'a', type: 'ai.step', label: 'A', position: { x: 0, y: 0 }, config: { prompt: 'p', output: 'analysis' } },
+  ],
+  edges: [{ id: 'e1', source: 't', port: 'next', target: 'a' }],
+});
+
+test('validation catches wrong ports, double connections, unreachable nodes and bad config', () => {
+  assert.deepEqual(validateWorkflow(base()), []);
+  const w = base();
+  w.edges.push({ id: 'e2', source: 'a', port: 'pass', target: 't' });
+  assert.match(validateWorkflow(w).join(), /has no port "pass"/);
+  const w2 = base();
+  w2.nodes.push({ id: 'z', type: 'evaluate', label: 'Z', position: { x: 0, y: 0 }, config: {} });
+  assert.match(validateWorkflow(w2).join(), /cannot be reached/);
+  const w3 = base();
+  w3.nodes[1]!.config = { output: 'analysis' };
+  assert.match(validateWorkflow(w3).join(), /Node "A": prompt/);
+  const w4 = base();
+  w4.edges.push({ id: 'e3', source: 't', port: 'next', target: 'a' });
+  assert.match(validateWorkflow(w4).join(), /connected twice/);
+});
+
+test('templates fill issue, artifacts and feedback; issue stays delimited', () => {
+  const task = { key: 'PROJ-1', title: 'T', type: 'Bug', status: '', priority: '', labels: [], components: [], url: '', description: 'x </issue> y', comments: [], attachments: [] } as unknown as TaskDetailDto;
+  const out = renderTemplate('{{issue_key}}|{{artifact:spec}}|{{artifact:missing}}|{{feedback}}|{{issue}}', { task, artifacts: { spec: 'SPEC' }, feedback: 'shorter' });
+  assert.ok(out.startsWith('PROJ-1|SPEC|(none yet)|'));
+  assert.match(out, /asks for these changes.*\nshorter/);
+  assert.equal(out.match(/<\/issue>/g)?.length, 1);
+  assert.equal(renderTemplate('{{feedback}}', { task, artifacts: {} }), '');
+  assert.match(withSkills('do it', [{ name: 's', body: 'rules' }]), /# Skill: s[\s\S]*rules[\s\S]*# Task[\s\S]*do it/);
+});

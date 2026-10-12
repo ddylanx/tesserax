@@ -168,7 +168,88 @@ export interface PipelineFeedbackTable {
   created_at: Generated<Date>;
 }
 
+export type WorkflowRunStatus = 'running' | 'waiting' | 'failed' | 'done' | 'cancelled';
+export type NodeRunStatus = 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled';
+
+export interface WorkflowRunsTable {
+  id: Generated<string>;
+  task_id: string;
+  workflow_id: string;
+  workflow_hash: string;
+  workflow_snapshot: Json;
+  trigger: string;
+  status: ColumnType<WorkflowRunStatus, WorkflowRunStatus | undefined, WorkflowRunStatus>;
+  current_node_id: string | null;
+  repo_path: string | null;
+  base_ref: string | null;
+  branch: string | null;
+  worktree_path: string | null;
+  error: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+  finished_at: Timestamp | null;
+}
+
+export interface NodeRunsTable {
+  id: Generated<string>;
+  run_id: string;
+  seq: number;
+  node_id: string;
+  node_type: string;
+  attempt: Generated<number>;
+  via_edge: string | null;
+  status: ColumnType<NodeRunStatus, NodeRunStatus | undefined, NodeRunStatus>;
+  port: string | null;
+  input: Json;
+  output: Json;
+  error: string | null;
+  skill_hash: string | null;
+  cost_usd: number | null;
+  num_turns: number | null;
+  agent_session_id: string | null;
+  process_id: number | null;
+  run_dir: string | null;
+  created_at: Generated<Date>;
+  started_at: Timestamp | null;
+  ended_at: Timestamp | null;
+  waiting_ms: BigCount;
+}
+
+export interface ArtifactsTable {
+  id: Generated<string>;
+  run_id: string;
+  node_run_id: string | null;
+  name: string;
+  version: number;
+  author: 'ai' | 'user';
+  content: string;
+  created_at: Generated<Date>;
+}
+
+export interface RunEventsTable {
+  id: Generated<string>;
+  run_id: string;
+  node_run_id: string | null;
+  actor: string;
+  action: string;
+  detail: Json;
+  correlation_id: string | null;
+  created_at: Generated<Date>;
+}
+
+export interface EvaluationsTable {
+  run_id: string;
+  scores: Json;
+  note: string | null;
+  created_at: Generated<Date>;
+}
+
 export interface Database {
+  workflow_runs: WorkflowRunsTable;
+  node_runs: NodeRunsTable;
+  artifacts: ArtifactsTable;
+  run_events: RunEventsTable;
+  evaluations: EvaluationsTable;
   pipeline_feedback: PipelineFeedbackTable;
   pipeline_runs: PipelineRunsTable;
   pipeline_events: PipelineEventsTable;
@@ -190,3 +271,7 @@ export type Task = Selectable<TasksTable>;
 export type NewTask = Insertable<TasksTable>;
 export type PipelineRun = Selectable<PipelineRunsTable>;
 export type PipelineRunUpdate = Updateable<PipelineRunsTable>;
+export type WorkflowRun = Selectable<WorkflowRunsTable>;
+export type WorkflowRunUpdate = Updateable<WorkflowRunsTable>;
+export type NodeRun = Selectable<NodeRunsTable>;
+export type NodeRunUpdate = Updateable<NodeRunsTable>;
