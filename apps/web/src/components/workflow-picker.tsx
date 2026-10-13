@@ -8,7 +8,7 @@ import { Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
 
 type Issue = ConditionContext['issue'];
-type TaskRef = Issue & { id: string; key: string | null; title: string };
+type TaskRef = Issue & { id: string; key: string | null; title: string; source?: string };
 
 /** The workflows plus the routing rules (workflows/routing.json) that suggest one per task. */
 export function useWorkflowChoices() {
@@ -46,9 +46,13 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
   const runs = useQuery({ queryKey: ['wf', 'runs', 'all'], queryFn: () => api<WorkflowRunList>('/api/workflow-runs?status=all') });
   const active = runs.data?.runs.find(r => r.task.id === task.id && ['running', 'waiting', 'failed'].includes(r.status));
   const open = (runId: string) => navigate({ to: '/runs/$runId', params: { runId } });
+  const repos = useQuery({ queryKey: ['pipeline', 'repos'], queryFn: () => api<Record<string, { path: string }>>('/api/pipeline/repos') });
+  const [project, setProject] = useState(task.project ?? '');
+  const repoPath = repos.data?.[project]?.path;
   const startRun = () => api<{ runId: string; created: boolean; workflowId: string }>(`/api/tasks/${task.id}/workflow-runs`, { method: 'POST', body: JSON.stringify({ workflowId: value }) });
   const start = useMutation({
     mutationFn: async (restart: boolean) => {
+      if (project !== (task.project ?? '')) await api(`/api/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify({ project }) });
       if (restart && active) await api(`/api/workflow-runs/${active.id}/cancel`, { method: 'POST' });
       return startRun();
     },
@@ -68,6 +72,19 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
             Starting does not create a second run: it would reopen that one. To use the workflow below, cancel it and start again.
           </div>
         )}
+        <label className="flex flex-col gap-1 text-xs">Repo the work happens in
+          {task.source === 'local' ? (
+            <Select value={project} onChange={e => setProject(e.target.value)}>
+              <option value="">Choose the repo…</option>
+              {Object.entries(repos.data ?? {}).map(([k, r]) => <option key={k} value={k}>{k} → {r.path.split('/').filter(Boolean).at(-1)}</option>)}
+            </Select>
+          ) : (
+            <span className="rounded-md border bg-muted/40 px-2 py-1.5 text-sm">{project || '(no project)'}{repoPath ? ` → ${repoPath}` : ''}</span>
+          )}
+          {task.source === 'local' && repoPath && <span className="text-muted-foreground">{repoPath}</span>}
+          {project && repos.data && !repoPath && <span className="text-amber-600">“{project}” has no repo in config/repos.json: the run will fail at the worktree step.</span>}
+          {!project && <span className="text-amber-600">No repo chosen: the run cannot create a worktree.</span>}
+        </label>
         <label className="flex flex-col gap-1 text-xs">Workflow
           <WorkflowSelect value={value} onChange={setPicked} suggested={suggestion?.id} workflows={workflows} />
         </label>
@@ -87,7 +104,7 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
               </Button>
             </>
           ) : (
-            <Button disabled={!value || start.isPending || runs.isLoading} onClick={() => start.mutate(false)}><Play className="size-3.5" />Start</Button>
+            <Button disabled={!value || !project || start.isPending || runs.isLoading} onClick={() => start.mutate(false)}><Play className="size-3.5" />Start</Button>
           )}
         </div>
       </div>

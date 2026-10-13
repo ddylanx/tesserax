@@ -26,7 +26,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     description: task?.description ?? '',
     type: (LOCAL_TASK_TYPES as readonly string[]).includes(task?.type ?? '') ? (task!.type as Form['type']) : 'Task',
     priority: (task?.priority as Form['priority']) ?? undefined,
-    project: task?.project ?? Object.keys(repos.data ?? {})[0] ?? '',
+    project: task?.project ?? '',
     labels: task?.labels.join(', ') ?? '',
     dueAt: task?.dueAt ?? undefined,
     statusCategory: task?.statusCategory ?? 'todo',
@@ -35,11 +35,6 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     prUrl: task?.review?.prUrl ?? '',
   }));
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(prev => ({ ...prev, [k]: v }));
-  // the repo list arrives after the dialog opens: default a new task to the first project
-  useEffect(() => {
-    const first = Object.keys(repos.data ?? {})[0];
-    if (!task && first) setF(prev => (prev.project ? prev : { ...prev, project: first }));
-  }, [repos.data, task]);
   const isReview = f.type === 'Code review';
   const body = () => ({
     ...(task ? {} : { workspace: f.workspace }),
@@ -80,7 +75,9 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     mutationFn: () => api(`/api/tasks/${task!.id}`, { method: 'DELETE' }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); onClose(); },
   });
-  const projects = Object.keys(repos.data ?? {});
+  const repoMap = (repos.data ?? {}) as Record<string, { path?: string }>;
+  const projects = Object.keys(repoMap);
+  const repoName = (k: string) => `${k} → ${(repoMap[k]?.path ?? '').split('/').filter(Boolean).at(-1) ?? ''}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" onMouseDown={onClose}>
@@ -110,10 +107,10 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
             <textarea className="min-h-28 rounded-md border bg-background p-2 text-sm" value={f.description ?? ''} onChange={e => set('description', e.target.value)}
               placeholder={isReview ? 'What the PR should do, what to focus on…' : 'Context, expected behaviour, acceptance criteria…'} />
           </label>
-          <label className="flex flex-col gap-1 text-xs">Project (repo)
+          <label className="flex flex-col gap-1 text-xs">Repo (required)
             <Select value={f.project ?? ''} onChange={e => set('project', e.target.value)}>
-              <option value="">(none)</option>
-              {projects.map(p => <option key={p}>{p}</option>)}
+              <option value="">Choose the repo…</option>
+              {projects.map(p => <option key={p} value={p}>{repoName(p)}</option>)}
             </Select>
           </label>
           <label className="flex flex-col gap-1 text-xs">Priority
@@ -168,7 +165,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
           ) : <span />}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button disabled={!f.title.trim() || (isReview && !f.sourceBranch.trim()) || save.isPending} onClick={() => save.mutate()}>{task ? 'Save' : 'Create task'}</Button>
+            <Button disabled={!f.title.trim() || !f.project || (isReview && !f.sourceBranch.trim()) || save.isPending} onClick={() => save.mutate()}>{task ? 'Save' : 'Create task'}</Button>
           </div>
         </div>
       </div>
