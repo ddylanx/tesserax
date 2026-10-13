@@ -8,6 +8,7 @@ import { NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type Workf
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
 import { nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
+import { MarkdownPanel } from '@/components/markdown';
 import { QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -167,15 +168,16 @@ function ArtifactView({ run, name }: { run: WorkflowRunDetail; name: string }) {
   const a = versions.find(x => x.version === v) ?? versions[0];
   if (!a) return <p className="text-xs text-muted-foreground">No “{name}” yet.</p>;
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex items-center justify-between text-xs">
-        <span className="font-medium">{name}</span>
-        <select className="rounded border bg-card px-1 text-xs" value={a.version} onChange={e => setV(Number(e.target.value))}>
+    <MarkdownPanel
+      title={name}
+      text={a.content}
+      maxHeight="max-h-[28rem]"
+      extra={versions.length > 1 ? (
+        <select className="rounded border bg-card px-1 py-1 text-xs" value={a.version} onChange={e => setV(Number(e.target.value))}>
           {versions.map(x => <option key={x.version} value={x.version}>v{x.version} · {x.author} · {timeAgo(x.createdAt)}</option>)}
         </select>
-      </div>
-      <pre className="max-h-80 overflow-auto rounded-md bg-muted/50 p-2 text-xs whitespace-pre-wrap">{a.content}</pre>
-    </div>
+      ) : null}
+    />
   );
 }
 
@@ -305,10 +307,13 @@ function GatePanel({ run, cfg }: { run: WorkflowRunDetail; cfg: { show?: string[
       {cfg.instructions && <p className="rounded-md bg-amber-500/10 p-2 text-xs">{cfg.instructions}</p>}
       {(cfg.show ?? []).filter(n => !editable.includes(n)).map(n => <ArtifactView key={n} run={run} name={n} />)}
       {editable.map(n => (
-        <label key={n} className="flex flex-col gap-1 text-xs">
-          <span className="font-medium">{n} (editable; your version is what the next steps use)</span>
-          <textarea className="min-h-64 rounded-md border bg-background p-2 font-mono text-xs" value={edits[n] ?? ''} onChange={e => setEdits({ ...edits, [n]: e.target.value })} />
-        </label>
+        <MarkdownPanel
+          key={n}
+          title={<>{n} <span className="font-normal text-muted-foreground">(editable: your version is what the next steps use)</span></>}
+          text={edits[n] ?? ''}
+          onChange={v => setEdits({ ...edits, [n]: v })}
+          maxHeight="max-h-[32rem]"
+        />
       ))}
       {(cfg.show ?? []).includes('implementation') && <DiffToggle runId={run.id} />}
       <textarea className="min-h-16 rounded-md border bg-background p-2 text-sm" placeholder="Feedback for the AI (required to send back)" value={feedback} onChange={e => setFeedback(e.target.value)} />
@@ -359,7 +364,7 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
         </>
       )}
       <label className="flex flex-col gap-1 text-xs">{isPr ? 'Description' : 'Comment'} (edit before confirming)
-        <textarea className="min-h-56 rounded-md border bg-background p-2 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} />
+        <MarkdownPanel title="Text to post" text={text} onChange={setText} maxHeight="max-h-[32rem]" />
       </label>
       <label className="flex items-center gap-2 text-sm">
         <input type="checkbox" checked={sure} onChange={e => setSure(e.target.checked)} />
@@ -393,7 +398,7 @@ function PrCommentPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: Nod
         {' '}(into <code>{o.target}</code>). Nothing else changes on the PR. Needs BITBUCKET_API_TOKEN in .env; otherwise Skip.
       </p>
       {nodeRun.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{nodeRun.error}</p>}
-      <textarea className="min-h-56 rounded-md border bg-background p-2 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} />
+      <MarkdownPanel title="Text to post" text={text} onChange={setText} maxHeight="max-h-[32rem]" />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sure} onChange={e => setSure(e.target.checked)} />Post this review on the PR</label>
       <div className="flex gap-2">
         <Button disabled={!sure || !text.trim() || act.isPending} onClick={() => act.mutate({ action: 'confirm', confirm: true, text })}>Post comment</Button>
