@@ -50,6 +50,9 @@ importers:
       '@ot/mod-pipeline':
         specifier: workspace:*
         version: link:../../packages/modules/pipeline
+      '@ot/mod-skill-packages':
+        specifier: workspace:*
+        version: link:../../packages/modules/skill-packages
       '@ot/mod-tasks':
         specifier: workspace:*
         version: link:../../packages/modules/tasks
@@ -259,6 +262,28 @@ importers:
       zod:
         specifier: ^4.1.13
         version: 4.6.5
+    devDependencies:
+      '@swc-node/register':
+        specifier: ^1.10.10
+        version: 1.12.1(@swc/core@1.16.18)(@swc/types@0.1.28)(typescript@5.9.3)
+      '@swc/core':
+        specifier: ^1.13.5
+        version: 1.16.18
+
+  packages/modules/skill-packages:
+    dependencies:
+      '@nestjs/common':
+        specifier: ^11.1.6
+        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@ot/config':
+        specifier: workspace:*
+        version: link:../../config
+      '@ot/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ot/core':
+        specifier: workspace:*
+        version: link:../../core
     devDependencies:
       '@swc-node/register':
         specifier: ^1.10.10

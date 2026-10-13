@@ -18,6 +18,7 @@
     "@ot/mod-agents": "workspace:*",
     "@ot/mod-mcp": "workspace:*",
     "@ot/mod-pipeline": "workspace:*",
+    "@ot/mod-skill-packages": "workspace:*",
     "@ot/mod-tasks": "workspace:*",
     "@ot/mod-workflow": "workspace:*",
     "@ot/mod-telegram": "workspace:*",

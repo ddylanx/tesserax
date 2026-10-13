@@ -7,7 +7,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { AlertTriangle, LayoutGrid, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { validateWorkflow, type NodeType, type WorkflowDefinition, type WorkflowNode } from '@ot/contracts';
+import { validateWorkflow, type NodeType, type PackageSkill, type WorkflowDefinition, type WorkflowNode } from '@ot/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { tidyLayout } from '@/components/flow/layout';
 import { nodeTypes, type CardData } from '@/components/flow/node-card';
@@ -47,6 +47,9 @@ function Editor() {
   const wf = useQuery({ queryKey: ['wf', 'def', workflowId], queryFn: () => api<{ def: WorkflowDefinition; hash: string }>(`/api/workflows/${workflowId}`) });
   const types = useQuery({ queryKey: ['wf', 'node-types'], queryFn: () => api<NodeTypeInfo[]>('/api/node-types') });
   const skills = useQuery({ queryKey: ['skills'], queryFn: () => api<SkillInfo[]>('/api/skills') });
+  // Skills from installed packages (Skills page > Packages) are offered next to the repo's own, labelled with the package.
+  const pkgSkills = useQuery({ queryKey: ['skill-packages', 'skills'], queryFn: () => api<PackageSkill[]>('/api/skill-packages/skills') });
+  const allSkills = useMemo(() => [...(skills.data ?? []), ...(pkgSkills.data ?? []).map(s => ({ ...s, name: `${s.name} (${s.package})` }))], [skills.data, pkgSkills.data]);
   const info = useMemo(() => new Map((types.data ?? []).map(t => [t.type, t])), [types.data]);
   const portsOf = useCallback((t: string) => info.get(t as NodeType)?.ports ?? [], [info]);
 
@@ -398,7 +401,7 @@ function Editor() {
                   key={selNode.id}
                   node={selNode}
                   info={info.get(selNode.type)}
-                  skills={skills.data ?? []}
+                  skills={allSkills}
                   onChange={p => updateNode(selNode.id, p)}
                   onDelete={selNode.type === 'trigger.jira' ? undefined : () => handlers.current.remove(selNode.id)}
                 />
