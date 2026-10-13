@@ -1,13 +1,12 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { dataDir } from '@ot/config';
-import type { NodeType } from '@ot/contracts';
-import { cleanEnv, diffInfo, diffPatch, git, launchDetached } from '@ot/mod-pipeline';
+import type { AgentExecutor, NodeType } from '@ot/contracts';
+import { cleanEnv, diffInfo, diffPatch, git } from '@ot/mod-pipeline';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, relative } from 'node:path';
 import { renderTemplate, withSkills } from '../render';
-import { askClaude } from './claude';
+import { askAgent } from './claude';
+import { startAgent } from './agent';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
 
 async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?: string; baseRef?: string; branch?: string; diff?: string } = {}) {
@@ -36,13 +35,13 @@ const aiStep: NodeExecutor = async ctx => {
   const wt = await worktree(ctx);
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
-  const { text, run } = await askClaude({
-    bin: ctx.appConfig.CLAUDE_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools, timeoutSeconds: c.timeoutSeconds,
-    model: c.model ?? ctx.appConfig.PLAYBOOK_MODEL, maxBudgetUsd: c.maxBudgetUsd,
+  const { text, costUsd, numTurns } = await askAgent({
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
-    costUsd: run.result?.total_cost_usd ?? null, numTurns: run.result?.num_turns ?? null, skillHash: skill?.hash ?? null,
+    costUsd, numTurns, skillHash: skill?.hash ?? null,
   };
 };
 
@@ -56,15 +55,15 @@ const aiReview: NodeExecutor = async ctx => {
     `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\nEnd your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL`,
     skills,
   );
-  const { text, run } = await askClaude({
-    bin: ctx.appConfig.CLAUDE_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools, timeoutSeconds: c.timeoutSeconds,
-    model: c.model ?? ctx.appConfig.PLAYBOOK_MODEL, maxBudgetUsd: c.maxBudgetUsd,
+  const { text, costUsd, numTurns } = await askAgent({
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
   });
   const verdict = [...text.matchAll(/VERDICT:\s*(PASS|FAIL)/gi)].at(-1)?.[1]?.toUpperCase();
   if (!verdict) throw new Error('The review did not end with VERDICT: PASS or VERDICT: FAIL');
   return {
     port: verdict === 'PASS' ? 'pass' : 'fail', artifact: { name: c.output, content: text },
-    output: { verdict, filesChanged: info.files }, costUsd: run.result?.total_cost_usd ?? null, numTurns: run.result?.num_turns ?? null,
+    output: { verdict, filesChanged: info.files }, costUsd, numTurns,
     skillHash: skills.map(s => s.hash).join(',') || null,
   };
 };
@@ -118,20 +117,24 @@ const checkCommand: NodeExecutor = async ctx => {
   return { port: ok ? 'pass' : 'fail', artifact: { name: c.output, content: lines.join('\n') }, output: { results } };
 };
 
-const agentRun: NodeExecutor = async ctx => {
+/** Worktree + rendered prompt for an agent step (also used when you pick the executor later). */
+export async function prepareAgent(ctx: NodeContext) {
   const c = ctx.config;
   const wt = await worktree(ctx);
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
-  const sessionId = randomUUID();
-  const runDir = join(dataDir(ctx.appConfig), 'runs', ctx.run.id, ctx.nodeRun.id);
-  const pid = launchDetached({
-    bin: ctx.appConfig.CLAUDE_BIN, cwd: wt.worktree, runDir, prompt, sessionId,
-    permissionMode: c.permissionMode, allowedTools: c.allowedTools, maxBudgetUsd: c.maxBudgetUsd, model: c.model ?? ctx.appConfig.PLAYBOOK_MODEL,
-  });
-  await ctx.engine.patchNode(ctx.nodeRun.id, { process_id: pid, run_dir: runDir, agent_session_id: sessionId, skill_hash: skill?.hash ?? null });
-  await ctx.engine.event(ctx.run.id, 'job', 'agent_started', { pid, sessionId, worktree: wt.worktree }, ctx.nodeRun.id);
-  return { async: true };
+  return { worktree: wt.worktree, prompt, skillHash: skill?.hash ?? null };
+}
+
+/** executor "ask": wait for you to pick (CLI agent or an editor); otherwise start right away. */
+const agentRun: NodeExecutor = async ctx => {
+  const prepared = await prepareAgent(ctx);
+  // a loop back to this step (tests failed, review said fail) reuses the executor you picked the first time
+  const remembered = ((ctx.run.vars ?? {}) as { executor?: Record<string, AgentExecutor> }).executor?.[ctx.node.id];
+  const executor = ctx.config.executor === 'ask' ? remembered : ctx.config.executor;
+  if (!executor) return { wait: true, output: { choose: true, worktree: prepared.worktree } };
+  const started = await startAgent(ctx, executor, prepared);
+  return started.mode === 'running' ? { async: true } : { wait: true, output: started.output };
 };
 
 export const slugify = (s: string) =>
@@ -144,11 +147,11 @@ async function draft(ctx: NodeContext) {
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const info = await diffInfo(wt.worktree, wt.baseRef).catch(() => null);
   const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
-  const { text, run } = await askClaude({
-    bin: ctx.appConfig.CLAUDE_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools, timeoutSeconds: c.timeoutSeconds,
-    model: c.model ?? ctx.appConfig.PLAYBOOK_MODEL, maxBudgetUsd: c.maxBudgetUsd,
+  const { text, costUsd, numTurns } = await askAgent({
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
   });
-  return { text, wt, info, cost: run.result?.total_cost_usd ?? null, turns: run.result?.num_turns ?? null, skillHash: skill?.hash ?? null };
+  return { text, wt, info, cost: costUsd, turns: numTurns, skillHash: skill?.hash ?? null };
 }
 
 /** Writes the ticket document into the repo and commits only that file on the ticket branch (local). */

@@ -42,6 +42,8 @@ export const envSchema = z.object({
 
   /** Claude Code CLI used for classification and playbook runs. */
   CLAUDE_BIN: z.string().default('claude'),
+  /** Gemini CLI, an alternative engine for AI steps and agent runs. */
+  GEMINI_BIN: z.string().default('gemini'),
   /** What a new Jira issue starts: the node workflow (default), the older pipeline, or nothing. */
   AUTO_START: z.enum(['workflow', 'pipeline', 'off']).default('workflow'),
   /** claude-cli (default; falls back to rules on any failure) | rules */

@@ -3,6 +3,21 @@ import { taskDetailSchema, taskSchema } from './tasks';
 
 // ---------- node types ----------
 
+/**
+ * Who does an agent.run step: a CLI agent running in the background, or you in an editor (the worktree is opened
+ * there with the prompt ready; you click Done when finished). "ask" lets you choose when the step is reached.
+ */
+export const AGENT_EXECUTORS = ['claude-cli', 'gemini-cli', 'editor:antigravity', 'editor:antigravity-ide', 'editor:cursor', 'editor:vscode'] as const;
+export type AgentExecutor = (typeof AGENT_EXECUTORS)[number];
+export const AGENT_EXECUTOR_INFO: Record<AgentExecutor, { title: string; description: string; kind: 'cli' | 'editor' }> = {
+  'claude-cli': { title: 'Claude Code (CLI)', description: 'Runs headless in the worktree, commits locally. Uses your Claude plan.', kind: 'cli' },
+  'gemini-cli': { title: 'Gemini CLI', description: 'Runs headless in the worktree (file edits only, no shell). Uses your Google account.', kind: 'cli' },
+  'editor:antigravity': { title: 'Antigravity', description: 'Opens the worktree in Antigravity; you work with its agent, then click Done.', kind: 'editor' },
+  'editor:antigravity-ide': { title: 'Antigravity IDE', description: 'Opens the worktree in Antigravity IDE; you work with its agent, then click Done.', kind: 'editor' },
+  'editor:cursor': { title: 'Cursor', description: 'Opens the worktree in Cursor; you work with its agent, then click Done.', kind: 'editor' },
+  'editor:vscode': { title: 'VS Code', description: 'Opens the worktree in VS Code; you work there, then click Done.', kind: 'editor' },
+};
+
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
 
@@ -18,6 +33,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName,
     allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
+    engine: z.enum(['claude', 'gemini']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -28,6 +45,7 @@ export const nodeConfigSchemas = {
     editable: z.array(artifactName).default([]),
   }),
   'agent.run': z.object({
+    executor: z.enum(['ask', ...AGENT_EXECUTORS]).default('ask'),
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -49,6 +67,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName.default('review'),
     allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
+    engine: z.enum(['claude', 'gemini']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(900),
@@ -62,6 +82,8 @@ export const nodeConfigSchemas = {
     path: z.string().min(1).default('docs/{{issue_key}}-{{slug}}.md'),
     commitMessage: z.string().min(1).default('{{issue_key}}: add ticket document'),
     allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
+    engine: z.enum(['claude', 'gemini']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -72,6 +94,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName.default('jira_comment'),
     allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
+    engine: z.enum(['claude', 'gemini']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -85,6 +109,8 @@ export const nodeConfigSchemas = {
     /** Target branch; empty = the run's base branch (e.g. develop). */
     targetBranch: z.string().optional(),
     allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
+    engine: z.enum(['claude', 'gemini']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -334,6 +360,10 @@ export const confirmActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('skip'), note: z.string().max(2000).optional() }),
 ]);
 export type ConfirmAction = z.infer<typeof confirmActionSchema>;
+
+/** Pick who does a waiting agent.run step, or finish an editor hand-off. */
+export const executorActionSchema = z.object({ executor: z.enum(AGENT_EXECUTORS) });
+export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
 export const evaluateActionSchema = z.object({
   scores: z.record(z.string(), z.number().int().min(1).max(5)),

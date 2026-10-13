@@ -7,6 +7,7 @@ import type { ClassificationService } from '@ot/mod-pipeline';
 import type { TasksService } from '@ot/mod-tasks';
 import { FINALIZE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
 import { EXECUTORS } from './executors';
+import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
 import type { SkillStore } from './stores';
 
@@ -91,7 +92,11 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
   const nr = await d.db.selectFrom('node_runs').selectAll().where('id', '=', data.nodeRunId).executeTakeFirst();
   if (!nr || nr.status !== 'running') return;
   const run = await d.db.selectFrom('workflow_runs').selectAll().where('id', '=', nr.run_id).executeTakeFirstOrThrow();
-  const outcome = readOutcome(nr.run_dir!, nr.process_id, Boolean(data.timedOut));
+  const gemini = engineOf(nr.run_dir) === 'gemini';
+  const g = gemini ? readGeminiOutcome(nr.run_dir!, nr.process_id, Boolean(data.timedOut)) : null;
+  const outcome = g
+    ? { finished: g.finished, exitCode: g.exitCode, signal: g.signal as string, message: g.message, result: { result: g.text ?? undefined, total_cost_usd: undefined, num_turns: undefined } }
+    : readOutcome(nr.run_dir!, nr.process_id, Boolean(data.timedOut));
   if (!outcome.finished) throw new Error('Agent still running');
   const diff = run.worktree_path && run.base_ref ? await diffInfo(run.worktree_path, run.base_ref).catch(() => null) : null;
   const r = outcome.result;

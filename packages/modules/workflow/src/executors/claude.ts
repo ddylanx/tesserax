@@ -28,3 +28,21 @@ export async function askClaude(o: {
   if (!text) throw new Error('The AI returned an empty answer');
   return { text, run };
 }
+
+/** Read-only AI call with the step's engine: Claude Code (default) or Gemini CLI (approval mode "plan"). */
+export async function askAgent(o: {
+  engine?: 'claude' | 'gemini'; claudeBin: string; geminiBin: string; cwd: string; prompt: string; allowedTools: string[];
+  timeoutSeconds: number; model?: string; maxBudgetUsd?: number;
+}): Promise<{ text: string; costUsd: number | null; numTurns: number | null }> {
+  if (o.engine === 'gemini') {
+    const { runGemini } = await import('./gemini');
+    const r = await runGemini({ bin: o.geminiBin, cwd: o.cwd, prompt: o.prompt, timeoutMs: o.timeoutSeconds * 1000, model: o.model });
+    if (r.signal !== 'ok' || !r.text) {
+      const msg = `gemini ${r.signal}: ${r.message ?? 'empty answer'}`;
+      throw ['auth', 'quota', 'not_installed', 'untrusted'].includes(r.signal) ? new FatalNodeError(msg) : new Error(msg);
+    }
+    return { text: r.text, costUsd: null, numTurns: null };
+  }
+  const { text, run } = await askClaude({ bin: o.claudeBin, cwd: o.cwd, prompt: o.prompt, allowedTools: o.allowedTools, timeoutSeconds: o.timeoutSeconds, model: o.model, maxBudgetUsd: o.maxBudgetUsd });
+  return { text, costUsd: run.result?.total_cost_usd ?? null, numTurns: run.result?.num_turns ?? null };
+}

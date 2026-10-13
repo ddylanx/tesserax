@@ -6,16 +6,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
 import type { Db } from '@ot/db';
-import { diffInfo, diffPatch } from '@ot/mod-pipeline';
+import { ClassificationService, diffInfo, diffPatch } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
 import { askClaude } from './executors/claude';
 import { renderTemplate, withSkills } from './render';
 import { RunConflict, WorkflowEngine } from './engine.service';
+import { HandoffService } from './handoff.service';
 import { computeMetrics } from './metrics';
 import { SkillStore } from './stores';
 
@@ -37,7 +38,40 @@ export class WorkflowController {
     private readonly tasks: TasksService,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
-  ) {}
+    classifier: ClassificationService,
+  ) {
+    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier);
+  }
+
+  private readonly handoff: HandoffService;
+
+  /** Who can do agent steps on this machine (CLI agents and installed editors). */
+  @Get('agent-executors')
+  agentExecutors() {
+    return this.handoff.executors();
+  }
+
+  @Post('workflow-runs/:id/executor')
+  @HttpCode(200)
+  chooseExecutor(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = executorActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Pick one of the listed executors.');
+    return guard(() => this.handoff.choose(id, parsed.data.executor));
+  }
+
+  @Post('workflow-runs/:id/handoff/reopen')
+  @HttpCode(200)
+  reopenEditor(@Param('id', ParseUUIDPipe) id: string) {
+    return guard(() => this.handoff.reopen(id));
+  }
+
+  @Post('workflow-runs/:id/handoff/finish')
+  @HttpCode(200)
+  finishHandoff(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = handoffActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('outcome must be done or failed');
+    return guard(() => this.handoff.finish(id, parsed.data.outcome, parsed.data.note?.trim() || undefined));
+  }
 
   @Get('metrics')
   metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string) {

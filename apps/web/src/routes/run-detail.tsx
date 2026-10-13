@@ -164,6 +164,8 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
         {waiting && (node.type === 'jira.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type} output={cfg.output ?? ''} />}
+        {waiting && node.type === 'agent.run' && last?.output.choose === true && <ExecutorPicker run={run} error={last.error} />}
+        {waiting && node.type === 'agent.run' && typeof last?.output.handoff === 'string' && <HandoffPanel run={run} nodeRun={last} />}
         {!waiting && last?.status === 'done' && typeof last.output.prUrl === 'string' && (
           <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Pull request #{String(last.output.prId)}{last.output.existingPr ? ' (already open)' : ''} →</a>
         )}
@@ -281,6 +283,80 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
           {act.isPending ? 'Working…' : isPr ? 'Push and open PR' : 'Post comment'}
         </Button>
         <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
+      </div>
+      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
+    </div>
+  );
+}
+
+interface ExecutorOption { id: string; title: string; description: string; kind: 'cli' | 'editor'; available: boolean }
+
+/** Who does this step: a CLI agent in the background, or you in an editor with its own agent. */
+function ExecutorPicker({ run, error }: { run: WorkflowRunDetail; error: string | null }) {
+  const qc = useQueryClient();
+  const opts = useQuery({ queryKey: ['wf', 'executors'], queryFn: () => api<ExecutorOption[]>('/api/agent-executors') });
+  const pick = useMutation({
+    mutationFn: (executor: string) => api(`/api/workflow-runs/${run.id}/executor`, { method: 'POST', body: JSON.stringify({ executor }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  const group = (kind: 'cli' | 'editor') => (opts.data ?? []).filter(o => o.kind === kind);
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+        Who implements the approved spec? A CLI agent works in the background in the worktree <code>{run.branch}</code>. An editor opens that worktree with the prompt ready, you work with its agent, then click Done here.
+      </p>
+      {error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{error}</p>}
+      {(['cli', 'editor'] as const).map(kind => (
+        <div key={kind} className="flex flex-col gap-1.5">
+          <div className="text-xs font-medium">{kind === 'cli' ? 'Run in the background (CLI)' : 'Work in an editor'}</div>
+          {group(kind).map(o => (
+            <button
+              key={o.id}
+              disabled={!o.available || pick.isPending}
+              onClick={() => pick.mutate(o.id)}
+              className="flex flex-col items-start rounded-md border px-3 py-2 text-left hover:border-primary hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <span className="text-sm font-medium">{o.title}{!o.available && ' (not installed)'}</span>
+              <span className="text-xs text-muted-foreground">{o.description}</span>
+            </button>
+          ))}
+        </div>
+      ))}
+      {pick.isPending && <p className="text-xs text-muted-foreground">Starting…</p>}
+      {pick.error && <p className="text-sm text-red-600">{(pick.error as Error).message}</p>}
+      <p className="text-[11px] text-muted-foreground">If the work loops back here (tests or review failed), the same choice is reused.</p>
+    </div>
+  );
+}
+
+/** The worktree is open in an editor; you finish there and report back. */
+function HandoffPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: NodeRunDto }) {
+  const qc = useQueryClient();
+  const o = nodeRun.output as { handoff: string; worktree?: string; prompt?: string };
+  const [note, setNote] = useState('');
+  const [copied, setCopied] = useState(false);
+  const act = useMutation({
+    mutationFn: ({ path, body }: { path: string; body?: unknown }) => api(`/api/workflow-runs/${run.id}/handoff/${path}`, { method: 'POST', body: JSON.stringify(body ?? {}) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  const copy = () => navigator.clipboard.writeText(o.prompt ?? '').then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+        Opened in <b>{o.handoff.replace('editor:', '')}</b>: <code className="break-all">{o.worktree}</code> (branch <code>{run.branch}</code>).
+        Paste the prompt into its agent, work until it is done, commit on this branch if you can, then click <b>Done</b>.
+      </p>
+      <div className="flex items-center justify-between text-xs">
+        <span className="font-medium">Prompt for the agent</span>
+        <Button size="sm" variant="outline" onClick={copy}>{copied ? 'Copied' : 'Copy prompt'}</Button>
+      </div>
+      <pre className="max-h-64 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] whitespace-pre-wrap">{o.prompt}</pre>
+      <DiffToggle runId={run.id} />
+      <textarea className="min-h-14 rounded-md border bg-background p-2 text-sm" placeholder="Note (optional): what you did, what is left" value={note} onChange={e => setNote(e.target.value)} />
+      <div className="flex flex-wrap gap-2">
+        <Button disabled={act.isPending} onClick={() => act.mutate({ path: 'finish', body: { outcome: 'done', note: note || undefined } })}>Done, continue</Button>
+        <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate({ path: 'reopen' })}>Open again</Button>
+        <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ path: 'finish', body: { outcome: 'failed', note: note || undefined } })}>Couldn't finish</Button>
       </div>
       {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
     </div>
