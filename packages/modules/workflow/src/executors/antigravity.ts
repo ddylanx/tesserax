@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { cleanEnv, isAlive } from '@ot/mod-pipeline';
@@ -49,7 +49,8 @@ export function antigravitySignal(o: { out: AntigravityOutput | null; stderr: st
   if (o.out?.error || (o.out?.status && o.out.status !== 'SUCCESS')) return { signal: 'error', message: (o.out?.error ?? `status ${o.out?.status}`).slice(0, 500) };
   if (!o.out?.response?.trim()) {
     if (o.out?.denied_actions?.length) {
-      return { signal: 'denied', message: 'Antigravity tried to run a shell command, which headless mode refuses, and returned nothing. Run the step again, or choose another engine.' };
+      const what = [...new Set(o.out.denied_actions.map(a => a.action ?? a.display_name ?? 'a tool'))].join(', ');
+      return { signal: 'denied', message: `Antigravity was refused ${what} (headless mode cannot ask for permission) and answered nothing. The step is retried; if it keeps failing, choose another engine.` };
     }
     return { signal: 'no_output', message: o.stderr.trim().split('\n').at(-1)?.slice(0, 300) || `No result (exit ${o.exitCode}).` };
   }
@@ -57,13 +58,26 @@ export function antigravitySignal(o: { out: AntigravityOutput | null; stderr: st
 }
 
 /** No stdin prompt in `agy`: the prompt is attached to the flag (a bare value that starts with "-" would be read as a flag). */
-export const antigravityArgs = (mode: 'plan' | 'accept-edits', prompt: string, model?: string) => [
-  '--mode', mode, '--output-format', 'stream-json', ...(model ? ['--model', model] : []), `--print=${prompt}`,
+export const antigravityArgs = (mode: 'plan' | 'accept-edits', prompt: string, model?: string, addDirs: string[] = []) => [
+  '--mode', mode, '--output-format', 'stream-json', ...(model ? ['--model', model] : []), ...addDirs.flatMap(d => ['--add-dir', d]), `--print=${prompt}`,
 ];
+
+/**
+ * A git worktree's `.git` is a pointer into the main repository's `.git/worktrees/…`, outside the working folder, so
+ * reading it is refused headless. Plan mode is read-only, so that folder can safely be added to the workspace.
+ */
+export function gitCommonDir(cwd: string): string | null {
+  try {
+    const d = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'], { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+    return d || null;
+  } catch {
+    return null;
+  }
+}
 
 /** Shell commands are refused headless and make the model give up silently, so tell it up front. */
 export const withToolHint = (prompt: string) =>
-  `${prompt}\n\n(Tooling note: shell commands are not available in this run. Read files with your file view and search tools only.)`;
+  `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. Shell commands are not available, and you may only read files inside the working folder. Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused, do not stop: answer from what you have.)`;
 
 /** One headless call, read-only (`--mode plan`). */
 export function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
@@ -71,7 +85,8 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
     let stdout = '';
     let stderr = '';
     let timedOut = false;
-    const child = spawn(o.bin, antigravityArgs('plan', withToolHint(o.prompt), o.model), { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const git = gitCommonDir(o.cwd);
+    const child = spawn(o.bin, antigravityArgs('plan', withToolHint(o.prompt), o.model, git ? [git] : []), { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');

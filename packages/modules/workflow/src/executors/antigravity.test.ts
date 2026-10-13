@@ -38,6 +38,8 @@ test('antigravity: missing binary, parsing with log noise, prompt attached to --
   const args = antigravityArgs('plan', '- starts with a dash\nsecond line');
   assert.equal(args.at(-1), '--print=- starts with a dash\nsecond line');
   assert.deepEqual(args.slice(0, 2), ['--mode', 'plan']);
+  assert.deepEqual(antigravityArgs('plan', 'p', undefined, ['/repo/.git']).slice(-3), ['--add-dir', '/repo/.git', '--print=p']);
+  assert.match(antigravitySignal({ out: { status: 'SUCCESS', response: '', denied_actions: [{ action: 'read_file' }] }, stderr: '', exitCode: 0, timedOut: false }).message!, /refused read_file/);
 });
 
 test('live log: the event stream is written while running and rendered as readable lines', async () => {
