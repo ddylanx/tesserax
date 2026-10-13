@@ -79,7 +79,7 @@ function sh(cmd: string, cwd: string, timeoutMs: number): Promise<{ code: number
     let timedOut = false;
     const child = spawn('/bin/sh', ['-c', cmd], { cwd, env: cleanEnv(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     const keep = (d: Buffer) => {
-      out = (out + d.toString()).slice(-20_000);
+      out = (out + d.toString()).slice(-200_000);
     };
     child.stdout.on('data', keep);
     child.stderr.on('data', keep);
@@ -112,7 +112,13 @@ const checkCommand: NodeExecutor = async ctx => {
     const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()));
     results.push({ command: cmd, exitCode: r.code, seconds: Math.round(r.ms / 100) / 10 });
     const passed = r.code === 0 && !r.timedOut;
-    lines.push(`## ${passed ? '✅' : '❌'} \`${cmd}\` (exit ${r.timedOut ? 'timeout' : r.code}, ${Math.round(r.ms / 1000)}s)`, '', '```', r.out.slice(-6000).trim() || '(no output)', '```', '');
+    // PHP deprecation notices (hundreds of lines at boot) would push the actual failure out of the tail we keep
+    const notices = r.out.split('\n').filter(l => /^(PHP )?Deprecated: /.test(l)).length;
+    const shown = notices > 0 ? r.out.split('\n').filter(l => !/^(PHP )?Deprecated: /.test(l)).join('\n') : r.out;
+    lines.push(
+      `## ${passed ? '✅' : '❌'} \`${cmd}\` (exit ${r.timedOut ? 'timeout' : r.code}, ${Math.round(r.ms / 1000)}s)`, '', '```',
+      `${notices ? `(${notices} “Deprecated:” notices hidden)\n` : ''}${shown.replace(/\n{3,}/g, '\n\n').slice(-6000).trim() || '(no output)'}`, '```', '',
+    );
     if (!passed) {
       ok = false;
       break; // later commands usually depend on earlier ones
