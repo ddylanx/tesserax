@@ -1,5 +1,5 @@
 import { Link, Outlet } from '@tanstack/react-router';
-import { BarChart3, Bot, Boxes, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
+import { BarChart3, Bot, Boxes, FolderGit2, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
 
 const nav = [
   { to: '/runs', label: 'Runs', icon: Workflow },
@@ -7,6 +7,7 @@ const nav = [
   { to: '/skills', label: 'Skills', icon: Sparkles },
   { to: '/metrics', label: 'Metrics', icon: BarChart3 },
   { to: '/tasks', label: 'Tasks', icon: ListChecks },
+  { to: '/repos', label: 'Repos', icon: FolderGit2 },
   { to: '/agents', label: 'Agents', icon: Bot },
   { to: '/mcp', label: 'MCP', icon: Boxes },
   { to: '/system', label: 'System', icon: Server },

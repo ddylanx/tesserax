@@ -7,7 +7,8 @@ import type { AppConfig } from '@ot/config';
 import { dataDir } from '@ot/config';
 import type { TaskDetailDto } from '@ot/contracts';
 import type { WorkflowRun } from '@ot/db';
-import { RepoMapStore, resolveBaseRef } from '@ot/mod-pipeline';
+import { resolveBaseRef } from '@ot/mod-pipeline';
+import { repoRegistry } from '@ot/mod-repos';
 import { BitbucketClient, commentOnPr, findOpenPr, parseBitbucketRemote, parsePrUrl, remoteUrl } from './bitbucket';
 import type { WorkflowEngine } from './engine.service';
 import { FatalNodeError } from './executors/types';
@@ -22,8 +23,8 @@ const git = (cwd: string, args: string[], timeout = 120_000) => exec('git', args
  */
 export async function ensureReviewWorktree(engine: WorkflowEngine, config: AppConfig, run: WorkflowRun, task: TaskDetailDto) {
   const review = task.review!;
-  const entry = new RepoMapStore().entry(task.project);
-  if (!entry) throw new FatalNodeError(`No local repo is mapped for project ${task.project ?? '(none)'}. Set the project on the task (config/repos.json), then Retry.`);
+  const entry = repoRegistry.resolve(task);
+  if (!entry) throw new FatalNodeError(`No workplace for this task (project ${task.project ?? '(none)'}). Register one on the Repos page or pick one on the task, then Retry.`);
   const remote = entry.remote ?? 'origin';
   const base = await resolveBaseRef(entry.path, entry.base).catch(() => `${remote}/develop`);
   const target = review.targetBranch ?? base.replace(/^[^/]+\//, '');
@@ -58,10 +59,10 @@ export async function postReviewComment(config: AppConfig, run: WorkflowRun, tas
   const client = new BitbucketClient({ baseUrl: config.BITBUCKET_API_URL, email, token: config.BITBUCKET_API_TOKEN });
   let pr = task.review?.prUrl ? parsePrUrl(task.review.prUrl) : null;
   if (!pr) {
-    const entry = new RepoMapStore().entry(task.project);
+    const entry = repoRegistry.resolve(task);
     if (!entry || !run.branch) throw new Error('No PR link on the task and no repo/branch to look it up.');
     const repo = entry.bitbucket ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! } : parseBitbucketRemote(await remoteUrl(entry.path, entry.remote ?? 'origin'));
-    if (!repo) throw new Error('The repo is not on Bitbucket (or set "bitbucket": "workspace/repo" in config/repos.json).');
+    if (!repo) throw new Error('The repo is not on Bitbucket (or set its Bitbucket workspace/repo on the Repos page).');
     pr = await findOpenPr(client, repo.workspace, repo.slug, run.branch);
     if (!pr) throw new Error(`No open PR found for branch ${run.branch}. Add the PR link to the task.`);
   }

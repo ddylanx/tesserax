@@ -3,14 +3,13 @@ import { dataDir, type AppConfig } from '@ot/config';
 import type { ConfirmAction } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
 import type { Db, NodeRun, WorkflowRun } from '@ot/db';
-import { RepoMapStore, diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@ot/mod-pipeline';
+import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@ot/mod-pipeline';
+import { repoRegistry } from '@ot/mod-repos';
 import { TasksService } from '@ot/mod-tasks';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
 
 @Injectable()
 export class WorkflowVcsService {
-  readonly repos = new RepoMapStore();
-
   constructor(
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
@@ -34,9 +33,9 @@ export class WorkflowVcsService {
       return { worktree: path, repoPath: run.repo_path, baseRef: run.base_ref, branch: run.branch };
     }
     const task = await this.tasks.getTask(run.task_id);
-    const entry = this.repos.entry(task?.project ?? null);
+    const entry = task ? repoRegistry.resolve(task) : null;
     if (!entry) {
-      throw new Error(`No local repo is mapped for project ${task?.project ?? '(none)'}. Add it to config/repos.json (or in the run page), then Retry.`);
+      throw new Error(`No workplace for this task (project ${task?.project ?? '(none)'}). Register one on the Repos page or pick one on the task, then Retry.`);
     }
     const baseRef = await resolveBaseRef(entry.path, entry.base);
     const fetched = await fetchBase(entry.path, baseRef);
@@ -58,7 +57,7 @@ export class WorkflowVcsService {
     }
     const out = (nr.output ?? {}) as { title?: string; target?: string };
     const task = await this.tasks.getTask(run.task_id);
-    const entry = this.repos.entry(task?.project ?? null);
+    const entry = task ? repoRegistry.resolve(task) : null;
     const remote = entry?.remote ?? (run.base_ref.includes('/') ? run.base_ref.split('/')[0]! : 'origin');
     const target = a.targetBranch ?? out.target ?? run.base_ref.replace(/^[^/]+\//, '');
     const title = a.title ?? out.title ?? `${task?.key ?? ''}`;
@@ -70,7 +69,7 @@ export class WorkflowVcsService {
       ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! }
       : parseBitbucketRemote(await remoteUrl(run.repo_path, remote));
     if (!repo) {
-      throw new Error(`Remote "${remote}" is not a Bitbucket repository; set "bitbucket": "workspace/repo" for this project in config/repos.json.`);
+      throw new Error(`Remote "${remote}" is not a Bitbucket repository; set "Bitbucket workspace/repo" on the repository (Repos page).`);
     }
     const email = this.config.BITBUCKET_EMAIL ?? this.config.JIRA_EMAIL;
     if (!this.config.BITBUCKET_API_TOKEN || !email) {

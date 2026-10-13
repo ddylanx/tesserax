@@ -8,7 +8,7 @@ import {
 } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@ot/db';
-import { RepoMapStore, isAlive, stopProcess } from '@ot/mod-pipeline';
+import { isAlive, stopProcess } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
 import { RoutingStore, WorkflowStore } from './stores';
 import { ArtifactService } from './artifact.service';
@@ -30,7 +30,6 @@ export type RunListener = (run: WorkflowRunDto, event: 'waiting' | 'failed' | 'd
 export class WorkflowEngine {
   readonly workflows = new WorkflowStore();
   readonly routing = new RoutingStore();
-  readonly repos = new RepoMapStore();
   private listeners: RunListener[] = [];
 
   constructor(

@@ -13,6 +13,7 @@ import { CONFIG, DB } from '@ot/core';
 import type { Db } from '@ot/db';
 import { ClassificationService, diffInfo, diffPatch } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
+import { repoRegistry } from '@ot/mod-repos';
 import { askClaude } from './executors/claude';
 import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
@@ -186,7 +187,7 @@ export class WorkflowController {
       const skill = this.skills.get(this.skills.pathOf(name));
       const task = await this.tasks.getTask(parsed.data.taskId);
       if (!task) throw new Error('Task not found');
-      const repo = this.engine.repos.forProject(task.project);
+      const repo = repoRegistry.resolve(task)?.path ?? null;
       const cwd = repo ?? mkdtempSync(join(tmpdir(), 'ot-skill-'));
       try {
         const prompt = withSkills(renderTemplate(parsed.data.prompt, { task, artifacts: {}, repoPath: repo, worktreePath: repo }), [skill]);

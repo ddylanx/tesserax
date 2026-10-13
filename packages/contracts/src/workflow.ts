@@ -346,6 +346,8 @@ export const workflowRunDetailSchema = workflowRunSchema.extend({
   events: z.array(z.object({ id: z.string(), actor: z.string(), action: z.string(), detail: z.record(z.string(), z.unknown()), createdAt: z.string() })),
   evaluation: z.object({ scores: z.record(z.string(), z.number()), note: z.string().nullable() }).nullable(),
   mappedRepo: z.string().nullable(),
+  /** Workplace the task resolves to (Repos page). */
+  workplace: z.object({ id: z.string().nullable(), brand: z.string().nullable(), repository: z.string().nullable(), origin: z.string().nullable(), path: z.string() }).nullable(),
 });
 export type WorkflowRunDetail = z.infer<typeof workflowRunDetailSchema>;
 

@@ -9,4 +9,5 @@ dist
 coverage
 
 config/repos.json
+config/workplaces.json
 .data/

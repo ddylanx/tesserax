@@ -19,6 +19,8 @@ export const taskSchema = z.object({
   dueAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
   archived: z.boolean(),
+  /** Workplace picked for this task (Repos page); null = by project. */
+  workplaceId: z.string().nullable().optional(),
 });
 export type TaskDto = z.infer<typeof taskSchema>;
 
@@ -68,8 +70,10 @@ export const createLocalTaskSchema = z.object({
   description: z.string().max(50_000).optional(),
   type: z.enum(LOCAL_TASK_TYPES).default('Task'),
   priority: z.enum(['Highest', 'High', 'Medium', 'Low', 'Lowest']).optional(),
-  /** Project key from config/repos.json (decides the repo the workflow works in). */
+  /** Jira-style project key (routing rules, and the default workplace when none is picked). */
   project: z.string().max(50).optional(),
+  /** Workplace (Repos page) the workflow works in. */
+  workplaceId: z.string().max(60).nullable().optional(),
   labels: z.array(z.string().min(1).max(50)).max(20).default([]),
   dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   review: reviewTargetSchema.optional(),

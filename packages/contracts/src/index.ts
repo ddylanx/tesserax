@@ -5,3 +5,4 @@ export * from './tasks';
 export * from './pipeline';
 export * from './workflow';
 export * from './skill-packages';
+export * from './repos';

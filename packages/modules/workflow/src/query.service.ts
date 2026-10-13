@@ -9,14 +9,13 @@ import type {
 } from '@ot/contracts';
 import { DB } from '@ot/core';
 import type { Db } from '@ot/db';
-import { RepoMapStore } from '@ot/mod-pipeline';
+import { repoRegistry } from '@ot/mod-repos';
 import { TasksService } from '@ot/mod-tasks';
 
 export const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
 @Injectable()
 export class WorkflowQueryService {
-  readonly repos = new RepoMapStore();
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -58,7 +57,13 @@ export class WorkflowQueryService {
       ...dto,
       task: task!,
       workflow: base.workflow_snapshot as WorkflowDefinition,
-      mappedRepo: this.repos.forProject(task?.project ?? null),
+      ...(() => {
+        const w = task ? repoRegistry.resolve(task) : null;
+        return {
+          mappedRepo: w?.path ?? null,
+          workplace: w ? { id: w.workplaceId, brand: w.brand, repository: w.repositoryName, origin: w.origin, path: w.path } : null,
+        };
+      })(),
       nodeRuns: nodeRuns.map(n => ({
         id: n.id,
         seq: n.seq,

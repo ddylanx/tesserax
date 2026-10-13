@@ -8,6 +8,7 @@ import * as m006 from './006_pipeline_feedback';
 import * as m007 from './007_workflows';
 import * as m008 from './008_run_vars';
 import * as m009 from './009_local_tasks';
+import * as m010 from './010_task_workplace';
 
 /** Ordered list of migrations. Add new files here; names sort lexically. */
 export const migrations: Record<string, Migration> = {
@@ -20,4 +21,5 @@ export const migrations: Record<string, Migration> = {
   '007_workflows': m007,
   '008_run_vars': m008,
   '009_local_tasks': m009,
+  '010_task_workplace': m010,
 };

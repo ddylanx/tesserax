@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSyn
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { findRepoRoot } from '@ot/config';
+import { repoRegistry } from '@ot/mod-repos';
 import { repoMapSchema, type RepoMap } from '@ot/contracts';
 
 /** config/repos.json (gitignored): Jira project key -> local git repo path. */
@@ -14,7 +15,10 @@ export class RepoMapStore {
     return parsed.success ? parsed.data : {};
   }
 
+  /** The repo for a project: its workplace on the Repos page (config/workplaces.json), else this file. */
   entry(project: string | null): { path: string; base?: string; remote?: string; bitbucket?: string } | null {
+    const w = project ? repoRegistry.resolve({ project }) : null;
+    if (w) return { path: w.path, base: w.base, remote: w.remote, bitbucket: w.bitbucket };
     const e = project ? this.read()[project] : undefined;
     if (!e) return null;
     return typeof e === 'string' ? { path: e } : e;

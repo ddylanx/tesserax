@@ -131,6 +131,7 @@ export class TasksService {
       dueAt: r.due_at ? new Date(r.due_at).toISOString().slice(0, 10) : null,
       updatedAt: iso(r.updated_at_source),
       archived: r.archived_at != null,
+      workplaceId: r.workplace_id ?? null,
     };
   }
 
@@ -167,12 +168,19 @@ export class TasksService {
         workspace_id: source.workspace_id, source_id: source.id, external_id: randomUUID(), key, title: input.title,
         description: input.description ?? null, status: 'To Do', status_category: 'todo', priority: input.priority ?? null,
         project: input.project ?? null, type: input.type, labels: input.labels, due_at: input.dueAt ?? null,
-        review: input.review ? JSON.stringify(input.review) : null, created_at_source: new Date(), updated_at_source: new Date(),
+        review: input.review ? JSON.stringify(input.review) : null, workplace_id: input.workplaceId ?? null, created_at_source: new Date(), updated_at_source: new Date(),
         raw: JSON.stringify({ local: true }), synced_at: new Date(), detail_synced_at: new Date(),
       })
       .returning('id')
       .executeTakeFirstOrThrow();
     return (await this.getTask(row.id))!;
+  }
+
+  /** The workplace a task's workflow works in; any task (Jira too: this is our own field, not Jira's). */
+  async setWorkplace(id: string, workplaceId: string | null): Promise<TaskDetailDto> {
+    const r = await this.db.updateTable('tasks').set({ workplace_id: workplaceId }).where('id', '=', id).executeTakeFirst();
+    if (!Number(r.numUpdatedRows)) throw new Error('Task not found');
+    return (await this.getTask(id))!;
   }
 
   private async assertLocal(id: string) {
@@ -195,6 +203,7 @@ export class TasksService {
         ...(input.labels !== undefined ? { labels: input.labels } : {}),
         ...(input.dueAt !== undefined ? { due_at: input.dueAt } : {}),
         ...(input.review !== undefined ? { review: input.review ? JSON.stringify(input.review) : null } : {}),
+        ...(input.workplaceId !== undefined ? { workplace_id: input.workplaceId } : {}),
         ...(input.statusCategory ? { status_category: input.statusCategory, status: statusName[input.statusCategory] } : {}),
         updated_at_source: new Date(),
       })

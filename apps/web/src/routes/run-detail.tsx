@@ -125,8 +125,10 @@ export function RunDetailPage() {
             )}
             {r.branch && <span className="inline-flex items-center gap-1"><GitBranch className="size-3" />{r.branch}{r.baseRef ? ` from ${r.baseRef}` : ''}</span>}
             {r.worktreePath && <span title={r.worktreePath}>worktree: <code>{r.worktreePath.split('/').slice(-2).join('/')}</code></span>}
-            {r.mappedRepo && <span title={r.mappedRepo}>repo: <b>{r.mappedRepo.split('/').filter(Boolean).at(-1)}</b> ({r.task.project})</span>}
-            {!r.mappedRepo && <span className="text-amber-600">project {r.task.project} has no repo in config/repos.json</span>}
+            {r.workplace
+              ? <span title={`${r.workplace.path}${r.workplace.origin ? `\norigin ${r.workplace.origin}` : ''}`}>workplace: <b>{r.workplace.brand ?? r.task.project}</b> · {r.workplace.repository ?? r.workplace.path.split('/').filter(Boolean).at(-1)}{r.workplace.origin ? <> · <code>{r.workplace.origin.replace(/^.*[:/]([^/:]+\/[^/]+?)(\.git)?$/, '$1')}</code></> : null}</span>
+              : r.mappedRepo && <span title={r.mappedRepo}>repo: <b>{r.mappedRepo.split('/').filter(Boolean).at(-1)}</b> ({r.task.project})</span>}
+            {!r.mappedRepo && <span className="text-amber-600">project {r.task.project} has no workplace (Repos page)</span>}
             {!canChangeWorkflow(r) && <span>workflow {r.workflowId}@{r.workflowHash.slice(0, 7)}</span>}
             <span>cost ${r.costUsd.toFixed(2)}</span>
           </div>

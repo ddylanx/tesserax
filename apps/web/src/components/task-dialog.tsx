@@ -6,9 +6,11 @@ import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto } from '@ot/
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { WorkplaceInfo, WorkplaceSelect, resolveWorkplace, useRepoRegistry } from '@/components/workplace';
 import { suggestWorkflow, useWorkflowChoices } from '@/components/workflow-picker';
 
-type Form = Omit<CreateLocalTask, 'labels' | 'review'> & {
+type Form = Omit<CreateLocalTask, 'labels' | 'review' | 'workplaceId'> & {
+  workplaceId: string;
   labels: string;
   statusCategory: 'todo' | 'in_progress' | 'done';
   sourceBranch: string;
@@ -19,7 +21,6 @@ type Form = Omit<CreateLocalTask, 'labels' | 'review'> & {
 /** Create or edit a local task (Company or Personal). Code-review tasks also take the member's branch / PR. */
 export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto; onClose: () => void; onCreated?: (t: TaskDetailDto) => void }) {
   const qc = useQueryClient();
-  const repos = useQuery({ queryKey: ['pipeline', 'repos'], queryFn: () => api<Record<string, unknown>>('/api/pipeline/repos') });
   const [f, setF] = useState<Form>(() => ({
     workspace: (task?.workspace as 'company' | 'personal') ?? 'company',
     title: task?.title ?? '',
@@ -27,6 +28,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     type: (LOCAL_TASK_TYPES as readonly string[]).includes(task?.type ?? '') ? (task!.type as Form['type']) : 'Task',
     priority: (task?.priority as Form['priority']) ?? undefined,
     project: task?.project ?? '',
+    workplaceId: task?.workplaceId ?? '',
     labels: task?.labels.join(', ') ?? '',
     dueAt: task?.dueAt ?? undefined,
     statusCategory: task?.statusCategory ?? 'todo',
@@ -43,6 +45,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     type: f.type,
     priority: f.priority || undefined,
     project: f.project || undefined,
+    workplaceId: f.workplaceId || null,
     labels: f.labels.split(',').map(s => s.trim()).filter(Boolean),
     dueAt: f.dueAt || undefined,
     ...(task ? { statusCategory: f.statusCategory } : {}),
@@ -75,9 +78,13 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     mutationFn: () => api(`/api/tasks/${task!.id}`, { method: 'DELETE' }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['tasks'] }); onClose(); },
   });
-  const repoMap = (repos.data ?? {}) as Record<string, { path?: string }>;
-  const projects = Object.keys(repoMap);
-  const repoName = (k: string) => `${k} → ${(repoMap[k]?.path ?? '').split('/').filter(Boolean).at(-1) ?? ''}`;
+  const registry = useRepoRegistry();
+  const workplace = resolveWorkplace(registry.data, { project: f.project, workplaceId: f.workplaceId || null });
+  // picking a workplace also sets the project (routing rules, Jira-style key) when the task has none
+  const pickWorkplace = (id: string) => {
+    const w = registry.data?.workplaces.find(x => x.id === id);
+    setF(prev => ({ ...prev, workplaceId: id, project: prev.project || w?.projects[0] || '' }));
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" onMouseDown={onClose}>
@@ -107,11 +114,10 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
             <textarea className="min-h-28 rounded-md border bg-background p-2 text-sm" value={f.description ?? ''} onChange={e => set('description', e.target.value)}
               placeholder={isReview ? 'What the PR should do, what to focus on…' : 'Context, expected behaviour, acceptance criteria…'} />
           </label>
-          <label className="flex flex-col gap-1 text-xs">Repo (required)
-            <Select value={f.project ?? ''} onChange={e => set('project', e.target.value)}>
-              <option value="">Choose the repo…</option>
-              {projects.map(p => <option key={p} value={p}>{repoName(p)}</option>)}
-            </Select>
+          <label className="flex flex-col gap-1 text-xs sm:col-span-2">Workplace (required: repo checkout and brand)
+            <WorkplaceSelect view={registry.data} value={f.workplaceId ?? ''} onChange={pickWorkplace} required />
+            {registry.data && f.workplaceId && <WorkplaceInfo view={registry.data} w={workplace} />}
+            {registry.data && !registry.data.workplaces.length && <span className="text-amber-600">No workplace yet: add one on the Repos page.</span>}
           </label>
           <label className="flex flex-col gap-1 text-xs">Priority
             <Select value={f.priority ?? ''} onChange={e => set('priority', (e.target.value || undefined) as Form['priority'])}>
@@ -165,7 +171,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
           ) : <span />}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={onClose}>Cancel</Button>
-            <Button disabled={!f.title.trim() || !f.project || (isReview && !f.sourceBranch.trim()) || save.isPending} onClick={() => save.mutate()}>{task ? 'Save' : 'Create task'}</Button>
+            <Button disabled={!f.title.trim() || !f.workplaceId || (isReview && !f.sourceBranch.trim()) || save.isPending} onClick={() => save.mutate()}>{task ? 'Save' : 'Create task'}</Button>
           </div>
         </div>
       </div>
