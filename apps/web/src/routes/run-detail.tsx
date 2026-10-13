@@ -19,6 +19,34 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 
 
 
+const mmss = (ms: number) => {
+  const t = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(t / 60)}:${String(t % 60).padStart(2, '0')}`;
+};
+
+/** Proof of life on a running step: a pulsing dot, how long the step has run, and whether the API still answers. */
+function LiveStatus({ run, fetchedAt, failing }: { run: WorkflowRunDetail; fetchedAt: number; failing: boolean }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const step = [...run.nodeRuns].reverse().find(n => n.status === 'running' || n.status === 'queued');
+  const stale = failing || now - fetchedAt > 15_000;
+  if (run.status !== 'running' && !failing) return null;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="This page checks the server every 3 seconds">
+      <span className="relative flex size-2">
+        {!stale && <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-500 opacity-75" />}
+        <span className={cn('relative inline-flex size-2 rounded-full', stale ? 'bg-red-500' : 'bg-green-500')} />
+      </span>
+      {stale
+        ? `No answer from the server for ${mmss(now - fetchedAt)}: the API may be stopped, so this run is not being updated`
+        : step?.startedAt ? `${step.status === 'queued' ? 'queued' : 'running'} ${mmss(now - new Date(step.startedAt).getTime())}` : 'working'}
+    </span>
+  );
+}
+
 function useRunAction(runId: string) {
   const qc = useQueryClient();
   return useMutation({
@@ -87,6 +115,7 @@ export function RunDetailPage() {
             ) : <span className="text-lg font-semibold">{r.task.key}</span>}
             <Badge variant={RUN_STATUS[r.status]?.variant ?? 'outline'}>{RUN_STATUS[r.status]?.label ?? r.status}</Badge>
             {r.currentNodeLabel && <span className="text-sm text-muted-foreground">at “{r.currentNodeLabel}”</span>}
+            <LiveStatus run={r} fetchedAt={q.dataUpdatedAt} failing={q.isRefetchError} />
           </div>
           <div className="truncate text-sm">{r.task.title}</div>
           <div className="mt-1 flex flex-wrap gap-3 text-xs text-muted-foreground">
