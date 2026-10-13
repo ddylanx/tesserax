@@ -421,6 +421,9 @@ importers:
       '@ot/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
+      '@ot/mod-workflow':
+        specifier: workspace:*
+        version: link:../workflow
       grammy:
         specifier: ^1.37.0
         version: 1.46.0

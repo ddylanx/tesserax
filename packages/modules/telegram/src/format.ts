@@ -1,4 +1,4 @@
-import type { AgentSessionList, McpList, PipelineRunDto, TaskList } from '@ot/contracts';
+import type { AgentSessionList, McpList, PipelineRunDto, TaskList, WorkflowRunDto } from '@ot/contracts';
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const MAX = 3900; // Telegram limit is 4096
@@ -91,5 +91,20 @@ export function formatPipelineNotice(run: PipelineRunDto, to: string, webBaseUrl
       return [`🔴 <b>${key}</b> failed${run.errorStep ? ` at ${esc(run.errorStep)}` : ''}`, esc((run.error ?? '').slice(0, 300)), `Open: ${esc(link)}`].join('\n');
     default:
       return null;
+  }
+}
+
+/** Workflow run notification. Read-only: it only links to the run page. */
+export function formatWorkflowNotice(run: WorkflowRunDto, event: 'waiting' | 'failed' | 'done', webBaseUrl: string): string {
+  const link = `${webBaseUrl.replace(/\/+$/, '')}/runs/${run.id}`;
+  const key = esc(run.task.key ?? '?');
+  const title = esc(run.task.title.slice(0, 120));
+  switch (event) {
+    case 'waiting':
+      return [`🟠 <b>${key}</b> waiting for you${run.currentNodeLabel ? ` at ${esc(run.currentNodeLabel)}` : ''}`, title, `Open: ${esc(link)}`].join('\n');
+    case 'failed':
+      return [`🔴 <b>${key}</b> workflow failed`, title, esc((run.error ?? '').slice(0, 300)), `Open: ${esc(link)}`].filter(Boolean).join('\n');
+    case 'done':
+      return [`✅ <b>${key}</b> workflow done`, title, `Open: ${esc(link)}`].join('\n');
   }
 }

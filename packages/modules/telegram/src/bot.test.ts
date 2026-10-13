@@ -60,3 +60,20 @@ test('pipeline notices: decision, verify, failed; nothing for other states', asy
   assert.match(formatPipelineNotice(run, 'failed', 'http://x')!, /failed at run/);
   assert.equal(formatPipelineNotice(run, 'queued', 'http://x'), null);
 });
+
+test('workflow notices: waiting, failed, done link to the run page', async () => {
+  const { formatWorkflowNotice } = await import('./format');
+  const run = {
+    id: 'w1', status: 'waiting', workflowId: 'fix-bug', workflowHash: 'h', trigger: 'manual',
+    task: { id: 't', workspace: 'company', source: 'jira', key: 'DEMO-2', title: 'Pay <fails>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
+    currentNodeId: 'review', currentNodeLabel: 'Review plan', repoPath: null, baseRef: null, branch: null, worktreePath: null,
+    error: 'quota: limit', costUsd: 0, vars: {}, createdAt: '', updatedAt: '', finishedAt: null,
+  } as never;
+  const w = formatWorkflowNotice(run, 'waiting', 'http://127.0.0.1:5180/');
+  assert.match(w, /DEMO-2.*waiting for you at Review plan/);
+  assert.match(w, /Pay &lt;fails&gt;/);
+  assert.match(w, /\/runs\/w1/);
+  assert.match(formatWorkflowNotice(run, 'failed', 'http://x'), /workflow failed[\s\S]*quota: limit/);
+  assert.match(formatWorkflowNotice(run, 'done', 'http://x'), /workflow done/);
+});
+

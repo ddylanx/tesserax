@@ -14,6 +14,7 @@
     "@ot/mod-mcp": "workspace:*",
     "@ot/mod-pipeline": "workspace:*",
     "@ot/mod-tasks": "workspace:*",
+    "@ot/mod-workflow": "workspace:*",
     "grammy": "^1.37.0"
   },
   "devDependencies": { "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }

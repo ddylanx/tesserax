@@ -6,13 +6,14 @@ import { AgentsModule, AgentsService } from '@ot/mod-agents';
 import { McpModule, McpService } from '@ot/mod-mcp';
 import { PipelineModule, PipelineService } from '@ot/mod-pipeline';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
+import { WorkflowEngine, WorkflowModule } from '@ot/mod-workflow';
 import { HELP, createBot } from './bot';
-import { formatPipelineNotice } from './format';
+import { formatPipelineNotice, formatWorkflowNotice } from './format';
 
 const log = createLogger('telegram');
 
 /** Read-only Telegram bot over long polling (no public URL needed). Off when TELEGRAM_BOT_TOKEN is empty. */
-@Module({ imports: [TasksModule, AgentsModule, McpModule, PipelineModule] })
+@Module({ imports: [TasksModule, AgentsModule, McpModule, PipelineModule, WorkflowModule] })
 export class TelegramModule implements OnApplicationBootstrap, OnApplicationShutdown {
   private bot?: Bot;
 
@@ -22,18 +23,30 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
     private readonly agents: AgentsService,
     private readonly mcp: McpService,
     private readonly pipeline: PipelineService,
+    private readonly workflow: WorkflowEngine,
   ) {}
+
+  private async notify(text: string) {
+    if (!this.bot) return;
+    for (const userId of this.config.TELEGRAM_ALLOWED_USER_IDS) {
+      await this.bot.api
+        .sendMessage(userId, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } })
+        .catch(err => log.warn({ err: (err as Error).message, userId }, 'telegram notify failed'));
+    }
+  }
 
   /** Notifications only (no actions from Telegram yet): classification ready, awaiting verify, failed. */
   private subscribePipeline() {
     this.pipeline.onTransition(async (run, _from, to) => {
       const text = formatPipelineNotice(run, to, this.config.WEB_BASE_URL);
-      if (!text || !this.bot) return;
-      for (const userId of this.config.TELEGRAM_ALLOWED_USER_IDS) {
-        await this.bot.api
-          .sendMessage(userId, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } })
-          .catch(err => log.warn({ err: (err as Error).message, userId }, 'telegram notify failed'));
-      }
+      if (text) await this.notify(text);
+    });
+  }
+
+  /** Workflow runs: waiting for a person, failed, done. */
+  private subscribeWorkflow() {
+    this.workflow.onRunEvent(async (run, event) => {
+      await this.notify(formatWorkflowNotice(run, event, this.config.WEB_BASE_URL));
     });
   }
 
@@ -46,6 +59,7 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
     const allowed = this.config.TELEGRAM_ALLOWED_USER_IDS;
     if (allowed.length === 0) log.warn('TELEGRAM_ALLOWED_USER_IDS is empty: the bot will answer nobody except with their user id');
     this.subscribePipeline();
+    this.subscribeWorkflow();
     this.bot = createBot(token, allowed, {
       tasks: () => this.tasks.list({}),
       agents: () => this.agents.listSessions('active'),
