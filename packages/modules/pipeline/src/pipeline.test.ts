@@ -22,7 +22,7 @@ test('the main path is allowed and shortcuts are not', () => {
 const task = (over: Partial<TaskDetailDto>): TaskDetailDto => ({
   id: '1', workspace: 'company', source: 'jira', key: 'A-1', title: 'x', status: null, statusCategory: 'todo', priority: null,
   assignee: null, project: 'A', type: null, labels: [], url: null, dueAt: null, updatedAt: null, archived: false,
-  description: null, reporter: null, components: [], parent: null, sprint: null, createdAt: null, comments: [], attachments: [], ...over,
+  description: null, reporter: null, components: [], parent: null, sprint: null, createdAt: null, comments: [], attachments: [], review: null, ...over,
 });
 const playbooks = [
   { id: 'investigate-bug', name: '', appliesTo: ['bug'], description: '' },

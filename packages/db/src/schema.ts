@@ -97,6 +97,7 @@ export interface TasksTable {
   comments: Json;
   attachments: Json;
   detail_synced_at: Timestamp | null;
+  review: Json | null;
   url: string | null;
   due_at: ColumnType<Date | null, string | null | undefined, string | null>;
   created_at_source: Timestamp | null;

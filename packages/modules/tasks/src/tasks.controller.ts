@@ -1,5 +1,5 @@
-import { BadRequestException, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { taskQuerySchema, type TaskDetailDto, type TaskList } from '@ot/contracts';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import { createLocalTaskSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@ot/contracts';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -18,6 +18,32 @@ export class TasksController {
     const t = await this.tasks.getTask(id);
     if (!t) throw new NotFoundException();
     return t;
+  }
+
+  /** "New task": a local task in the Company or Personal workspace. */
+  @Post()
+  async create(@Body() body: unknown): Promise<TaskDetailDto> {
+    const parsed = createLocalTaskSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    return this.tasks.createLocal(parsed.data);
+  }
+
+  @Patch(':id')
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown): Promise<TaskDetailDto> {
+    const parsed = updateLocalTaskSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    return this.tasks.updateLocal(id, parsed.data).catch(e => {
+      throw new BadRequestException((e as Error).message);
+    });
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  async remove(@Param('id', ParseUUIDPipe) id: string) {
+    await this.tasks.deleteLocal(id).catch(e => {
+      throw new BadRequestException((e as Error).message);
+    });
+    return { ok: true };
   }
 
   @Post('sync')

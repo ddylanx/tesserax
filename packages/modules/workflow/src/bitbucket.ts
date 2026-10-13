@@ -45,7 +45,7 @@ export class BitbucketClient {
     this.auth = `Basic ${Buffer.from(`${o.email.trim()}:${o.token.trim()}`).toString('base64')}`;
   }
 
-  private async request<T>(path: string, init: { method?: string; body?: unknown; params?: Record<string, string> } = {}): Promise<T> {
+  async request<T>(path: string, init: { method?: string; body?: unknown; params?: Record<string, string> } = {}): Promise<T> {
     const url = new URL(`${this.o.baseUrl.replace(/\/+$/, '')}${path}`);
     for (const [k, v] of Object.entries(init.params ?? {})) url.searchParams.set(k, v);
     const res = await this.fetchFn(url, {
@@ -92,4 +92,35 @@ export class BitbucketClient {
     });
     return { id: pr.id, url: pr.links.html.href, state: pr.state, existing: false };
   }
+}
+
+export interface PrRef {
+  workspace: string;
+  slug: string;
+  id: number;
+  url: string;
+}
+
+/** ".../workspace/repo/pull-requests/123" -> parts */
+export function parsePrUrl(url: string): PrRef | null {
+  const m = url.match(/bitbucket\.org\/([\w.-]+)\/([\w.-]+)\/pull-requests\/(\d+)/i);
+  return m ? { workspace: m[1]!, slug: m[2]!, id: Number(m[3]), url } : null;
+}
+
+/** The open PR whose source branch is `source`, if any. */
+export async function findOpenPr(client: BitbucketClient, workspace: string, slug: string, source: string): Promise<PrRef | null> {
+  const r = await client.request<{ values?: Array<{ id: number; links: { html: { href: string } } }> }>(
+    `/repositories/${encodeURIComponent(workspace)}/${encodeURIComponent(slug)}/pullrequests`,
+    { params: { q: `source.branch.name="${source}" AND state="OPEN"` } },
+  );
+  const pr = r.values?.[0];
+  return pr ? { workspace, slug, id: pr.id, url: pr.links.html.href } : null;
+}
+
+/** Posts a general (non-inline) comment on a PR. Markdown. */
+export async function commentOnPr(client: BitbucketClient, pr: PrRef, markdown: string): Promise<{ id: number }> {
+  return client.request<{ id: number }>(
+    `/repositories/${encodeURIComponent(pr.workspace)}/${encodeURIComponent(pr.slug)}/pullrequests/${pr.id}/comments`,
+    { method: 'POST', body: { content: { raw: markdown } } },
+  );
 }

@@ -51,6 +51,37 @@ export const taskListSchema = z.object({
 });
 export type TaskList = z.infer<typeof taskListSchema>;
 
+/** For code-review tasks: the member's branch (and PR) to review. */
+export const reviewTargetSchema = z.object({
+  sourceBranch: z.string().min(1).max(200).regex(/^[\w./-]+$/, 'branch name'),
+  targetBranch: z.string().min(1).max(200).regex(/^[\w./-]+$/, 'branch name').optional(),
+  prUrl: z.string().url().optional(),
+});
+export type ReviewTarget = z.infer<typeof reviewTargetSchema>;
+
+export const LOCAL_TASK_TYPES = ['Bug', 'Story', 'Task', 'Question', 'Code review'] as const;
+
+/** "New task": a task kept only in Open Tesseract, in the Company or Personal workspace. */
+export const createLocalTaskSchema = z.object({
+  workspace: z.enum(['personal', 'company']),
+  title: z.string().min(1).max(300),
+  description: z.string().max(50_000).optional(),
+  type: z.enum(LOCAL_TASK_TYPES).default('Task'),
+  priority: z.enum(['Highest', 'High', 'Medium', 'Low', 'Lowest']).optional(),
+  /** Project key from config/repos.json (decides the repo the workflow works in). */
+  project: z.string().max(50).optional(),
+  labels: z.array(z.string().min(1).max(50)).max(20).default([]),
+  dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  review: reviewTargetSchema.optional(),
+});
+export type CreateLocalTask = z.infer<typeof createLocalTaskSchema>;
+
+export const updateLocalTaskSchema = createLocalTaskSchema
+  .omit({ workspace: true })
+  .partial()
+  .extend({ statusCategory: z.enum(['todo', 'in_progress', 'done']).optional(), review: reviewTargetSchema.nullable().optional() });
+export type UpdateLocalTask = z.infer<typeof updateLocalTaskSchema>;
+
 export const taskDetailSchema = taskSchema.extend({
   description: z.string().nullable(),
   reporter: z.string().nullable(),
@@ -58,6 +89,7 @@ export const taskDetailSchema = taskSchema.extend({
   parent: z.string().nullable(),
   sprint: z.string().nullable(),
   createdAt: z.string().nullable(),
+  review: reviewTargetSchema.nullable(),
   comments: z.array(z.object({ author: z.string().nullable(), created: z.string().nullable(), body: z.string() })),
   attachments: z.array(
     z.object({ filename: z.string(), mimeType: z.string().nullable(), size: z.number().nullable(), created: z.string().nullable(), author: z.string().nullable() }),

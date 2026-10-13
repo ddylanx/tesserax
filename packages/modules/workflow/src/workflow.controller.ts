@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
@@ -17,6 +17,7 @@ import { askClaude } from './executors/claude';
 import { renderTemplate, withSkills } from './render';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
+import { postReviewComment } from './review';
 import { computeMetrics } from './metrics';
 import { SkillStore } from './stores';
 
@@ -57,6 +58,35 @@ export class WorkflowController {
     const parsed = executorActionSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('Pick one of the listed executors.');
     return guard(() => this.handoff.choose(id, parsed.data.executor));
+  }
+
+  /** Post the approved review on the member's PR (confirm: true + the exact text), or skip. */
+  @Post('workflow-runs/:id/pr-comment')
+  @HttpCode(200)
+  prComment(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = prCommentActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('Needs { action: "confirm", confirm: true, text } or { action: "skip" }.');
+    return guard(async () => {
+      const nr = await this.db.selectFrom('node_runs').selectAll().where('run_id', '=', id).where('node_type', '=', 'pr.comment').where('status', '=', 'waiting').orderBy('seq', 'desc').executeTakeFirst();
+      if (!nr) throw new RunConflict('No PR comment is waiting on this run.');
+      if (parsed.data.action === 'skip') {
+        await this.engine.complete(nr.id, 'skipped', { skipped: true }, 'user', ['waiting']);
+        return { skipped: true };
+      }
+      const claimed = await this.db.updateTable('node_runs').set({ status: 'running', error: null }).where('id', '=', nr.id).where('status', '=', 'waiting').executeTakeFirst();
+      if (!Number(claimed.numUpdatedRows)) throw new RunConflict('Already being posted.');
+      try {
+        const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
+        const task = await this.tasks.getTask(run.task_id);
+        const result = await postReviewComment(this.config, run, task!, parsed.data.text);
+        await this.engine.event(id, 'user', 'pr_comment_posted', result, nr.id);
+        await this.engine.complete(nr.id, 'posted', { ...(nr.output as object), ...result }, 'user', ['running']);
+        return result;
+      } catch (e) {
+        await this.db.updateTable('node_runs').set({ status: 'waiting', error: String((e as Error).message).slice(0, 2000) }).where('id', '=', nr.id).where('status', '=', 'running').execute();
+        throw e;
+      }
+    });
   }
 
   @Post('workflow-runs/:id/handoff/reopen')

@@ -7,6 +7,7 @@ import { dirname, normalize, relative } from 'node:path';
 import { renderTemplate, withSkills } from '../render';
 import { askAgent } from './claude';
 import { startAgent } from './agent';
+import { ensureReviewWorktree } from '../review';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
 
 async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?: string; baseRef?: string; branch?: string; diff?: string } = {}) {
@@ -18,6 +19,8 @@ async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?
 }
 
 const worktree = async (ctx: NodeContext) => {
+  // code-review tasks work in a read-only checkout of the member's branch, compared with its target branch
+  if (ctx.task.review) return ensureReviewWorktree(ctx.engine, ctx.appConfig, ctx.run, ctx.task);
   try {
     return await ctx.engine.ensureRunWorktree(ctx.run.id);
   } catch (e) {
@@ -177,6 +180,7 @@ const docWrite: NodeExecutor = async ctx => {
 };
 
 const jiraComment: NodeExecutor = async ctx => {
+  if (ctx.task.source !== 'jira') return { port: 'skipped', output: { skipped: true, reason: 'not a Jira task' } };
   const d = await draft(ctx);
   return { wait: true, artifact: { name: ctx.config.output, content: d.text }, output: { issueKey: ctx.task.key }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
 };
@@ -209,7 +213,16 @@ const aiClassify: NodeExecutor = async ctx => {
   return { port: 'next', artifact: { name: 'classification', content: md }, output: { ...classification, engine } };
 };
 
+/** Waits for you to confirm posting the approved review on the member's PR (or Skip). */
+const prComment: NodeExecutor = async ctx => {
+  const from = ctx.config.from as string;
+  const text = ctx.artifacts[from];
+  if (!text?.trim()) return { port: 'skipped', output: { skipped: true, reason: `no "${from}" document to post` } };
+  return { wait: true, output: { from, source: ctx.run.branch, target: ctx.run.base_ref, prUrl: ctx.task.review?.prUrl ?? null, draft: text } };
+};
+
 export const EXECUTORS: Partial<Record<NodeType, NodeExecutor>> = {
+  'pr.comment': prComment,
   'ai.classify': aiClassify,
   'doc.write': docWrite,
   'jira.comment': jiraComment,

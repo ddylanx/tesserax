@@ -13,7 +13,7 @@ export const ACTIVE_PIPELINE_STATES: readonly PipelineStateDto[] = [
   'new', 'classifying', 'awaiting_decision', 'queued', 'running_playbook', 'awaiting_verify', 'failed',
 ];
 
-export const ISSUE_TYPES = ['bug', 'feature', 'chore', 'research', 'question'] as const;
+export const ISSUE_TYPES = ['bug', 'feature', 'chore', 'research', 'question', 'review'] as const;
 export const AUTOMATION_LEVELS = ['auto', 'assisted', 'manual'] as const;
 
 /** What the classifier must return (validated; anything else is rejected and falls back to rules). */

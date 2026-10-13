@@ -1,7 +1,8 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { jiraConfigured, type AppConfig } from '@ot/config';
-import type { TaskDetailDto, TaskDto, TaskList, TaskQuery } from '@ot/contracts';
+import { randomUUID } from 'node:crypto';
+import type { CreateLocalTask, TaskDetailDto, TaskDto, TaskList, TaskQuery, UpdateLocalTask } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, type Queue } from '@ot/core';
 import type { Db } from '@ot/db';
 import { JiraClient } from './jira/client';
@@ -108,6 +109,7 @@ export class TasksService {
       comments: (r.comments ?? []) as TaskDetailDto['comments'],
       attachments: (r.attachments ?? []) as TaskDetailDto['attachments'],
       createdAt: iso(r.created_at_source),
+      review: (r.review ?? null) as TaskDetailDto['review'],
     };
   }
 
@@ -130,6 +132,80 @@ export class TasksService {
       updatedAt: iso(r.updated_at_source),
       archived: r.archived_at != null,
     };
+  }
+
+  // ---------- local tasks (not from Jira) ----------
+
+  /** The "Local" source of a workspace, created on first use. */
+  private async localSource(workspace: 'personal' | 'company') {
+    const ws = await this.db.selectFrom('workspaces').select('id').where('slug', '=', workspace).executeTakeFirstOrThrow();
+    return this.db
+      .insertInto('sources')
+      .values({ workspace_id: ws.id, kind: 'local', name: 'Local', config: JSON.stringify({}) })
+      .onConflict(oc => oc.columns(['workspace_id', 'kind', 'name']).doUpdateSet({ name: 'Local' }))
+      .returning(['id', 'workspace_id'])
+      .executeTakeFirstOrThrow();
+  }
+
+  /** Keys like C-12 (Company) or P-3 (Personal); used for branch names (ot/C-12). */
+  private async nextLocalKey(sourceId: string, workspace: 'personal' | 'company') {
+    const prefix = workspace === 'company' ? 'C' : 'P';
+    const r = await this.db
+      .selectFrom('tasks')
+      .select(sql<number>`coalesce(max(nullif(regexp_replace(key, '^[A-Z]+-', ''), '')::int), 0)`.as('n'))
+      .where('source_id', '=', sourceId)
+      .executeTakeFirstOrThrow();
+    return `${prefix}-${Number(r.n) + 1}`;
+  }
+
+  async createLocal(input: CreateLocalTask): Promise<TaskDetailDto> {
+    const source = await this.localSource(input.workspace);
+    const key = await this.nextLocalKey(source.id, input.workspace);
+    const row = await this.db
+      .insertInto('tasks')
+      .values({
+        workspace_id: source.workspace_id, source_id: source.id, external_id: randomUUID(), key, title: input.title,
+        description: input.description ?? null, status: 'To Do', status_category: 'todo', priority: input.priority ?? null,
+        project: input.project ?? null, type: input.type, labels: input.labels, due_at: input.dueAt ?? null,
+        review: input.review ? JSON.stringify(input.review) : null, created_at_source: new Date(), updated_at_source: new Date(),
+        raw: JSON.stringify({ local: true }), synced_at: new Date(), detail_synced_at: new Date(),
+      })
+      .returning('id')
+      .executeTakeFirstOrThrow();
+    return (await this.getTask(row.id))!;
+  }
+
+  private async assertLocal(id: string) {
+    const t = await this.db.selectFrom('tasks as t').innerJoin('sources as s', 's.id', 't.source_id').select(['t.id', 's.kind']).where('t.id', '=', id).executeTakeFirst();
+    if (!t) throw new Error('Task not found');
+    if (t.kind !== 'local') throw new Error('Only local tasks can be changed here; Jira tasks are read-only.');
+  }
+
+  async updateLocal(id: string, input: UpdateLocalTask): Promise<TaskDetailDto> {
+    await this.assertLocal(id);
+    const statusName = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' } as const;
+    await this.db
+      .updateTable('tasks')
+      .set({
+        ...(input.title !== undefined ? { title: input.title } : {}),
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.priority !== undefined ? { priority: input.priority } : {}),
+        ...(input.project !== undefined ? { project: input.project || null } : {}),
+        ...(input.labels !== undefined ? { labels: input.labels } : {}),
+        ...(input.dueAt !== undefined ? { due_at: input.dueAt } : {}),
+        ...(input.review !== undefined ? { review: input.review ? JSON.stringify(input.review) : null } : {}),
+        ...(input.statusCategory ? { status_category: input.statusCategory, status: statusName[input.statusCategory] } : {}),
+        updated_at_source: new Date(),
+      })
+      .where('id', '=', id)
+      .execute();
+    return (await this.getTask(id))!;
+  }
+
+  async deleteLocal(id: string) {
+    await this.assertLocal(id);
+    await this.db.deleteFrom('tasks').where('id', '=', id).execute();
   }
 
   async syncNow(): Promise<{ queued: boolean }> {

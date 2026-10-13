@@ -13,6 +13,7 @@ const port = Number(process.argv[2] ?? 4499);
 const issues = () => JSON.parse(readFileSync(join(root, 'fixtures/jira/issues.json'), 'utf8'));
 const posted = [];
 const prs = [];
+const prComments = [];
 
 const pick = (issue, fields) => ({ id: issue.id, key: issue.key, fields: Object.fromEntries(Object.entries(issue.fields).filter(([k]) => !fields || fields.includes(k))) });
 const send = (res, status, body) => { res.writeHead(status, { 'content-type': 'application/json' }); res.end(JSON.stringify(body)); };
@@ -47,6 +48,19 @@ createServer((req, res) => {
     return;
   }
   if (url.pathname === '/_prs') return send(res, 200, prs);
+  const prc = url.pathname.match(/^\/2\.0\/repositories\/([^/]+)\/([^/]+)\/pullrequests\/(\d+)\/comments$/);
+  if (prc && req.method === 'POST') {
+    let body = '';
+    req.on('data', c => (body += c));
+    req.on('end', () => {
+      const c = { id: prComments.length + 1, pr: Number(prc[3]), repo: `${prc[1]}/${prc[2]}`, raw: JSON.parse(body).content.raw };
+      prComments.push(c);
+      console.log(`[fake-bitbucket] comment on PR #${c.pr}: ${c.raw.slice(0, 80)}`);
+      send(res, 201, { id: c.id });
+    });
+    return;
+  }
+  if (url.pathname === '/_pr_comments') return send(res, 200, prComments);
   const m = url.pathname.match(/^\/rest\/api\/3\/issue\/([^/]+)(\/comment)?$/);
   if (m) {
     const issue = issues().find(i => i.key === decodeURIComponent(m[1]) || i.id === m[1]);

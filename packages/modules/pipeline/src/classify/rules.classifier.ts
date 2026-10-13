@@ -9,15 +9,16 @@ export class RulesClassifier implements Classifier {
     const issueType = (task.type ?? '').toLowerCase();
     const labels = task.labels.map(l => l.toLowerCase());
     let type: Classification['type'];
-    if (issueType === 'bug' || labels.includes('bug')) type = 'bug';
+    if (/review/.test(issueType) || labels.includes('review') || labels.includes('code-review')) type = 'review';
+    else if (issueType === 'bug' || labels.includes('bug')) type = 'bug';
     else if (/spike|research/.test(issueType) || labels.includes('research')) type = 'research';
     else if (labels.includes('question') || task.title.trim().endsWith('?')) type = 'question';
     else if (/story|feature|improvement|epic/.test(issueType)) type = 'feature';
     else type = 'chore';
 
     const automation: Classification['automation'] =
-      type === 'question' || type === 'research' ? 'auto' : type === 'bug' || type === 'feature' ? 'assisted' : 'manual';
-    const preferred = { bug: 'investigate-bug', question: 'research-question', research: 'research-question', feature: null, chore: null }[type];
+      type === 'question' || type === 'research' || type === 'review' ? 'auto' : type === 'bug' || type === 'feature' ? 'assisted' : 'manual';
+    const preferred = ({ bug: 'investigate-bug', question: 'research-question', research: 'research-question', feature: null, chore: null, review: null } as const)[type];
     const playbook = preferred && playbooks.some(p => p.id === preferred) ? preferred : playbooks.find(p => p.appliesTo.includes(type))?.id ?? null;
 
     return {

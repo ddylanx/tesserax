@@ -165,6 +165,10 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
         {waiting && (node.type === 'jira.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type} output={cfg.output ?? ''} />}
         {waiting && node.type === 'agent.run' && last?.output.choose === true && <ExecutorPicker run={run} error={last.error} />}
+        {waiting && node.type === 'pr.comment' && last && <PrCommentPanel run={run} nodeRun={last} />}
+        {!waiting && last?.status === 'done' && node.type === 'pr.comment' && typeof last.output.prUrl === 'string' && last.port === 'posted' && (
+          <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Review posted on the PR →</a>
+        )}
         {waiting && node.type === 'agent.run' && typeof last?.output.handoff === 'string' && <HandoffPanel run={run} nodeRun={last} />}
         {!waiting && last?.status === 'done' && typeof last.output.prUrl === 'string' && (
           <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Pull request #{String(last.output.prId)}{last.output.existingPr ? ' (already open)' : ''} →</a>
@@ -282,6 +286,34 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
         <Button disabled={!sure || !text.trim() || act.isPending} onClick={() => act.mutate({ action: 'confirm', confirm: true, text, ...(isPr ? { title, targetBranch: target || undefined } : {}) })}>
           {act.isPending ? 'Working…' : isPr ? 'Push and open PR' : 'Post comment'}
         </Button>
+        <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
+      </div>
+      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
+    </div>
+  );
+}
+
+/** Post the approved review as a comment on the member's PR, after explicit confirmation. */
+function PrCommentPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: NodeRunDto }) {
+  const qc = useQueryClient();
+  const o = nodeRun.output as { draft?: string; source?: string; target?: string; prUrl?: string | null };
+  const [text, setText] = useState(o.draft ?? '');
+  const [sure, setSure] = useState(false);
+  const act = useMutation({
+    mutationFn: (body: unknown) => api(`/api/workflow-runs/${run.id}/pr-comment`, { method: 'POST', body: JSON.stringify(body) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+        After you confirm, this text is posted as a comment on the pull request {o.prUrl ? <a className="underline" href={o.prUrl} target="_blank" rel="noreferrer">{o.prUrl}</a> : <>for branch <code>{o.source}</code></>}
+        {' '}(into <code>{o.target}</code>). Nothing else changes on the PR. Needs BITBUCKET_API_TOKEN in .env; otherwise Skip.
+      </p>
+      {nodeRun.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{nodeRun.error}</p>}
+      <textarea className="min-h-56 rounded-md border bg-background p-2 font-mono text-xs" value={text} onChange={e => setText(e.target.value)} />
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sure} onChange={e => setSure(e.target.checked)} />Post this review on the PR</label>
+      <div className="flex gap-2">
+        <Button disabled={!sure || !text.trim() || act.isPending} onClick={() => act.mutate({ action: 'confirm', confirm: true, text })}>Post comment</Button>
         <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
       </div>
       {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}

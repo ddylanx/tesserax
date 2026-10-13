@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
-import { ExternalLink, Play, RefreshCw } from 'lucide-react';
+import { ExternalLink, Pencil, Play, Plus, RefreshCw } from 'lucide-react';
+import { TaskDialog } from '@/components/task-dialog';
 import { useState } from 'react';
-import type { TaskList, TaskQuery } from '@ot/contracts';
+import type { TaskDetailDto, TaskList, TaskQuery } from '@ot/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,8 @@ export function TasksPage() {
     mutationFn: (taskId: string) => api<{ run: { id: string }; created: boolean }>(`/api/pipeline/tasks/${taskId}/runs`, { method: 'POST' }),
     onSuccess: r => navigate({ to: '/inbox', search: { run: r.run.id, group: 'all' } }),
   });
+  const [dialog, setDialog] = useState<{ task?: TaskDetailDto } | null>(null);
+  const openEdit = (id: string) => api<TaskDetailDto>(`/api/tasks/${id}`).then(task => setDialog({ task }));
   const d = q.data;
   const tasks = d?.tasks ?? [];
 
@@ -57,9 +60,12 @@ export function TasksPage() {
           : 'Read-only tasks from Jira Cloud.'
       }
       actions={
-        <Button variant="outline" size="sm" disabled={!d?.jiraConfigured || sync.isPending} onClick={() => sync.mutate()}>
-          <RefreshCw className={`size-3.5 ${sync.isPending ? 'animate-spin' : ''}`} />Sync now
-        </Button>
+        <div className="flex gap-2">
+          <Button size="sm" onClick={() => setDialog({})}><Plus className="size-3.5" />New task</Button>
+          <Button variant="outline" size="sm" disabled={!d?.jiraConfigured || sync.isPending} onClick={() => sync.mutate()}>
+            <RefreshCw className={`size-3.5 ${sync.isPending ? 'animate-spin' : ''}`} />Sync now
+          </Button>
+        </div>
       }
     >
       {d && !d.jiraConfigured && (
@@ -101,7 +107,8 @@ export function TasksPage() {
               {tasks.map(t => (
                 <Tr key={t.id} className={t.archived ? 'opacity-60' : ''}>
                   <Td className="whitespace-nowrap">
-                    {t.url ? <a className="inline-flex items-center gap-1 font-medium hover:underline" href={t.url} target="_blank" rel="noreferrer">{t.key}<ExternalLink className="size-3" /></a> : t.key}
+                    {t.url ? <a className="inline-flex items-center gap-1 font-medium hover:underline" href={t.url} target="_blank" rel="noreferrer">{t.key}<ExternalLink className="size-3" /></a> : <span className="font-medium">{t.key}</span>}
+                    {t.source === 'local' && <div><Badge variant="outline">local</Badge></div>}
                   </Td>
                   <Td>
                     <div>{t.title}</div>
@@ -114,6 +121,7 @@ export function TasksPage() {
                   <Td className="text-xs whitespace-nowrap text-muted-foreground">{timeAgo(t.updatedAt)}</Td>
                   <Td>
                     <div className="flex gap-1">
+                      {t.source === 'local' && <Button size="sm" variant="ghost" title="Edit" onClick={() => openEdit(t.id)}><Pencil className="size-3" /></Button>}
                       <Button size="sm" title="Start the workflow (analyze → spec → implement → test → review)" disabled={startWorkflow.isPending} onClick={() => startWorkflow.mutate(t.id)}>
                         <Play className="size-3" />Start workflow
                       </Button>
@@ -128,6 +136,7 @@ export function TasksPage() {
           </Table>
         )}
       </Card>
+      {dialog && <TaskDialog task={dialog.task} onClose={() => setDialog(null)} />}
     </Page>
   );
 }

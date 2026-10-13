@@ -115,6 +115,10 @@ export const nodeConfigSchemas = {
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
   }),
+  'pr.comment': z.object({
+    /** The document to post (usually the review you approved at the previous gate). */
+    from: artifactName.default('review'),
+  }),
   evaluate: z.object({
     criteria: z.array(z.string().min(1)).min(1).default(['Meets the requirement', 'Code quality', 'Tests', 'Documentation']),
   }),
@@ -134,6 +138,7 @@ export const NODE_PORTS: Record<NodeType, readonly string[]> = {
   'doc.write': ['next'],
   'jira.comment': ['posted', 'skipped'],
   'git.pr': ['opened', 'skipped'],
+  'pr.comment': ['posted', 'skipped'],
   evaluate: ['end'],
 };
 
@@ -365,6 +370,11 @@ export type ConfirmAction = z.infer<typeof confirmActionSchema>;
 export const executorActionSchema = z.object({ executor: z.enum(AGENT_EXECUTORS) });
 export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
+export const prCommentActionSchema = z.discriminatedUnion('action', [
+  z.object({ action: z.literal('confirm'), confirm: z.literal(true), text: z.string().min(1).max(60_000) }),
+  z.object({ action: z.literal('skip') }),
+]);
+
 export const evaluateActionSchema = z.object({
   scores: z.record(z.string(), z.number().int().min(1).max(5)),
   note: z.string().max(4000).optional(),
@@ -389,6 +399,7 @@ export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: stri
   'doc.write': { title: 'Ticket doc', description: 'AI writes the ticket document into the repo (docs/<KEY>-<slug>.md) and commits it on the ticket branch.' },
   'jira.comment': { title: 'Jira comment', description: 'AI drafts a comment with the Jira-comment skill; posted only after you confirm.' },
   'git.pr': { title: 'Pull request', description: 'AI drafts the PR; after you confirm, the branch is pushed and a Bitbucket PR is opened.' },
+  'pr.comment': { title: 'Comment on PR', description: 'Posts the review you approved as a comment on the member\'s Bitbucket PR, only after you confirm.' },
   evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },
 };
 
