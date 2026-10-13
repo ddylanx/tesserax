@@ -14,6 +14,11 @@ const task: TaskDetailDto = {
 };
 const ctx = { task, playbooks: [{ id: 'investigate-bug', name: 'Investigate', appliesTo: ['bug'], description: 'x' }], mappedRepo: '/repo' };
 
+test('cleanEnv keeps our own settings and secrets away from child processes', () => {
+  const e = cleanEnv({ PATH: '/bin', NODE_ENV: 'development', DATABASE_URL: 'postgres://ot@127.0.0.1:54329/x', JIRA_API_TOKEN: 't', TELEGRAM_BOT_TOKEN: 't', DB_HOST: 'theirs' }, { OT_RUN_DIR: '/r' });
+  assert.deepEqual(e, { PATH: '/bin', NODE_ENV: 'development', DB_HOST: 'theirs', OT_RUN_DIR: '/r' });
+});
+
 test('cleanEnv drops variables a parent Claude Code session injects', () => {
   const e = cleanEnv({ PATH: '/bin', CLAUDECODE: '1', CLAUDE_CODE_SESSION_ID: 'x', ANTHROPIC_BASE_URL: 'http://x', ANTHROPIC_API_KEY: 'k' });
   assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_API_KEY', 'PATH']);

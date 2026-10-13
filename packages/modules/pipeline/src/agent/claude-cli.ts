@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { envSchema } from '@ot/config';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -8,9 +9,16 @@ import { dirname } from 'node:path';
  */
 const PARENT_SESSION_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_PREVIEW_|ANTHROPIC_BASE_URL$)/;
 
+/**
+ * Open Tesseract's own settings (<repo>/.env is loaded into process.env). A child process works in someone else's
+ * repo: it must not inherit our database URL or tokens (a Laravel test run connected to our Postgres through
+ * DATABASE_URL). Generic names (NODE_ENV, LOG_LEVEL) are kept.
+ */
+const OWN_ENV = new Set(Object.keys(envSchema.shape).filter(k => k !== 'NODE_ENV' && k !== 'LOG_LEVEL'));
+
 export function cleanEnv(env: NodeJS.ProcessEnv = process.env, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {};
-  for (const [k, v] of Object.entries(env)) if (!PARENT_SESSION_ENV.test(k)) out[k] = v;
+  for (const [k, v] of Object.entries(env)) if (!PARENT_SESSION_ENV.test(k) && !OWN_ENV.has(k)) out[k] = v;
   return { ...out, ...extra };
 }
 
