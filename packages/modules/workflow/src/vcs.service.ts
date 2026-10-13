@@ -3,7 +3,7 @@ import { dataDir, type AppConfig } from '@ot/config';
 import type { ConfirmAction } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
 import type { Db, NodeRun, WorkflowRun } from '@ot/db';
-import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@ot/mod-pipeline';
+import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@ot/agent-runtime';
 import { repoRegistry } from '@ot/mod-repos';
 import { TasksService } from '@ot/mod-tasks';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';

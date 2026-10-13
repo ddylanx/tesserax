@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { AUTOMATION_LEVELS, ISSUE_TYPES, classificationSchema, type Classification } from '@ot/contracts';
-import { runClaude } from '../agent/claude-cli';
+import { runClaude } from '@ot/agent-runtime';
 import type { Classifier, ClassifierContext } from './classifier';
 
 const SYSTEM = [

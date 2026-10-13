@@ -8,7 +8,7 @@ import {
 } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@ot/db';
-import { isAlive, stopProcess } from '@ot/mod-pipeline';
+import { isAlive, stopProcess } from '@ot/agent-runtime';
 import { TasksService } from '@ot/mod-tasks';
 import { RoutingStore, WorkflowStore } from './stores';
 import { ArtifactService } from './artifact.service';

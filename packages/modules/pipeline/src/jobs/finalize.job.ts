@@ -2,8 +2,7 @@ import type { AppConfig } from '@ot/config';
 import type { RunResult } from '@ot/contracts';
 import { createLogger, type JobMeta, type Queue } from '@ot/core';
 import type { Db } from '@ot/db';
-import { diffInfo } from '../agent/git';
-import { isAlive, readOutcome, stopProcess } from '../agent/launcher';
+import { diffInfo, isAlive, readOutcome, stopProcess } from '@ot/agent-runtime';
 import type { PipelineService } from '../pipeline.service';
 import { STEPS, STEP_RETRY, type StepJobData } from '../states';
 

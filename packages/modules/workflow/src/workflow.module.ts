@@ -2,7 +2,7 @@ import { Inject, Module, type OnApplicationBootstrap, type OnModuleDestroy, type
 import type { AppConfig } from '@ot/config';
 import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@ot/core';
 import type { Db } from '@ot/db';
-import { ClassificationService, PipelineModule } from '@ot/mod-pipeline';
+import { ClassificationService, ClassifyModule } from '@ot/mod-classify';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, WorkflowEngine } from './engine.service';
 import { finalizeAgentJob, runNodeJob, scanAgentNodes, type JobDeps } from './jobs';
@@ -15,7 +15,7 @@ import { WorkflowVcsService } from './vcs.service';
 const log = createLogger('workflow');
 
 @Module({
-  imports: [TasksModule, PipelineModule],
+  imports: [TasksModule, ClassifyModule],
   controllers: [WorkflowController],
   providers: [
     ArtifactService,

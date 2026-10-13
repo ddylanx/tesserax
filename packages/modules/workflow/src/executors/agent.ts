@@ -4,7 +4,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { dataDir } from '@ot/config';
 import { AGENT_EXECUTORS, AGENT_EXECUTOR_INFO, type AgentExecutor } from '@ot/contracts';
-import { launchDetached } from '@ot/mod-pipeline';
+import { launchDetached } from '@ot/agent-runtime';
 import { launchAntigravityDetached } from './antigravity';
 import { launchGeminiDetached } from './gemini';
 import type { NodeContext } from './types';

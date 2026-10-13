@@ -7,8 +7,7 @@ import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Database, Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
 import type { Transaction } from 'kysely';
 import { TasksService } from '@ot/mod-tasks';
-import { resolveBaseRef } from './agent/git';
-import { isAlive, stopProcess } from './agent/launcher';
+import { isAlive, resolveBaseRef, stopProcess } from '@ot/agent-runtime';
 import { RepoMapStore } from './repo-map';
 import { STATE_GROUPS, STEPS, STEP_RETRY, TransitionConflict, canTransition, type StepJobData, type StepName } from './states';
 

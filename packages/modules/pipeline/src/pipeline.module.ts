@@ -3,8 +3,7 @@ import type { AppConfig } from '@ot/config';
 import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@ot/core';
 import type { Db } from '@ot/db';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
-import { ClassificationService } from './classify/classification.service';
-import { ClaudeCliClassifier } from './classify/claude-cli.classifier';
+import { ClassificationService, ClassifyModule } from '@ot/mod-classify';
 import { runClassifyJob } from './jobs/classify.job';
 import { runFinalizeJob, scanRunningPlaybooks } from './jobs/finalize.job';
 import { runPlaybookJob } from './jobs/run-playbook.job';
@@ -16,10 +15,10 @@ import { STEPS, type StepJobData } from './states';
 const log = createLogger('pipeline');
 
 @Module({
-  imports: [TasksModule],
+  imports: [TasksModule, ClassifyModule],
   controllers: [PipelineController],
-  providers: [PipelineService, ClassificationService, { provide: PlaybookRegistry, useFactory: () => new PlaybookRegistry() }],
-  exports: [PipelineService, ClassificationService],
+  providers: [PipelineService, { provide: PlaybookRegistry, useFactory: () => new PlaybookRegistry() }],
+  exports: [PipelineService],
 })
 export class PipelineModule implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private watcher?: NodeJS.Timeout;
@@ -36,10 +35,6 @@ export class PipelineModule implements OnModuleInit, OnApplicationBootstrap, OnM
   ) {}
 
   onModuleInit() {
-    if (this.config.CLASSIFIER_ENGINE === 'claude-cli') {
-      this.classifier.usePrimary(new ClaudeCliClassifier({ bin: this.config.CLAUDE_BIN, model: this.config.CLASSIFIER_MODEL }));
-    }
-    log.info({ engine: this.config.CLASSIFIER_ENGINE, bin: this.config.CLAUDE_BIN }, 'classifier');
     this.queue.work<StepJobData>(STEPS.classify.queue, (data, meta) =>
       runClassifyJob({ pipeline: this.pipeline, tasks: this.tasks, classifier: this.classifier, playbooks: this.playbooks }, data, meta),
     );

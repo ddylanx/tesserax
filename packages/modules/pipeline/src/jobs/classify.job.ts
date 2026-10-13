@@ -1,6 +1,6 @@
 import type { JobMeta } from '@ot/core';
 import type { TasksService } from '@ot/mod-tasks';
-import type { ClassificationService } from '../classify/classification.service';
+import type { ClassificationService } from '@ot/mod-classify';
 import type { PipelineService } from '../pipeline.service';
 import type { PlaybookRegistry } from '../playbooks';
 import type { StepJobData } from '../states';

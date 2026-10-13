@@ -9,8 +9,10 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/contracts` Zod schemas + types shared by api and web (the API contract).
 - `packages/core` WorkContext (AsyncLocalStorage correlationId), pino logger, `Queue` (pg-boss wrapper), `ScheduleRegistry`, Nest injection tokens.
 - `packages/db` Kysely client, schema types, migrations (`src/migrations`, registered in `migrations/index.ts`), seed.
+- `packages/agent-runtime` git/worktree/diff helpers, Claude CLI runner, detached launcher; plain TS, no Nest.
 - `packages/modules/*` feature modules (`@ot/mod-*`), each a Nest module with `jobs/` for its pg-boss handlers.
-- `packages/modules/pipeline` the automation pipeline: state machine (`states.ts`, `PipelineService.transition`), step jobs in `jobs/`, classifiers in `classify/`, Claude CLI runner + worktrees in `agent/`.
+- `packages/modules/classify` `ClassifyModule`, `ClassificationService`: rules engine + Claude CLI classifier; used by pipeline and workflow.
+- `packages/modules/pipeline` the automation pipeline: state machine (`states.ts`, `PipelineService.transition`), step jobs in `jobs/`.
 - `packages/modules/workflow` node-based workflow engine (spec: `docs/specs/0001-workflow-engine.md`): `engine.service.ts` (runs, routing, gates, loops), `executors/` (one per node type), `jobs.ts`. Workflows in `workflows/*.workflow.json`, skills in `skills/*/SKILL.md`; node config schemas in `@ot/contracts` (`workflow.ts`).
 - `packages/modules/skill-packages` external skill packages: git repos installed into `skills/_packages/<id>/` (only SKILL.md/.md text, plus LICENSE), manifest `skills/packages.json` (source, ref, commit, version, category). Package skills are referenced by path like any skill.
 - `packages/modules/repos` repos registry (Repos page): repositories (origin, base branch) and their workplaces (a local checkout per brand, with the Jira projects that default to it), stored in `config/workplaces.json` (gitignored; created from `config/repos.json` the first time). A task runs in its picked workplace (`tasks.workplace_id`), else the first workplace registered for its project; resolve with `repoRegistry.resolve(task)`.
@@ -27,7 +29,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - Everything binds to 127.0.0.1; no auth in local mode. Never log or store secrets; `.env` is gitignored.
 - Pipeline state only changes through `PipelineService.transition` (guarded UPDATE + event). Steps start via `startStep` and run inside `runStep` (stale-job skip, retries, then failed).
 - Issue text is untrusted: keep it inside `<issue>` delimiters in every prompt. Never write to Jira except `postJiraComment`, which needs an explicit confirmed click.
-- Agent runs never push or merge (see `ALWAYS_DENIED` in `agent/launcher.ts`).
+- Agent runs never push or merge (see `ALWAYS_DENIED` in `packages/agent-runtime/src/launcher.ts`).
 - Logs: use `createLogger(scope)`; correlationId is added automatically inside a WorkContext (HTTP requests, jobs, bot updates).
 
 ## Commands

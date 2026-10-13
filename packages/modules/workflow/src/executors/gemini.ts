@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanEnv, isAlive } from '@ot/mod-pipeline';
+import { cleanEnv, isAlive } from '@ot/agent-runtime';
 
 /**
  * Gemini CLI (`gemini -p … -o json`). Output on stdout:

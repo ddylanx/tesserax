@@ -7,7 +7,7 @@ import type { AppConfig } from '@ot/config';
 import { dataDir } from '@ot/config';
 import type { TaskDetailDto } from '@ot/contracts';
 import type { WorkflowRun } from '@ot/db';
-import { resolveBaseRef } from '@ot/mod-pipeline';
+import { resolveBaseRef } from '@ot/agent-runtime';
 import { repoRegistry } from '@ot/mod-repos';
 import { BitbucketClient, commentOnPr, findOpenPr, parseBitbucketRemote, parsePrUrl, remoteUrl } from './bitbucket';
 import type { WorkflowEngine } from './engine.service';

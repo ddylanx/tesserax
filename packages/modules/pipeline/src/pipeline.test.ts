@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 import { ACTIVE_PIPELINE_STATES, PIPELINE_STATES, type TaskDetailDto } from '@ot/contracts';
-import { RulesClassifier } from './classify/rules.classifier';
+import { RulesClassifier } from '@ot/mod-classify';
 import { TRANSITIONS, canTransition } from './states';
 
 test('every state has a transition entry; terminal states have none', () => {

@@ -1,7 +1,8 @@
 import type { AppConfig } from '@ot/config';
 import { nodeConfigSchemas, type AgentExecutor } from '@ot/contracts';
 import type { Db } from '@ot/db';
-import { ClassificationService, diffInfo } from '@ot/mod-pipeline';
+import { diffInfo } from '@ot/agent-runtime';
+import { ClassificationService } from '@ot/mod-classify';
 import { TasksService } from '@ot/mod-tasks';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';

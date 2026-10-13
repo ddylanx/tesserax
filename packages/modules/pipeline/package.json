@@ -6,6 +6,8 @@
   "types": "src/index.ts",
   "scripts": { "typecheck": "tsc -p tsconfig.json", "test": "node --test -r @swc-node/register 'src/**/*.test.ts'" },
   "dependencies": {
+    "@ot/agent-runtime": "workspace:*",
+    "@ot/mod-classify": "workspace:*",
     "@ot/mod-repos": "workspace:*",
     "@nestjs/common": "^11.1.6",
     "@ot/config": "workspace:*",

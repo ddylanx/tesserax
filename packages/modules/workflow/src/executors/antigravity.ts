@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { cleanEnv, isAlive } from '@ot/mod-pipeline';
+import { cleanEnv, isAlive } from '@ot/agent-runtime';
 
 /**
  * Antigravity CLI (`agy --print <prompt> --output-format stream-json`, v1.3). One JSON event per stdout line

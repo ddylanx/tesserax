@@ -11,7 +11,8 @@ import {
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
 import type { Db } from '@ot/db';
-import { ClassificationService, diffInfo, diffPatch } from '@ot/mod-pipeline';
+import { diffInfo, diffPatch } from '@ot/agent-runtime';
+import { ClassificationService } from '@ot/mod-classify';
 import { TasksService } from '@ot/mod-tasks';
 import { repoRegistry } from '@ot/mod-repos';
 import { askClaude } from './executors/claude';

@@ -12,7 +12,8 @@
     "@ot/contracts": "workspace:*",
     "@ot/core": "workspace:*",
     "@ot/db": "workspace:*",
-    "@ot/mod-pipeline": "workspace:*",
+    "@ot/agent-runtime": "workspace:*",
+    "@ot/mod-classify": "workspace:*",
     "@ot/mod-tasks": "workspace:*",
     "kysely": "^0.28.17"
   },

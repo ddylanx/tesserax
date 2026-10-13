@@ -1,7 +1,7 @@
 import type { AppConfig } from '@ot/config';
 import type { TaskDetailDto, WorkflowNode } from '@ot/contracts';
 import type { NodeRun, WorkflowRun } from '@ot/db';
-import type { ClassificationService } from '@ot/mod-pipeline';
+import type { ClassificationService } from '@ot/mod-classify';
 import type { TasksService } from '@ot/mod-tasks';
 import type { WorkflowEngine } from '../engine.service';
 import type { SkillStore } from '../stores';

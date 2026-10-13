@@ -2,10 +2,10 @@ import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import type { TaskDetailDto } from '@ot/contracts';
-import { ClaudeCliClassifier, buildClassifyPrompt, extractJson } from '../classify/claude-cli.classifier';
-import { cleanEnv, detectSignal, runClaude } from './claude-cli';
+import { ClaudeCliClassifier, buildClassifyPrompt, extractJson } from './claude-cli.classifier';
+import { cleanEnv, detectSignal, runClaude } from '@ot/agent-runtime';
 
-const FAKE = join(__dirname, '../../../../../scripts/fake-claude.mjs');
+const FAKE = join(__dirname, '../../../../scripts/fake-claude.mjs');
 const task: TaskDetailDto = {
   id: '1', workspace: 'company', source: 'jira', key: 'DEMO-1', title: 'Login fails on Safari', status: 'To Do', statusCategory: 'todo',
   priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false,
