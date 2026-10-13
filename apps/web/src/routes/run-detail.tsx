@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
 import { RUN_STATUS } from './runs';
+import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker';
 
 
 
@@ -95,7 +96,7 @@ export function RunDetailPage() {
             {r.branch && <span className="inline-flex items-center gap-1"><GitBranch className="size-3" />{r.branch}{r.baseRef ? ` from ${r.baseRef}` : ''}</span>}
             {r.worktreePath && <span title={r.worktreePath}>worktree: <code>{r.worktreePath.split('/').slice(-2).join('/')}</code></span>}
             {!r.mappedRepo && <span className="text-amber-600">project {r.task.project} has no repo in config/repos.json</span>}
-            <span>workflow {r.workflowId}@{r.workflowHash.slice(0, 7)}</span>
+            {!canChangeWorkflow(r) && <span>workflow {r.workflowId}@{r.workflowHash.slice(0, 7)}</span>}
             <span>cost ${r.costUsd.toFixed(2)}</span>
           </div>
         </div>
@@ -104,6 +105,7 @@ export function RunDetailPage() {
           {active && <Button size="sm" variant="ghost" onClick={() => confirm('Cancel this run? A running agent is stopped.') && action.mutate({ path: 'cancel' })}>Cancel run</Button>}
         </div>
       </div>
+      <ChangeWorkflow run={r} />
       {r.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-700 dark:text-red-400">{r.error}</p>}
       {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
 

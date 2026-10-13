@@ -245,6 +245,14 @@ export class WorkflowController {
     return guard(() => this.engine.startRun(taskId, 'manual', body?.workflowId || undefined));
   }
 
+  /** Switch a run that has not got past its first step to another workflow (starts a new run). */
+  @Post('workflow-runs/:id/workflow')
+  @HttpCode(200)
+  changeWorkflow(@Param('id', ParseUUIDPipe) id: string, @Body() body: { workflowId?: string }) {
+    if (!body?.workflowId) throw new BadRequestException('workflowId is required');
+    return guard(() => this.engine.changeWorkflow(id, body.workflowId!));
+  }
+
   @Post('workflow-runs/:id/gate')
   @HttpCode(200)
   async gate(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {

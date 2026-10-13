@@ -269,6 +269,15 @@ export function routeWorkflow(r: WorkflowRouting, issue: ConditionContext['issue
   return r.rules.find(rule => conditionsMatch(rule.when, { issue }))?.workflow ?? r.default;
 }
 
+/** Steps that only set a run up; a run may still switch workflow after them. */
+const SETUP_NODE_TYPES: readonly string[] = ['trigger.jira', 'ai.classify'];
+
+/** A run can switch to another workflow while it is active and no real step has finished yet (skipped steps don't count). */
+export function canSwitchWorkflow(status: string, nodeRuns: { nodeType: string; status: string; output: Record<string, unknown> | null }[]): boolean {
+  if (!['running', 'waiting', 'failed'].includes(status)) return false;
+  return !nodeRuns.some(n => n.status === 'done' && !SETUP_NODE_TYPES.includes(n.nodeType) && !n.output?.skipped);
+}
+
 // ---------- runs ----------
 
 export const workflowRunStatusSchema = z.enum(['running', 'waiting', 'failed', 'done', 'cancelled']);

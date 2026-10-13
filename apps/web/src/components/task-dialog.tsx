@@ -1,10 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto } from '@ot/contracts';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { suggestWorkflow, useWorkflowChoices } from '@/components/workflow-picker';
 
 type Form = Omit<CreateLocalTask, 'labels' | 'review'> & {
   labels: string;
@@ -53,11 +55,26 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
       ? { sourceBranch: f.sourceBranch.trim(), targetBranch: f.targetBranch.trim() || undefined, prUrl: f.prUrl.trim() || undefined }
       : task ? null : undefined,
   });
+  // new tasks: optionally start a workflow right away (the routing rules suggest one)
+  const { workflows, routing } = useWorkflowChoices();
+  const suggested = suggestWorkflow(routing, { type: f.type, project: f.project, priority: f.priority, labels: body().labels })?.id ?? null;
+  const [startWith, setStartWith] = useState('');
+  const navigate = useNavigate();
   const save = useMutation({
-    mutationFn: () => (task
-      ? api<TaskDetailDto>(`/api/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify(body()) })
-      : api<TaskDetailDto>('/api/tasks', { method: 'POST', body: JSON.stringify(body()) })),
-    onSuccess: t => { qc.invalidateQueries({ queryKey: ['tasks'] }); onCreated?.(t); onClose(); },
+    mutationFn: async () => {
+      if (task) return { t: await api<TaskDetailDto>(`/api/tasks/${task.id}`, { method: 'PATCH', body: JSON.stringify(body()) }), runId: null };
+      const t = await api<TaskDetailDto>('/api/tasks', { method: 'POST', body: JSON.stringify(body()) });
+      const run = startWith
+        ? await api<{ runId: string }>(`/api/tasks/${t.id}/workflow-runs`, { method: 'POST', body: JSON.stringify({ workflowId: startWith === 'suggested' ? suggested : startWith }) })
+        : null;
+      return { t, runId: run?.runId ?? null };
+    },
+    onSuccess: ({ t, runId }) => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      onCreated?.(t);
+      onClose();
+      if (runId) navigate({ to: '/runs/$runId', params: { runId } });
+    },
   });
   const remove = useMutation({
     mutationFn: () => api(`/api/tasks/${task!.id}`, { method: 'DELETE' }),
@@ -117,6 +134,15 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
                 <option value="todo">To Do</option>
                 <option value="in_progress">In Progress</option>
                 <option value="done">Done</option>
+              </Select>
+            </label>
+          )}
+          {!task && (
+            <label className="flex flex-col gap-1 text-xs sm:col-span-2">After creating
+              <Select value={startWith} onChange={e => setStartWith(e.target.value)}>
+                <option value="">Don't start a workflow yet</option>
+                {suggested && <option value="suggested">Start workflow: {workflows.find(w => w.id === suggested)?.name ?? suggested} (suggested by rules)</option>}
+                {workflows.filter(w => w.id !== suggested).map(w => <option key={w.id} value={w.id}>Start workflow: {w.name}</option>)}
               </Select>
             </label>
           )}

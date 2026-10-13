@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { ExternalLink, Pencil, Play, Plus, RefreshCw } from 'lucide-react';
 import { TaskDialog } from '@/components/task-dialog';
+import { StartWorkflowDialog } from '@/components/workflow-picker';
 import { useState } from 'react';
-import type { TaskDetailDto, TaskList, TaskQuery } from '@ot/contracts';
+import type { TaskDetailDto, TaskDto, TaskList, TaskQuery } from '@ot/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,13 +31,7 @@ export function TasksPage() {
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
   });
   const navigate = useNavigate();
-  const [workflowId, setWorkflowId] = useState('');
-  const workflows = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string }[]>('/api/workflows') });
-  const startWorkflow = useMutation({
-    mutationFn: (taskId: string) =>
-      api<{ runId: string; created: boolean }>(`/api/tasks/${taskId}/workflow-runs`, { method: 'POST', body: JSON.stringify(workflowId ? { workflowId } : {}) }),
-    onSuccess: r => navigate({ to: '/runs/$runId', params: { runId: r.runId } }),
-  });
+  const [starting, setStarting] = useState<TaskDto | null>(null);
   const runPipeline = useMutation({
     mutationFn: (taskId: string) => api<{ run: { id: string }; created: boolean }>(`/api/pipeline/tasks/${taskId}/runs`, { method: 'POST' }),
     onSuccess: r => navigate({ to: '/inbox', search: { run: r.run.id, group: 'all' } }),
@@ -90,10 +85,6 @@ export function TasksPage() {
           <option value="">All projects</option>
           {d?.projects.map(p => <option key={p}>{p}</option>)}
         </Select>
-        <Select value={workflowId} onChange={e => setWorkflowId(e.target.value)} title="Workflow used by “Start workflow”">
-          <option value="">Workflow: by routing rules</option>
-          {workflows.data?.map(w => <option key={w.id} value={w.id}>Workflow: {w.name}</option>)}
-        </Select>
         <label className="flex items-center gap-1.5 text-sm">
           <input type="checkbox" checked={f.includeArchived === '1'} onChange={e => set('includeArchived')(e.target.checked ? '1' : '')} /> Show archived
         </label>
@@ -122,7 +113,7 @@ export function TasksPage() {
                   <Td>
                     <div className="flex gap-1">
                       {t.source === 'local' && <Button size="sm" variant="ghost" title="Edit" onClick={() => openEdit(t.id)}><Pencil className="size-3" /></Button>}
-                      <Button size="sm" title="Start the workflow (analyze → spec → implement → test → review)" disabled={startWorkflow.isPending} onClick={() => startWorkflow.mutate(t.id)}>
+                      <Button size="sm" title="Choose a workflow and start it" onClick={() => setStarting(t)}>
                         <Play className="size-3" />Start workflow
                       </Button>
                       <Button size="sm" variant="ghost" title="Older pipeline: classify + playbook (Inbox)" disabled={runPipeline.isPending} onClick={() => runPipeline.mutate(t.id)}>
@@ -137,6 +128,7 @@ export function TasksPage() {
         )}
       </Card>
       {dialog && <TaskDialog task={dialog.task} onClose={() => setDialog(null)} />}
+      {starting && <StartWorkflowDialog task={starting} onClose={() => setStarting(null)} />}
     </Page>
   );
 }

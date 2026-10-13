@@ -1,0 +1,101 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { Play, X } from 'lucide-react';
+import { useState } from 'react';
+import { canSwitchWorkflow, conditionsMatch, type ConditionContext, type WorkflowRouting, type WorkflowRunDetail } from '@ot/contracts';
+import { Button } from '@/components/ui/button';
+import { Select } from '@/components/ui/input';
+import { api } from '@/lib/api';
+
+type Issue = ConditionContext['issue'];
+type TaskRef = Issue & { id: string; key: string | null; title: string };
+
+/** The workflows plus the routing rules (workflows/routing.json) that suggest one per task. */
+export function useWorkflowChoices() {
+  const workflows = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string }[]>('/api/workflows') });
+  const routing = useQuery({ queryKey: ['wf', 'routing'], queryFn: () => api<WorkflowRouting>('/api/workflow-routing') });
+  return { workflows: workflows.data ?? [], routing: routing.data, isLoading: workflows.isLoading || routing.isLoading };
+}
+
+/** Same choice the server makes when no workflow is given: first matching rule, else the default. */
+export function suggestWorkflow(routing: WorkflowRouting | undefined, issue: Issue): { id: string; rule: string | null } | null {
+  if (!routing) return null;
+  const rule = routing.rules.find(r => conditionsMatch(r.when, { issue }));
+  return rule ? { id: rule.workflow, rule: rule.name || 'a routing rule' } : { id: routing.default, rule: null };
+}
+
+export function WorkflowSelect({ value, onChange, suggested, workflows, className }: {
+  value: string; onChange: (id: string) => void; suggested?: string | null; workflows: { id: string; name: string }[]; className?: string;
+}) {
+  return (
+    <Select value={value} onChange={e => onChange(e.target.value)} className={className}>
+      {workflows.map(w => <option key={w.id} value={w.id}>{w.name}{w.id === suggested ? ' (suggested)' : ''}</option>)}
+    </Select>
+  );
+}
+
+/** "Start workflow" for one task: pick the workflow (the routing rules preselect one), then start. */
+export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose: () => void }) {
+  const { workflows, routing } = useWorkflowChoices();
+  const suggestion = suggestWorkflow(routing, task);
+  const [picked, setPicked] = useState<string | null>(null);
+  const value = picked ?? suggestion?.id ?? workflows[0]?.id ?? '';
+  const navigate = useNavigate();
+  const start = useMutation({
+    mutationFn: () => api<{ runId: string; created: boolean; workflowId: string }>(`/api/tasks/${task.id}/workflow-runs`, { method: 'POST', body: JSON.stringify({ workflowId: value }) }),
+    onSuccess: r => navigate({ to: '/runs/$runId', params: { runId: r.runId } }),
+  });
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" onMouseDown={onClose}>
+      <div className="flex w-full max-w-md flex-col gap-3 rounded-xl border bg-card p-4 shadow-xl" onMouseDown={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Start workflow · {task.key}</h3>
+          <button className="rounded p-1 hover:bg-accent" onClick={onClose} title="Close"><X className="size-4" /></button>
+        </div>
+        <div className="truncate text-sm text-muted-foreground">{task.title}</div>
+        <label className="flex flex-col gap-1 text-xs">Workflow
+          <WorkflowSelect value={value} onChange={setPicked} suggested={suggestion?.id} workflows={workflows} />
+        </label>
+        {suggestion && (
+          <p className="text-xs text-muted-foreground">
+            Suggested: <b>{suggestion.id}</b> {suggestion.rule ? `(rule “${suggestion.rule}”)` : '(default, no rule matched)'}. Rules are on the Workflows page.
+          </p>
+        )}
+        {start.data && !start.data.created && <p className="text-xs text-amber-600">This task already has an active run; opening it.</p>}
+        {start.error && <p className="text-sm text-red-600">{(start.error as Error).message}</p>}
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button disabled={!value || start.isPending} onClick={() => start.mutate()}><Play className="size-3.5" />Start</Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const canChangeWorkflow = (run: WorkflowRunDetail) => canSwitchWorkflow(run.status, run.nodeRuns);
+
+/** Workflow picker on a run that has not got past its first step; switching cancels it and starts a new run. */
+export function ChangeWorkflow({ run }: { run: WorkflowRunDetail }) {
+  const { workflows } = useWorkflowChoices();
+  const [value, setValue] = useState(run.workflowId);
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const change = useMutation({
+    mutationFn: () => api<{ runId: string }>(`/api/workflow-runs/${run.id}/workflow`, { method: 'POST', body: JSON.stringify({ workflowId: value }) }),
+    onSuccess: r => { qc.invalidateQueries({ queryKey: ['wf'] }); navigate({ to: '/runs/$runId', params: { runId: r.runId } }); },
+  });
+  if (!canChangeWorkflow(run) || !workflows.length) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-muted-foreground">Workflow</span>
+      <WorkflowSelect value={value} onChange={setValue} workflows={workflows} className="h-8" />
+      {value !== run.workflowId && (
+        <Button size="sm" variant="outline" disabled={change.isPending}
+          onClick={() => confirm(`Switch ${run.task.key} to “${value}”? This run is cancelled and a new one starts from the beginning.`) && change.mutate()}>
+          Switch
+        </Button>
+      )}
+      {change.error && <span className="text-red-600">{(change.error as Error).message}</span>}
+    </div>
+  );
+}

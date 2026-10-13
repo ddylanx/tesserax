@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { AppConfig } from '@ot/config';
 import {
-  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
+  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
   type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@ot/contracts';
@@ -107,6 +107,26 @@ export class WorkflowEngine {
     await this.event(inserted.id, trigger === 'manual' ? 'user' : 'system', 'run_started', { workflow: def.id, hash });
     await this.enqueue(inserted.id, triggerNode.id, null, {});
     return { runId: inserted.id, created: true, workflowId };
+  }
+
+  /**
+   * Switches a run to another workflow while it has not got past its first step (see canSwitchWorkflow): the run is cancelled
+   * (a running agent is stopped) and a new run starts on the chosen workflow.
+   */
+  async changeWorkflow(runId: string, workflowId: string): Promise<{ runId: string; workflowId: string }> {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    if (!ACTIVE.includes(run.status as (typeof ACTIVE)[number])) throw new RunConflict(`The run is already ${run.status}.`);
+    if (run.workflow_id === workflowId) return { runId, workflowId };
+    const steps = await this.db.selectFrom('node_runs').select(['node_type', 'status', 'output']).where('run_id', '=', runId).execute();
+    if (!canSwitchWorkflow(run.status, steps.map(n => ({ nodeType: n.node_type, status: n.status, output: n.output as Record<string, unknown> | null })))) {
+      throw new RunConflict('This run is past its first step; cancel it and start a new run to use another workflow.');
+    }
+    const { problems } = this.workflows.load(workflowId);
+    if (problems.length) throw new Error(`Workflow ${workflowId} is invalid: ${problems.join('; ')}`);
+    await this.cancel(runId);
+    await this.event(runId, 'user', 'workflow_changed', { from: run.workflow_id, to: workflowId });
+    const next = await this.startRun(run.task_id, 'manual', workflowId);
+    return { runId: next.runId, workflowId: next.workflowId };
   }
 
   /** Creates the next node run. Human nodes wait for the user; others are queued as pg-boss jobs. */

@@ -38,10 +38,10 @@ export function RunsPage() {
       </div>
       <Card>
         <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && runs.length === 0}
-          emptyText="No runs here. Start one with “Start workflow” on the Tasks page; new Jira issues start one automatically." />
+          emptyText="No runs here. Start one with “Start workflow” on the Tasks page (you pick the workflow); new Jira issues start the one the routing rules suggest, and you can switch it on the run until its first step finishes." />
         {runs.length > 0 && (
           <Table>
-            <THead><Tr><Th>Ticket</Th><Th>Status</Th><Th>Current step</Th><Th>Cost</Th><Th>Updated</Th></Tr></THead>
+            <THead><Tr><Th>Ticket</Th><Th>Workflow</Th><Th>Status</Th><Th>Current step</Th><Th>Cost</Th><Th>Updated</Th></Tr></THead>
             <TBody>
               {runs.map(r => (
                 <Tr key={r.id}>
@@ -49,6 +49,7 @@ export function RunsPage() {
                     <Link to="/runs/$runId" params={{ runId: r.id }} className="font-medium hover:underline">{r.task.key}</Link>
                     <div className="max-w-md truncate text-xs text-muted-foreground">{r.task.title}</div>
                   </Td>
+                  <Td className="text-xs">{r.workflowId}</Td>
                   <Td><Badge variant={RUN_STATUS[r.status]?.variant ?? 'outline'}>{RUN_STATUS[r.status]?.label ?? r.status}</Badge></Td>
                   <Td className="text-xs">{r.currentNodeLabel ?? '–'}{r.error && <div className="max-w-xs truncate text-red-600" title={r.error}>{r.error}</div>}</Td>
                   <Td className="text-xs">${r.costUsd.toFixed(2)}</Td>

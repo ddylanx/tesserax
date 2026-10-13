@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { ExternalLink, GitBranch, Paperclip } from 'lucide-react';
+import { ExternalLink, GitBranch, Paperclip, Play } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import {
   AUTOMATION_LEVELS, ISSUE_TYPES,
@@ -14,6 +14,7 @@ import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
 import { VerifyPanel } from './inbox-verify';
+import { StartWorkflowDialog } from '@/components/workflow-picker';
 
 const GROUPS = [
   { id: 'decide', label: 'Needs decision' },
@@ -126,6 +127,7 @@ function Section({ title, children, className }: { title: string; children: Reac
 function RunDetail({ id }: { id: string }) {
   const q = useQuery({ queryKey: ['pipeline', 'run', id], queryFn: () => api<PipelineRunDetail>(`/api/pipeline/runs/${id}`), refetchInterval: 3_000 });
   const action = usePipelineAction(id);
+  const [starting, setStarting] = useState(false);
   const r = q.data;
   if (!r) return <QueryState isLoading={q.isLoading} error={q.error} />;
   const t = r.task;
@@ -149,6 +151,7 @@ function RunDetail({ id }: { id: string }) {
           <div className="flex flex-wrap gap-2">
             {r.state === 'failed' && <Button size="sm" onClick={() => action.mutate({ action: 'retry' })}>Retry</Button>}
             {r.state === 'awaiting_verify' && <Button size="sm" variant="outline" onClick={() => action.mutate({ action: 'rerun' })}>Run playbook again</Button>}
+            <Button size="sm" variant="outline" onClick={() => setStarting(true)}><Play className="size-3" />Start workflow…</Button>
             {canCancel && (
               <Button size="sm" variant="ghost" onClick={() => confirm('Cancel this run?') && action.mutate({ action: 'cancel' })}>Cancel run</Button>
             )}
@@ -157,6 +160,7 @@ function RunDetail({ id }: { id: string }) {
         </CardContent>
       </Card>
 
+      {starting && <StartWorkflowDialog task={t} onClose={() => setStarting(false)} />}
       {r.state === 'awaiting_decision' && r.classification && <DecisionPanel run={r} />}
       {['queued', 'running_playbook'].includes(r.state) && <RunningPanel run={r} />}
       {['awaiting_verify', 'verified_true', 'verified_false'].includes(r.state) && <VerifyPanel run={r} />}
