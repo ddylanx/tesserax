@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ExternalLink, Pencil, Play, Plus, RefreshCw } from 'lucide-react';
 import { TaskDialog } from '@/components/task-dialog';
 import { StartWorkflowDialog } from '@/components/workflow-picker';
+import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import type { TaskDetailDto, TaskDto, TaskList, TaskQuery } from '@ot/contracts';
+import type { TaskDetailDto, TaskDto, TaskList, TaskQuery, WorkflowRunList } from '@ot/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,8 @@ export function TasksPage() {
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
   });
   const [starting, setStarting] = useState<TaskDto | null>(null);
+  const runsQ = useQuery({ queryKey: ['wf', 'runs', 'all'], queryFn: () => api<WorkflowRunList>('/api/workflow-runs?status=all'), refetchInterval: 15_000 });
+  const activeRun = new Map((runsQ.data?.runs ?? []).filter(r => ['running', 'waiting', 'failed'].includes(r.status)).map(r => [r.task.id, r]));
   const [dialog, setDialog] = useState<{ task?: TaskDetailDto } | null>(null);
   const openEdit = (id: string) => api<TaskDetailDto>(`/api/tasks/${id}`).then(task => setDialog({ task }));
   const d = q.data;
@@ -98,6 +101,11 @@ export function TasksPage() {
                   <Td>
                     <div>{t.title}</div>
                     <div className="text-xs text-muted-foreground">{[t.type, t.project, t.workspace, ...t.labels].filter(Boolean).join(' · ')}{t.archived && ' · archived'}</div>
+                    {activeRun.get(t.id) && (
+                      <Link to="/runs/$runId" params={{ runId: activeRun.get(t.id)!.id }} className="mt-0.5 inline-block text-xs text-sky-600 hover:underline">
+                        run: {activeRun.get(t.id)!.workflowId} · {activeRun.get(t.id)!.status}{activeRun.get(t.id)!.currentNodeLabel ? ` · ${activeRun.get(t.id)!.currentNodeLabel}` : ''} →
+                      </Link>
+                    )}
                   </Td>
                   <Td><Badge variant={CAT[t.statusCategory].variant}>{t.status ?? CAT[t.statusCategory].label}</Badge></Td>
                   <Td className="text-xs">{t.priority ?? '–'}</Td>

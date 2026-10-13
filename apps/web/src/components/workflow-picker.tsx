@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Play, X } from 'lucide-react';
 import { useState } from 'react';
-import { canSwitchWorkflow, conditionsMatch, type ConditionContext, type WorkflowRouting, type WorkflowRunDetail } from '@ot/contracts';
+import { canSwitchWorkflow, conditionsMatch, type ConditionContext, type WorkflowRouting, type WorkflowRunDetail, type WorkflowRunList } from '@ot/contracts';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
@@ -41,9 +41,18 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
   const [picked, setPicked] = useState<string | null>(null);
   const value = picked ?? suggestion?.id ?? workflows[0]?.id ?? '';
   const navigate = useNavigate();
+  const qc = useQueryClient();
+  // a task has one active run at a time: starting again would silently reopen that run
+  const runs = useQuery({ queryKey: ['wf', 'runs', 'all'], queryFn: () => api<WorkflowRunList>('/api/workflow-runs?status=all') });
+  const active = runs.data?.runs.find(r => r.task.id === task.id && ['running', 'waiting', 'failed'].includes(r.status));
+  const open = (runId: string) => navigate({ to: '/runs/$runId', params: { runId } });
+  const startRun = () => api<{ runId: string; created: boolean; workflowId: string }>(`/api/tasks/${task.id}/workflow-runs`, { method: 'POST', body: JSON.stringify({ workflowId: value }) });
   const start = useMutation({
-    mutationFn: () => api<{ runId: string; created: boolean; workflowId: string }>(`/api/tasks/${task.id}/workflow-runs`, { method: 'POST', body: JSON.stringify({ workflowId: value }) }),
-    onSuccess: r => navigate({ to: '/runs/$runId', params: { runId: r.runId } }),
+    mutationFn: async (restart: boolean) => {
+      if (restart && active) await api(`/api/workflow-runs/${active.id}/cancel`, { method: 'POST' });
+      return startRun();
+    },
+    onSuccess: r => { qc.invalidateQueries({ queryKey: ['wf'] }); open(r.runId); },
   });
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" onMouseDown={onClose}>
@@ -53,6 +62,12 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
           <button className="rounded p-1 hover:bg-accent" onClick={onClose} title="Close"><X className="size-4" /></button>
         </div>
         <div className="truncate text-sm text-muted-foreground">{task.title}</div>
+        {active && (
+          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+            {task.key} already has a run on <b>{active.workflowId}</b> ({active.status}{active.currentNodeLabel ? `, at “${active.currentNodeLabel}”` : ''}).
+            Starting does not create a second run: it would reopen that one. To use the workflow below, cancel it and start again.
+          </div>
+        )}
         <label className="flex flex-col gap-1 text-xs">Workflow
           <WorkflowSelect value={value} onChange={setPicked} suggested={suggestion?.id} workflows={workflows} />
         </label>
@@ -61,11 +76,19 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
             Suggested: <b>{suggestion.id}</b> {suggestion.rule ? `(rule “${suggestion.rule}”)` : '(default, no rule matched)'}. Rules are on the Workflows page.
           </p>
         )}
-        {start.data && !start.data.created && <p className="text-xs text-amber-600">This task already has an active run; opening it.</p>}
         {start.error && <p className="text-sm text-red-600">{(start.error as Error).message}</p>}
-        <div className="flex justify-end gap-2">
-          <Button variant="ghost" onClick={onClose}>Cancel</Button>
-          <Button disabled={!value || start.isPending} onClick={() => start.mutate()}><Play className="size-3.5" />Start</Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>Close</Button>
+          {active ? (
+            <>
+              <Button variant="outline" onClick={() => open(active.id)}>Open the run</Button>
+              <Button disabled={!value || start.isPending} onClick={() => confirm(`Cancel the current run of ${task.key} and start “${value}” from the beginning?`) && start.mutate(true)}>
+                <Play className="size-3.5" />Cancel it and start again
+              </Button>
+            </>
+          ) : (
+            <Button disabled={!value || start.isPending || runs.isLoading} onClick={() => start.mutate(false)}><Play className="size-3.5" />Start</Button>
+          )}
         </div>
       </div>
     </div>
