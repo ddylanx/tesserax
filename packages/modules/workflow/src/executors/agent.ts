@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { dataDir } from '@ot/config';
 import { AGENT_EXECUTORS, AGENT_EXECUTOR_INFO, type AgentExecutor } from '@ot/contracts';
 import { launchDetached } from '@ot/mod-pipeline';
+import { launchAntigravityDetached } from './antigravity';
 import { launchGeminiDetached } from './gemini';
 import type { NodeContext } from './types';
 
@@ -19,12 +20,13 @@ const EDITOR_APPS: Record<string, string> = {
 const onPath = (bin: string) => (process.env.PATH ?? '').split(':').some(d => existsSync(join(d, bin)));
 
 /** Which executors this machine can use right now (installed apps / CLIs; login is checked when they run). */
-export function availableExecutors(claudeBin: string, geminiBin: string) {
+export function availableExecutors(claudeBin: string, geminiBin: string, antigravityBin: string) {
   return AGENT_EXECUTORS.map(id => {
     const info = AGENT_EXECUTOR_INFO[id];
     const available =
       id === 'claude-cli' ? existsSync(claudeBin) || onPath(claudeBin)
       : id === 'gemini-cli' ? existsSync(geminiBin) || onPath(geminiBin)
+      : id === 'antigravity-cli' ? existsSync(antigravityBin) || onPath(antigravityBin)
       : existsSync(`/Applications/${EDITOR_APPS[id]}.app`) || existsSync(join(process.env.HOME ?? '', 'Applications', `${EDITOR_APPS[id]}.app`));
     return { id, ...info, available };
   });
@@ -55,14 +57,16 @@ export async function startAgent(
   const c = ctx.config;
   const runDir = join(dataDir(ctx.appConfig), 'runs', ctx.run.id, ctx.nodeRun.id);
   const model = c.model ?? ctx.appConfig.PLAYBOOK_MODEL;
-  if (executor === 'claude-cli' || executor === 'gemini-cli') {
+  if (executor === 'claude-cli' || executor === 'gemini-cli' || executor === 'antigravity-cli') {
     const sessionId = executor === 'claude-cli' ? randomUUID() : null;
     const pid = executor === 'claude-cli'
       ? launchDetached({
           bin: ctx.appConfig.CLAUDE_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, sessionId: sessionId!,
           permissionMode: c.permissionMode, allowedTools: c.allowedTools, maxBudgetUsd: c.maxBudgetUsd, model,
         })
-      : launchGeminiDetached({ bin: ctx.appConfig.GEMINI_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model });
+      : executor === 'gemini-cli'
+        ? launchGeminiDetached({ bin: ctx.appConfig.GEMINI_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model })
+        : launchAntigravityDetached({ bin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model });
     await ctx.engine.patchNode(ctx.nodeRun.id, { process_id: pid, run_dir: runDir, agent_session_id: sessionId, skill_hash: prepared.skillHash });
     await ctx.engine.event(ctx.run.id, 'job', 'agent_started', { executor, pid, sessionId, worktree: prepared.worktree }, ctx.nodeRun.id);
     return { mode: 'running' };

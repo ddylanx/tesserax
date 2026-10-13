@@ -29,9 +29,9 @@ export async function askClaude(o: {
   return { text, run };
 }
 
-/** Read-only AI call with the step's engine: Claude Code (default) or Gemini CLI (approval mode "plan"). */
+/** Read-only AI call with the step's engine: Claude Code (default), Gemini CLI (approval mode "plan") or Antigravity CLI (mode "plan"). */
 export async function askAgent(o: {
-  engine?: 'claude' | 'gemini'; claudeBin: string; geminiBin: string; cwd: string; prompt: string; allowedTools: string[];
+  engine?: 'claude' | 'gemini' | 'antigravity'; claudeBin: string; geminiBin: string; antigravityBin: string; cwd: string; prompt: string; allowedTools: string[];
   timeoutSeconds: number; model?: string; maxBudgetUsd?: number;
 }): Promise<{ text: string; costUsd: number | null; numTurns: number | null }> {
   if (o.engine === 'gemini') {
@@ -40,6 +40,15 @@ export async function askAgent(o: {
     if (r.signal !== 'ok' || !r.text) {
       const msg = `gemini ${r.signal}: ${r.message ?? 'empty answer'}`;
       throw ['auth', 'quota', 'not_installed', 'untrusted'].includes(r.signal) ? new FatalNodeError(msg) : new Error(msg);
+    }
+    return { text: r.text, costUsd: null, numTurns: null };
+  }
+  if (o.engine === 'antigravity') {
+    const { runAntigravity } = await import('./antigravity');
+    const r = await runAntigravity({ bin: o.antigravityBin, cwd: o.cwd, prompt: o.prompt, timeoutMs: o.timeoutSeconds * 1000, model: o.model });
+    if (r.signal !== 'ok' || !r.text) {
+      const msg = `antigravity ${r.signal}: ${r.message ?? 'empty answer'}`;
+      throw ['auth', 'quota', 'not_installed'].includes(r.signal) ? new FatalNodeError(msg) : new Error(msg);
     }
     return { text: r.text, costUsd: null, numTurns: null };
   }

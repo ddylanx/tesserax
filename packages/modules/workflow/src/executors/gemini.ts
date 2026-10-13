@@ -104,10 +104,11 @@ export function readGeminiOutcome(runDir: string, pid: number | null, timedOut: 
   return { finished, exitCode, text: out?.response?.trim() ?? null, signal, message };
 }
 
-export const engineOf = (runDir: string | null): 'claude' | 'gemini' => {
+export const engineOf = (runDir: string | null): 'claude' | 'gemini' | 'antigravity' => {
   if (!runDir || !existsSync(join(runDir, 'command.json'))) return 'claude';
   try {
-    return (JSON.parse(readFileSync(join(runDir, 'command.json'), 'utf8')) as { engine?: string }).engine === 'gemini' ? 'gemini' : 'claude';
+    const engine = (JSON.parse(readFileSync(join(runDir, 'command.json'), 'utf8')) as { engine?: string }).engine;
+    return engine === 'gemini' || engine === 'antigravity' ? engine : 'claude';
   } catch {
     return 'claude';
   }

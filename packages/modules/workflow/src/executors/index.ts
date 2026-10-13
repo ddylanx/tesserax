@@ -39,8 +39,8 @@ const aiStep: NodeExecutor = async ctx => {
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
   const { text, costUsd, numTurns } = await askAgent({
-    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd,
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
@@ -59,8 +59,8 @@ const aiReview: NodeExecutor = async ctx => {
     skills,
   );
   const { text, costUsd, numTurns } = await askAgent({
-    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd,
   });
   const verdict = [...text.matchAll(/VERDICT:\s*(PASS|FAIL)/gi)].at(-1)?.[1]?.toUpperCase();
   if (!verdict) throw new Error('The review did not end with VERDICT: PASS or VERDICT: FAIL');
@@ -151,8 +151,8 @@ async function draft(ctx: NodeContext) {
   const info = await diffInfo(wt.worktree, wt.baseRef).catch(() => null);
   const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
   const { text, costUsd, numTurns } = await askAgent({
-    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'gemini' ? undefined : ctx.appConfig.PLAYBOOK_MODEL), maxBudgetUsd: c.maxBudgetUsd,
+    engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd,
   });
   return { text, wt, info, cost: costUsd, turns: numTurns, skillHash: skill?.hash ?? null };
 }

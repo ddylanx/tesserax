@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { z } from 'zod';
 
@@ -44,6 +45,8 @@ export const envSchema = z.object({
   CLAUDE_BIN: z.string().default('claude'),
   /** Gemini CLI, an alternative engine for AI steps and agent runs. */
   GEMINI_BIN: z.string().default('gemini'),
+  /** Antigravity CLI (`agy`), another engine for AI steps and agent runs. */
+  ANTIGRAVITY_BIN: z.string().default(join(homedir(), '.local', 'bin', 'agy')),
   /** What a new Jira issue starts: the node workflow (default), the older pipeline, or nothing. */
   AUTO_START: z.enum(['workflow', 'pipeline', 'off']).default('workflow'),
   /** claude-cli (default; falls back to rules on any failure) | rules */

@@ -21,7 +21,7 @@ export class HandoffService {
   ) {}
 
   executors() {
-    return availableExecutors(this.config.CLAUDE_BIN, this.config.GEMINI_BIN);
+    return availableExecutors(this.config.CLAUDE_BIN, this.config.GEMINI_BIN, this.config.ANTIGRAVITY_BIN);
   }
 
   private async waitingAgentNode(runId: string) {

@@ -14,7 +14,7 @@ test('runGemini returns the response; auth errors are recognised', async () => {
   try {
     const bad = await runGemini({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000 });
     assert.equal(bad.signal, 'auth');
-    await assert.rejects(askAgent({ engine: 'gemini', claudeBin: 'x', geminiBin: FAKE, cwd: __dirname, prompt: 'p', allowedTools: [], timeoutSeconds: 10 }), /gemini auth/);
+    await assert.rejects(askAgent({ engine: 'gemini', claudeBin: 'x', geminiBin: FAKE, antigravityBin: 'agy', cwd: __dirname, prompt: 'p', allowedTools: [], timeoutSeconds: 10 }), /gemini auth/);
   } finally {
     delete process.env.FAKE_GEMINI_MODE;
   }

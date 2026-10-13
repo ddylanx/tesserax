@@ -7,11 +7,12 @@ import { taskDetailSchema, taskSchema } from './tasks';
  * Who does an agent.run step: a CLI agent running in the background, or you in an editor (the worktree is opened
  * there with the prompt ready; you click Done when finished). "ask" lets you choose when the step is reached.
  */
-export const AGENT_EXECUTORS = ['claude-cli', 'gemini-cli', 'editor:antigravity', 'editor:antigravity-ide', 'editor:cursor', 'editor:vscode'] as const;
+export const AGENT_EXECUTORS = ['claude-cli', 'gemini-cli', 'antigravity-cli', 'editor:antigravity', 'editor:antigravity-ide', 'editor:cursor', 'editor:vscode'] as const;
 export type AgentExecutor = (typeof AGENT_EXECUTORS)[number];
 export const AGENT_EXECUTOR_INFO: Record<AgentExecutor, { title: string; description: string; kind: 'cli' | 'editor' }> = {
   'claude-cli': { title: 'Claude Code (CLI)', description: 'Runs headless in the worktree, commits locally. Uses your Claude plan.', kind: 'cli' },
   'gemini-cli': { title: 'Gemini CLI', description: 'Runs headless in the worktree (file edits only, no shell). Uses your Google account.', kind: 'cli' },
+  'antigravity-cli': { title: 'Antigravity CLI', description: 'Runs headless in the worktree (file edits only, no shell). Uses your Antigravity account and quota.', kind: 'cli' },
   'editor:antigravity': { title: 'Antigravity', description: 'Opens the worktree in Antigravity; you work with its agent, then click Done.', kind: 'editor' },
   'editor:antigravity-ide': { title: 'Antigravity IDE', description: 'Opens the worktree in Antigravity IDE; you work with its agent, then click Done.', kind: 'editor' },
   'editor:cursor': { title: 'Cursor', description: 'Opens the worktree in Cursor; you work with its agent, then click Done.', kind: 'editor' },
@@ -34,7 +35,7 @@ export const nodeConfigSchemas = {
     output: artifactName,
     allowedTools: tools,
     /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini']).default('claude'),
+    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -68,7 +69,7 @@ export const nodeConfigSchemas = {
     output: artifactName.default('review'),
     allowedTools: tools,
     /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini']).default('claude'),
+    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(900),
@@ -83,7 +84,7 @@ export const nodeConfigSchemas = {
     commitMessage: z.string().min(1).default('{{issue_key}}: add ticket document'),
     allowedTools: tools,
     /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini']).default('claude'),
+    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -95,7 +96,7 @@ export const nodeConfigSchemas = {
     output: artifactName.default('jira_comment'),
     allowedTools: tools,
     /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini']).default('claude'),
+    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -110,7 +111,7 @@ export const nodeConfigSchemas = {
     targetBranch: z.string().optional(),
     allowedTools: tools,
     /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini']).default('claude'),
+    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
