@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
 import { ExternalLink, Pencil, Play, Plus, RefreshCw } from 'lucide-react';
 import { TaskDialog } from '@/components/task-dialog';
 import { StartWorkflowDialog } from '@/components/workflow-picker';
@@ -30,12 +29,7 @@ export function TasksPage() {
     mutationFn: () => api<{ queued: boolean }>('/api/tasks/sync', { method: 'POST' }),
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
   });
-  const navigate = useNavigate();
   const [starting, setStarting] = useState<TaskDto | null>(null);
-  const runPipeline = useMutation({
-    mutationFn: (taskId: string) => api<{ run: { id: string }; created: boolean }>(`/api/pipeline/tasks/${taskId}/runs`, { method: 'POST' }),
-    onSuccess: r => navigate({ to: '/inbox', search: { run: r.run.id, group: 'all' } }),
-  });
   const [dialog, setDialog] = useState<{ task?: TaskDetailDto } | null>(null);
   const openEdit = (id: string) => api<TaskDetailDto>(`/api/tasks/${id}`).then(task => setDialog({ task }));
   const d = q.data;
@@ -115,9 +109,6 @@ export function TasksPage() {
                       {t.source === 'local' && <Button size="sm" variant="ghost" title="Edit" onClick={() => openEdit(t.id)}><Pencil className="size-3" /></Button>}
                       <Button size="sm" title="Choose a workflow and start it" onClick={() => setStarting(t)}>
                         <Play className="size-3" />Start workflow
-                      </Button>
-                      <Button size="sm" variant="ghost" title="Older pipeline: classify + playbook (Inbox)" disabled={runPipeline.isPending} onClick={() => runPipeline.mutate(t.id)}>
-                        Pipeline
                       </Button>
                     </div>
                   </Td>
