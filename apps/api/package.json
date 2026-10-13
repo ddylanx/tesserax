@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "node --watch -r @swc-node/register src/main.ts",
+    "dev": "node -r @swc-node/register src/main.ts",
+    "dev:watch": "node --watch -r @swc-node/register src/main.ts",
     "start": "node -r @swc-node/register src/main.ts",
     "typecheck": "tsc -p tsconfig.json"
   },

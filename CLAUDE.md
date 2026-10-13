@@ -30,4 +30,4 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - Logs: use `createLogger(scope)`; correlationId is added automatically inside a WorkContext (HTTP requests, jobs, bot updates).
 
 ## Commands
-`pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down`
+`pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180; the api does not restart on file changes so running steps are not interrupted: restart `pnpm dev` after editing api code, or use `pnpm --filter @ot/api dev:watch`) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down`
