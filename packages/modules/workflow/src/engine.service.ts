@@ -1,20 +1,21 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
-import { dataDir, type AppConfig } from '@ot/config';
+import type { AppConfig } from '@ot/config';
 import {
   CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
-  type ArtifactDto, type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
+  type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@ot/db';
-import { RepoMapStore, diffInfo, ensureWorktree, fetchBase, isAlive, resolveBaseRef, stopProcess } from '@ot/mod-pipeline';
-import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
+import { RepoMapStore, isAlive, stopProcess } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
 import { RoutingStore, WorkflowStore } from './stores';
+import { ArtifactService } from './artifact.service';
+import { WorkflowQueryService } from './query.service';
+import { WorkflowVcsService } from './vcs.service';
 
 const log = createLogger('workflow');
-const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
 export const NODE_QUEUE = 'wf.node';
 export const FINALIZE_QUEUE = 'wf.finalize';
@@ -37,6 +38,9 @@ export class WorkflowEngine {
     @Inject(QUEUE) private readonly queue: Queue,
     @Inject(CONFIG) private readonly config: AppConfig,
     private readonly tasks: TasksService,
+    readonly artifacts: ArtifactService,
+    readonly queries: WorkflowQueryService,
+    readonly vcs: WorkflowVcsService,
   ) {}
 
   onRunEvent(fn: RunListener) {
@@ -76,7 +80,6 @@ export class WorkflowEngine {
 
   // ---------- lifecycle ----------
 
-  /** Starts a run of a workflow for a task. Returns the existing active run if the task already has one. */
   /** Starts a run; without a workflow id the routing rules (workflows/routing.json) pick one. */
   async startRun(taskId: string, trigger: 'new_issue' | 'manual', requested?: string): Promise<{ runId: string; created: boolean; workflowId: string }> {
     const task = await this.tasks.getTask(taskId);
@@ -313,7 +316,9 @@ export class WorkflowEngine {
     const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : 'jira_comment');
     try {
       if ((await this.latestArtifact(runId, outputName))?.content !== a.text) await this.saveArtifact(runId, nr.id, outputName, a.text, 'user');
-      const result = nr.node_type === 'jira.comment' ? await this.postJiraComment(run, a.text) : await this.openPullRequest(run, nr, a);
+      const result = nr.node_type === 'jira.comment'
+        ? await this.vcs.postJiraComment(run, a.text)
+        : await this.vcs.openPullRequest(run, nr, a);
       await this.event(runId, 'user', nr.node_type === 'jira.comment' ? 'jira_comment_posted' : 'pull_request_opened', result, nr.id);
       await this.complete(nr.id, nr.node_type === 'jira.comment' ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
       return result;
@@ -323,42 +328,6 @@ export class WorkflowEngine {
       await this.event(runId, 'user', 'confirm_failed', { error: message }, nr.id);
       throw err;
     }
-  }
-
-  private async postJiraComment(run: WorkflowRun, text: string) {
-    const task = await this.tasks.getTask(run.task_id);
-    if (!task?.key) throw new Error('This task has no Jira key.');
-    const client = await this.tasks.jiraClient();
-    if (!client) throw new Error('Jira is not configured (JIRA_* in .env).');
-    const { id } = await client.addComment(task.key, text);
-    return { commentId: id, issueKey: task.key };
-  }
-
-  private async openPullRequest(run: WorkflowRun, nr: NodeRun, a: Extract<ConfirmAction, { action: 'confirm' }>) {
-    if (!run.worktree_path || !run.repo_path || !run.branch || !run.base_ref) throw new Error('This run has no worktree/branch yet.');
-    const out = (nr.output ?? {}) as { title?: string; target?: string };
-    const task = await this.tasks.getTask(run.task_id);
-    const entry = this.repos.entry(task?.project ?? null);
-    const remote = entry?.remote ?? (run.base_ref.includes('/') ? run.base_ref.split('/')[0]! : 'origin');
-    const target = a.targetBranch ?? out.target ?? run.base_ref.replace(/^[^/]+\//, '');
-    const title = a.title ?? out.title ?? `${task?.key ?? ''}`;
-    const commits = (await diffInfo(run.worktree_path, run.base_ref)).commits;
-    if (!commits.length) throw new Error(`Nothing is committed on ${run.branch} compared with ${run.base_ref}; there is nothing to open a PR for.`);
-    const repo = entry?.bitbucket
-      ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! }
-      : parseBitbucketRemote(await remoteUrl(run.repo_path, remote));
-    if (!repo) throw new Error(`Remote "${remote}" is not a Bitbucket repository; set "bitbucket": "workspace/repo" for this project in config/repos.json.`);
-    const email = this.config.BITBUCKET_EMAIL ?? this.config.JIRA_EMAIL;
-    if (!this.config.BITBUCKET_API_TOKEN || !email) {
-      throw new Error('Bitbucket is not configured: set BITBUCKET_API_TOKEN (and BITBUCKET_EMAIL if it differs from JIRA_EMAIL) in .env.');
-    }
-    const pushLog = await pushBranch(run.worktree_path, remote, run.branch).catch(e => {
-      throw new Error(`git push failed: ${String((e as { stderr?: string }).stderr ?? (e as Error).message).trim().slice(0, 800)}`);
-    });
-    const pr = await new BitbucketClient({ baseUrl: this.config.BITBUCKET_API_URL, email, token: this.config.BITBUCKET_API_TOKEN }).openPullRequest({
-      ...repo, title, description: a.text, source: run.branch, destination: target,
-    });
-    return { prUrl: pr.url, prId: pr.id, existingPr: pr.existing, target, pushed: run.branch, commits: commits.length, pushLog: pushLog.slice(0, 500) };
   }
 
   /** Re-runs the step that failed (new attempt of the same node). */
@@ -380,128 +349,43 @@ export class WorkflowEngine {
     await this.event(runId, 'user', 'run_cancelled', { stoppedAgents: live.filter(n => n.process_id).length });
   }
 
-  // ---------- artifacts + worktree ----------
+  // ---------- artifacts (delegated) ----------
 
-  async saveArtifact(runId: string, nodeRunId: string | null, name: string, content: string, author: 'ai' | 'user') {
-    const latest = await this.latestArtifact(runId, name);
-    await this.db
-      .insertInto('artifacts')
-      .values({ run_id: runId, node_run_id: nodeRunId, name, version: (latest?.version ?? 0) + 1, author, content })
-      .execute();
+  saveArtifact(runId: string, nodeRunId: string | null, name: string, content: string, author: 'ai' | 'user') {
+    return this.artifacts.saveArtifact(runId, nodeRunId, name, content, author);
   }
 
-  async latestArtifact(runId: string, name: string) {
-    return this.db.selectFrom('artifacts').selectAll().where('run_id', '=', runId).where('name', '=', name).orderBy('version', 'desc').executeTakeFirst();
+  latestArtifact(runId: string, name: string) {
+    return this.artifacts.latestArtifact(runId, name);
   }
 
-  async latestArtifacts(runId: string): Promise<Record<string, string>> {
-    const rows = await this.db
-      .selectFrom('artifacts')
-      .select(['name', 'content'])
-      .distinctOn('name')
-      .where('run_id', '=', runId)
-      .orderBy('name')
-      .orderBy('version', 'desc')
-      .execute();
-    return Object.fromEntries(rows.map(r => [r.name, r.content]));
+  latestArtifacts(runId: string): Promise<Record<string, string>> {
+    return this.artifacts.latestArtifacts(runId);
   }
 
-  /** The run's worktree on branch ot/<KEY>, created from the project's base branch the first time a node needs code. */
+  // ---------- worktree (delegated) ----------
+
   async ensureRunWorktree(runId: string): Promise<{ worktree: string; repoPath: string; baseRef: string; branch: string }> {
-    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
-    if (run.worktree_path && run.repo_path && run.base_ref && run.branch) {
-      const { path } = await ensureWorktree(run.repo_path, run.branch, dataDir(this.config), run.base_ref);
-      return { worktree: path, repoPath: run.repo_path, baseRef: run.base_ref, branch: run.branch };
+    const res = await this.vcs.ensureRunWorktree(runId);
+    if (res.created !== undefined) {
+      await this.event(runId, 'system', res.created ? 'worktree_created' : 'worktree_reused', {
+        path: res.worktree, branch: res.branch, baseRef: res.baseRef, fetched: res.fetched,
+      });
     }
-    const task = await this.tasks.getTask(run.task_id);
-    const entry = this.repos.entry(task?.project ?? null);
-    if (!entry) throw new Error(`No local repo is mapped for project ${task?.project ?? '(none)'}. Add it to config/repos.json (or in the run page), then Retry.`);
-    const baseRef = await resolveBaseRef(entry.path, entry.base);
-    const fetched = await fetchBase(entry.path, baseRef);
-    const branch = run.branch ?? `ot/${task?.key ?? run.id.slice(0, 8)}`;
-    const { path, created } = await ensureWorktree(entry.path, branch, dataDir(this.config), baseRef);
-    await this.patchRun(runId, { repo_path: entry.path, base_ref: baseRef, branch, worktree_path: path });
-    await this.event(runId, 'system', created ? 'worktree_created' : 'worktree_reused', { path, branch, baseRef, fetched });
-    return { worktree: path, repoPath: entry.path, baseRef, branch };
+    return { worktree: res.worktree, repoPath: res.repoPath, baseRef: res.baseRef, branch: res.branch };
   }
 
-  // ---------- reads ----------
+  // ---------- reads (delegated) ----------
 
-  async listRuns(status?: string): Promise<WorkflowRunList> {
-    let q = this.baseQuery().orderBy('r.updated_at', 'desc').limit(300);
-    if (status && status !== 'all') q = q.where('r.status', '=', status as never);
-    const rows = await q.execute();
-    const counts = await this.db.selectFrom('workflow_runs').select(['status', sql<number>`count(*)::int`.as('n')]).groupBy('status').execute();
-    return { runs: rows.map(r => this.toDto(r)), counts: Object.fromEntries(counts.map(c => [c.status, c.n])) };
+  listRuns(status?: string): Promise<WorkflowRunList> {
+    return this.queries.listRuns(status);
   }
 
-  async getRun(id: string): Promise<WorkflowRunDto | null> {
-    const r = await this.baseQuery().where('r.id', '=', id).executeTakeFirst();
-    return r ? this.toDto(r) : null;
+  getRun(id: string): Promise<WorkflowRunDto | null> {
+    return this.queries.getRun(id);
   }
 
-  async getRunDetail(id: string): Promise<WorkflowRunDetail | null> {
-    const base = await this.baseQuery().where('r.id', '=', id).executeTakeFirst();
-    if (!base) return null;
-    const dto = this.toDto(base);
-    const [task, nodeRuns, artifacts, events, evaluation] = await Promise.all([
-      this.tasks.getTask(dto.task.id),
-      this.db.selectFrom('node_runs').selectAll().where('run_id', '=', id).orderBy('seq').execute(),
-      this.db.selectFrom('artifacts').selectAll().where('run_id', '=', id).orderBy('name').orderBy('version', 'desc').execute(),
-      this.db.selectFrom('run_events').selectAll().where('run_id', '=', id).orderBy('id', 'desc').limit(300).execute(),
-      this.db.selectFrom('evaluations').selectAll().where('run_id', '=', id).executeTakeFirst(),
-    ]);
-    return {
-      ...dto,
-      task: task!,
-      workflow: base.workflow_snapshot as WorkflowDefinition,
-      mappedRepo: this.repos.forProject(task?.project ?? null),
-      nodeRuns: nodeRuns.map(n => ({
-        id: n.id, seq: n.seq, nodeId: n.node_id, nodeType: n.node_type, attempt: n.attempt, status: n.status, port: n.port,
-        input: (n.input ?? {}) as Record<string, unknown>, output: (n.output ?? {}) as Record<string, unknown>, error: n.error,
-        costUsd: n.cost_usd, numTurns: n.num_turns, skillHash: n.skill_hash, agentSessionId: n.agent_session_id,
-        startedAt: iso(n.started_at), endedAt: iso(n.ended_at), waitingMs: n.waiting_ms == null ? null : Number(n.waiting_ms),
-      })),
-      artifacts: artifacts.map(
-        (a): ArtifactDto => ({ id: a.id, name: a.name, version: a.version, author: a.author, content: a.content, nodeRunId: a.node_run_id, createdAt: a.created_at.toISOString() }),
-      ),
-      events: events.map(e => ({ id: String(e.id), actor: e.actor, action: e.action, detail: (e.detail ?? {}) as Record<string, unknown>, createdAt: e.created_at.toISOString() })),
-      evaluation: evaluation ? { scores: evaluation.scores as Record<string, number>, note: evaluation.note } : null,
-    };
-  }
-
-  private baseQuery() {
-    return this.db
-      .selectFrom('workflow_runs as r')
-      .innerJoin('tasks as t', 't.id', 'r.task_id')
-      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
-      .innerJoin('sources as s', 's.id', 't.source_id')
-      .selectAll('r')
-      .select(eb => [
-        't.id as t_id', 't.key as t_key', 't.title as t_title', 't.status as t_status', 't.status_category as t_status_category',
-        't.priority as t_priority', 't.assignee as t_assignee', 't.project as t_project', 't.type as t_type', 't.labels as t_labels',
-        't.url as t_url', 't.due_at as t_due_at', 't.updated_at_source as t_updated', 't.archived_at as t_archived_at',
-        'w.slug as t_workspace', 's.kind as t_source',
-        eb.selectFrom('node_runs').select(sql<number>`coalesce(sum(cost_usd), 0)::float`.as('c')).whereRef('node_runs.run_id', '=', 'r.id').as('cost'),
-      ]);
-  }
-
-  private toDto(r: any): WorkflowRunDto {
-    const def = r.workflow_snapshot as WorkflowDefinition;
-    return {
-      id: r.id, status: r.status, workflowId: r.workflow_id, workflowHash: r.workflow_hash, trigger: r.trigger,
-      task: {
-        id: r.t_id, workspace: r.t_workspace, source: r.t_source, key: r.t_key, title: r.t_title, status: r.t_status,
-        statusCategory: r.t_status_category, priority: r.t_priority, assignee: r.t_assignee, project: r.t_project, type: r.t_type,
-        labels: r.t_labels ?? [], url: r.t_url, dueAt: r.t_due_at ? new Date(r.t_due_at).toISOString().slice(0, 10) : null,
-        updatedAt: iso(r.t_updated), archived: r.t_archived_at != null,
-      },
-      currentNodeId: r.current_node_id,
-      currentNodeLabel: def.nodes.find(n => n.id === r.current_node_id)?.label ?? null,
-      repoPath: r.repo_path, baseRef: r.base_ref, branch: r.branch, worktreePath: r.worktree_path, error: r.error,
-      costUsd: Number(r.cost ?? 0),
-      vars: (r.vars ?? {}) as Record<string, unknown>,
-      createdAt: iso(r.created_at)!, updatedAt: iso(r.updated_at)!, finishedAt: iso(r.finished_at),
-    };
+  getRunDetail(id: string): Promise<WorkflowRunDetail | null> {
+    return this.queries.getRunDetail(id);
   }
 }

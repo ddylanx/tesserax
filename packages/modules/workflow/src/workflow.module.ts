@@ -8,14 +8,23 @@ import { FINALIZE_QUEUE, NODE_QUEUE, WorkflowEngine } from './engine.service';
 import { finalizeAgentJob, runNodeJob, scanAgentNodes, type JobDeps } from './jobs';
 import { SkillStore } from './stores';
 import { WorkflowController } from './workflow.controller';
+import { ArtifactService } from './artifact.service';
+import { WorkflowQueryService } from './query.service';
+import { WorkflowVcsService } from './vcs.service';
 
 const log = createLogger('workflow');
 
 @Module({
   imports: [TasksModule, PipelineModule],
   controllers: [WorkflowController],
-  providers: [WorkflowEngine, { provide: SkillStore, useFactory: () => new SkillStore() }],
-  exports: [WorkflowEngine],
+  providers: [
+    ArtifactService,
+    WorkflowQueryService,
+    WorkflowVcsService,
+    WorkflowEngine,
+    { provide: SkillStore, useFactory: () => new SkillStore() },
+  ],
+  exports: [WorkflowEngine, ArtifactService, WorkflowQueryService, WorkflowVcsService],
 })
 export class WorkflowModule implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private watcher?: NodeJS.Timeout;

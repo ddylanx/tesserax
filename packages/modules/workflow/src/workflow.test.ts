@@ -92,3 +92,13 @@ test('skip ports are validated', () => {
   w.nodes[1] = { ...w.nodes[1]!, skipIf: [{ field: 'issue.type', op: 'in', values: ['x'] }], skipPort: 'pass' };
   assert.match(validateWorkflow(w).join(), /skip port "pass" does not exist/);
 });
+
+test('WorkflowEngine resolves graph and nodes correctly', async () => {
+  const { WorkflowEngine } = await import('./engine.service');
+  const engine = new WorkflowEngine({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+  const run = { workflow_snapshot: base() };
+  assert.equal(engine.graph(run).id, 'x');
+  assert.equal(engine.node(run, 't').type, 'trigger.jira');
+  assert.throws(() => engine.node(run, 'non-existent'), /is not in this run's workflow/);
+});
+
