@@ -5,7 +5,7 @@ import type { Db } from '@ot/db';
 import { diffInfo, isAlive, readOutcome, stopProcess } from '@ot/mod-pipeline';
 import type { ClassificationService } from '@ot/mod-pipeline';
 import type { TasksService } from '@ot/mod-tasks';
-import { FINALIZE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
+import { FINALIZE_QUEUE, NODE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
 import { EXECUTORS } from './executors';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
@@ -23,8 +23,43 @@ export interface JobDeps {
   queue: Queue;
 }
 
+/** Node runs executing in this process right now (to tell them apart from ones orphaned by a restart). */
+const inFlight = new Set<string>();
+
+/**
+ * A restart (e.g. the dev server reloading) kills steps that were executing; their rows stay "running" and the
+ * retried job would skip them. Re-queue any non-agent step marked running that this process is not executing.
+ * Agent runs are separate processes and are finalized by scanAgentNodes instead.
+ */
+export async function recoverOrphanedNodes(d: JobDeps) {
+  const rows = await d.db
+    .selectFrom('node_runs')
+    .select(['id', 'run_id', 'node_id', 'started_at'])
+    .where('status', '=', 'running')
+    .where('node_type', '!=', 'agent.run')
+    .where('started_at', '<', new Date(Date.now() - 30_000))
+    .execute();
+  for (const r of rows) {
+    if (inFlight.has(r.id)) continue;
+    const reset = await d.db.updateTable('node_runs').set({ status: 'queued' }).where('id', '=', r.id).where('status', '=', 'running').executeTakeFirst();
+    if (!Number(reset.numUpdatedRows)) continue;
+    await d.engine.event(r.run_id, 'system', 'node_requeued', { node: r.node_id, reason: 'was interrupted (server restart)' }, r.id);
+    await d.queue.send(NODE_QUEUE, { nodeRunId: r.id }, { singletonKey: `wf:${r.id}:recover:${Date.now()}`, ...STEP_RETRY });
+    log.warn({ nodeRunId: r.id, node: r.node_id }, 'interrupted step re-queued');
+  }
+}
+
 /** Runs one queued node. Claiming queued -> running makes duplicate deliveries a no-op. */
-export async function runNodeJob(d: JobDeps, { nodeRunId }: { nodeRunId: string }, meta: JobMeta) {
+export async function runNodeJob(d: JobDeps, data: { nodeRunId: string }, meta: JobMeta) {
+  inFlight.add(data.nodeRunId);
+  try {
+    return await runNodeJobInner(d, data, meta);
+  } finally {
+    inFlight.delete(data.nodeRunId);
+  }
+}
+
+async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string }, meta: JobMeta) {
   const nr = await d.db
     .updateTable('node_runs')
     .set({ status: 'running', started_at: new Date(), error: null })
@@ -68,6 +103,7 @@ export async function runNodeJob(d: JobDeps, { nodeRunId }: { nodeRunId: string 
 
 /** Agent nodes that ended (or ran past their timeout) get a finalize job. File checks only. */
 export async function scanAgentNodes(d: JobDeps) {
+  await recoverOrphanedNodes(d).catch(err => log.warn({ err }, 'recovering interrupted steps failed'));
   const rows = await d.db
     .selectFrom('node_runs as n')
     .innerJoin('workflow_runs as r', 'r.id', 'n.run_id')
