@@ -62,7 +62,7 @@ export async function startAgent(
     const pid = executor === 'claude-cli'
       ? launchDetached({
           bin: ctx.appConfig.CLAUDE_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, sessionId: sessionId!,
-          permissionMode: c.permissionMode, allowedTools: c.allowedTools, maxBudgetUsd: c.maxBudgetUsd, model,
+          permissionMode: c.permissionMode, allowedTools: c.allowedTools, maxBudgetUsd: c.maxBudgetUsd, model, stream: true,
         })
       : executor === 'gemini-cli'
         ? launchGeminiDetached({ bin: ctx.appConfig.GEMINI_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model })

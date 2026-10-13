@@ -14,6 +14,7 @@ import type { Db } from '@ot/db';
 import { ClassificationService, diffInfo, diffPatch } from '@ot/mod-pipeline';
 import { TasksService } from '@ot/mod-tasks';
 import { askClaude } from './executors/claude';
+import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
@@ -226,6 +227,15 @@ export class WorkflowController {
     const r = await this.engine.getRunDetail(id);
     if (!r) throw new NotFoundException();
     return r;
+  }
+
+  /** What a step's agent is doing: its tool calls and messages so far. `from` is the `next` of the previous call. */
+  @Get('workflow-runs/:id/node-runs/:nodeRunId/log')
+  async nodeLog(@Param('id', ParseUUIDPipe) id: string, @Param('nodeRunId', ParseUUIDPipe) nodeRunId: string, @Query('from') from?: string) {
+    const nr = await this.db.selectFrom('node_runs').select(['status']).where('id', '=', nodeRunId).where('run_id', '=', id).executeTakeFirst();
+    if (!nr) throw new NotFoundException();
+    const r = readLiveLog(nodeRunDir(this.config, id, nodeRunId), Math.max(0, Number(from) || 0));
+    return { ...r, live: nr.status === 'running' || nr.status === 'queued' };
   }
 
   @Get('workflow-runs/:id/diff')

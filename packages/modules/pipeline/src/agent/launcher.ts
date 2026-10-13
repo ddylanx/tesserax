@@ -21,11 +21,13 @@ export interface LaunchOptions {
   maxBudgetUsd?: number;
   model?: string;
   env?: Record<string, string>;
+  /** stream-json (one event per line, so the run can be followed live) instead of a single json result. */
+  stream?: boolean;
 }
 
 export function buildRunArgs(o: Omit<LaunchOptions, 'bin' | 'cwd' | 'runDir' | 'prompt' | 'env'>): string[] {
   return [
-    '-p', '--output-format', 'json',
+    '-p', '--output-format', o.stream ? 'stream-json' : 'json', ...(o.stream ? ['--verbose'] : []),
     '--session-id', o.sessionId,
     '--permission-mode', o.permissionMode,
     '--strict-mcp-config',

@@ -6,7 +6,16 @@ const args = process.argv.slice(2);
 const mode = process.env.FAKE_AGY_MODE ?? 'ok';
 const printArg = args.find(a => a.startsWith('--print='));
 const input = printArg ? printArg.slice('--print='.length) : '';
-const out = o => process.stdout.write(`${JSON.stringify({ conversation_id: 'fake-agy', duration_seconds: 1, num_turns: 1, ...o })}\n`);
+const streaming = args[args.indexOf('--output-format') + 1] === 'stream-json';
+const emit = o => process.stdout.write(`${JSON.stringify(o)}\n`);
+const out = o => {
+  const result = { conversation_id: 'fake-agy', duration_seconds: 1, num_turns: 1, ...o };
+  if (!streaming) return emit(result);
+  emit({ event: 'init', conversation_id: 'fake-agy', init: { cwd: process.cwd() } });
+  emit({ event: 'step_update', step_update: { step_index: 1, state: 'ACTIVE', step_type: 'tool', tool_name: 'view_file', tool_info: { name: 'view_file', parameters: { AbsolutePath: `${process.cwd()}/README.md` } } } });
+  emit({ event: 'step_update', step_update: { step_index: 1, state: 'DONE', step_type: 'tool', tool_name: 'view_file', tool_info: { output: '3 lines' } } });
+  emit({ event: 'result', result });
+};
 if (mode === 'auth') {
   console.error('error: authentication required. Run agy to sign in.');
   out({ status: 'ERROR', response: '', error: 'authentication required' });

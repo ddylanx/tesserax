@@ -3,7 +3,7 @@ import { useParams } from '@tanstack/react-router';
 import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Edge, type Node } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
@@ -179,6 +179,57 @@ function ArtifactView({ run, name }: { run: WorkflowRunDetail; name: string }) {
   );
 }
 
+/** What the step's agent is doing right now: tool calls and messages, polled every 2 s while the step runs. */
+function LiveLog({ runId, nodeRun }: { runId: string; nodeRun: NodeRunDto }) {
+  const [text, setText] = useState('');
+  const [exists, setExists] = useState(false);
+  const ref = useRef<HTMLPreElement>(null);
+  const stick = useRef(true);
+  const active = nodeRun.status === 'running' || nodeRun.status === 'queued';
+  useEffect(() => {
+    let cancelled = false;
+    let next = 0;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    setText('');
+    setExists(false);
+    const tick = async () => {
+      try {
+        const r = await api<{ text: string; next: number; exists: boolean; live: boolean }>(`/api/workflow-runs/${runId}/node-runs/${nodeRun.id}/log?from=${next}`);
+        if (cancelled) return;
+        if (r.next < next) setText(''); // the file started over (a retry)
+        next = r.next;
+        if (r.exists) setExists(true);
+        if (r.text) setText(prev => `${prev}${prev && !prev.endsWith('\n') ? '\n' : ''}${r.text}`);
+        if (r.live) timer = setTimeout(tick, 2000);
+      } catch {
+        if (!cancelled && active) timer = setTimeout(tick, 4000);
+      }
+    };
+    tick();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [runId, nodeRun.id, nodeRun.status, active]);
+  useEffect(() => {
+    const el = ref.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [text]);
+  if (!exists) return active ? <p className="text-xs text-muted-foreground">Waiting for the agent’s first output…</p> : null;
+  return (
+    <details open={active} className="rounded border">
+      <summary className="cursor-pointer px-2 py-1 text-xs font-medium">
+        {active ? 'Live log' : 'Log'} <span className="font-normal text-muted-foreground">({text ? text.split('\n').length : 0} lines)</span>
+      </summary>
+      <pre
+        ref={ref}
+        onScroll={e => { const el = e.currentTarget; stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24; }}
+        className="max-h-72 overflow-auto whitespace-pre-wrap break-words border-t bg-muted/40 p-2 font-mono text-[11px] leading-relaxed"
+      >{text || '…'}</pre>
+    </details>
+  );
+}
+
 function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }) {
   const runs = run.nodeRuns.filter(n => n.nodeId === node.id);
   const last = runs.at(-1);
@@ -192,6 +243,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {cfg.commands && <p className="text-xs text-muted-foreground">commands: {cfg.commands.join(' · ')}</p>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
+        {last && ['ai.step', 'ai.review', 'agent.run', 'doc.write', 'jira.comment', 'git.pr'].includes(node.type) && last.status !== 'waiting' && <LiveLog runId={run.id} nodeRun={last} />}
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
         {waiting && (node.type === 'jira.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type} output={cfg.output ?? ''} />}

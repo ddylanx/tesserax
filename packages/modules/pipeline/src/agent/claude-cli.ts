@@ -1,4 +1,6 @@
 import { spawn } from 'node:child_process';
+import { appendFileSync, mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 
 /**
  * Variables a parent Claude Code session injects. Passed on, they make the CLI refuse to start
@@ -81,6 +83,8 @@ export interface RunClaudeOptions {
   stdin: string;
   timeoutMs: number;
   env?: Record<string, string>;
+  /** Append stdout to this file as it arrives (live log). */
+  teeFile?: string;
 }
 
 /**
@@ -116,9 +120,12 @@ export function runClaude(o: RunClaudeOptions): Promise<ClaudeRun> {
       const { signal, message } = detectSignal({ exitCode, timedOut: tOut, stderr, result, spawnError });
       resolve({ exitCode, timedOut: tOut, stdout, stderr, result, signal, message });
     };
+    if (o.teeFile) mkdirSync(dirname(o.teeFile), { recursive: true });
     child.stdout.on('data', d => {
       stdout += d;
-      if (!graceTimer && parseResult(stdout)) graceTimer = setTimeout(stop, 3000);
+      if (o.teeFile) appendFileSync(o.teeFile, d);
+      // stream-json prints many lines: only look for the result once a chunk can contain it
+      if (!graceTimer && String(d).includes('"result"') && parseResult(stdout)) graceTimer = setTimeout(stop, 3000);
     });
     child.stderr.on('data', d => (stderr += d));
     child.on('error', err => finish(null, (err as NodeJS.ErrnoException).code === 'ENOENT' ? `Claude CLI not found: ${o.bin}` : String(err)));
