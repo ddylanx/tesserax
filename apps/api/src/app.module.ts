@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
-import { findRepoRoot } from '@ot/config';
-import { createLogger } from '@ot/core';
-import { AgentsModule } from '@ot/mod-agents';
-import { McpModule } from '@ot/mod-mcp';
-import { PipelineModule } from '@ot/mod-pipeline';
-import { ReposModule } from '@ot/mod-repos';
-import { SkillsModule } from '@ot/mod-skills';
-import { TasksModule } from '@ot/mod-tasks';
-import { TelegramModule } from '@ot/mod-telegram';
-import { WorkflowModule, WorkflowStore } from '@ot/mod-workflow';
+import { findRepoRoot } from '@tesserax/config';
+import { createLogger } from '@tesserax/core';
+import { AgentsModule } from '@tesserax/mod-agents';
+import { McpModule } from '@tesserax/mod-mcp';
+import { PipelineModule } from '@tesserax/mod-pipeline';
+import { ReposModule } from '@tesserax/mod-repos';
+import { SkillsModule } from '@tesserax/mod-skills';
+import { TasksModule } from '@tesserax/mod-tasks';
+import { TelegramModule } from '@tesserax/mod-telegram';
+import { WorkflowModule, WorkflowStore } from '@tesserax/mod-workflow';
 import { InfraModule } from './infra/infra.module';
 import { SystemController } from './system/system.controller';
 

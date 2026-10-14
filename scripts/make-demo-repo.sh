@@ -7,7 +7,7 @@ mkdir -p "$DIR/src" && cd "$DIR"
 git init -q -b main
 cat > README.md <<'MD'
 # Demo app
-A tiny app used to try the Open Tesseract pipeline.
+A tiny app used to try the Tesserax pipeline.
 MD
 cat > src/login.js <<'JS'
 export function submitLogin(form) {

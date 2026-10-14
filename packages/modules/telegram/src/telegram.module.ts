@@ -1,12 +1,12 @@
 import { Inject, Module, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { Bot } from 'grammy';
-import type { AppConfig } from '@ot/config';
-import { CONFIG, createLogger } from '@ot/core';
-import { AgentsModule, AgentsService } from '@ot/mod-agents';
-import { McpModule, McpService } from '@ot/mod-mcp';
-import { PipelineModule, PipelineService } from '@ot/mod-pipeline';
-import { TasksModule, TasksService } from '@ot/mod-tasks';
-import { WorkflowEngine, WorkflowModule } from '@ot/mod-workflow';
+import type { AppConfig } from '@tesserax/config';
+import { CONFIG, createLogger } from '@tesserax/core';
+import { AgentsModule, AgentsService } from '@tesserax/mod-agents';
+import { McpModule, McpService } from '@tesserax/mod-mcp';
+import { PipelineModule, PipelineService } from '@tesserax/mod-pipeline';
+import { TasksModule, TasksService } from '@tesserax/mod-tasks';
+import { WorkflowEngine, WorkflowModule } from '@tesserax/mod-workflow';
 import { HELP, createBot } from './bot';
 import { formatPipelineNotice, formatWorkflowNotice } from './format';
 

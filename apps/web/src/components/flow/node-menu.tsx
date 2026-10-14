@@ -1,6 +1,6 @@
 import { Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { NodeType } from '@ot/contracts';
+import type { NodeType } from '@tesserax/contracts';
 import { cn } from '@/lib/utils';
 import { metaOf } from './meta';
 

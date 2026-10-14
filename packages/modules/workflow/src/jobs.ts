@@ -1,16 +1,16 @@
-import type { AppConfig } from '@ot/config';
-import { nodeConfigSchemas, type NodeType } from '@ot/contracts';
-import { createLogger, type JobMeta, type Queue } from '@ot/core';
-import type { Db } from '@ot/db';
-import { diffInfo, isAlive, readOutcome, stopProcess } from '@ot/agent-runtime';
-import type { ClassificationService } from '@ot/mod-classify';
-import type { TasksService } from '@ot/mod-tasks';
+import type { AppConfig } from '@tesserax/config';
+import { nodeConfigSchemas, type NodeType } from '@tesserax/contracts';
+import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
+import { diffInfo, isAlive, readOutcome, stopProcess } from '@tesserax/agent-runtime';
+import type { ClassificationService } from '@tesserax/mod-classify';
+import type { TasksService } from '@tesserax/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
 import { EXECUTORS } from './executors';
 import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
-import type { SkillCatalog } from '@ot/mod-skills';
+import type { SkillCatalog } from '@tesserax/mod-skills';
 
 const log = createLogger('workflow.jobs');
 

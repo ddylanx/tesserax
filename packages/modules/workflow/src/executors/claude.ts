@@ -1,4 +1,4 @@
-import { ALWAYS_DENIED, runClaude, type ClaudeRun } from '@ot/agent-runtime';
+import { ALWAYS_DENIED, runClaude, type ClaudeRun } from '@tesserax/agent-runtime';
 import { FatalNodeError } from './types';
 
 const FATAL = new Set(['auth', 'quota', 'budget', 'nested_session', 'not_installed']);

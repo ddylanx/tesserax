@@ -4,7 +4,7 @@ import { TaskDialog } from '@/components/task-dialog';
 import { StartWorkflowDialog } from '@/components/workflow-picker';
 import { Link } from '@tanstack/react-router';
 import { useState } from 'react';
-import type { TaskDetailDto, TaskDto, TaskList, TaskQuery, WorkflowRunList } from '@ot/contracts';
+import type { TaskDetailDto, TaskDto, TaskList, TaskQuery, WorkflowRunList } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -62,7 +62,7 @@ export function TasksPage() {
     >
       {d && !d.jiraConfigured && (
         <Card><CardContent className="pt-4 text-sm">
-          Jira is not connected. Set <code>JIRA_BASE_URL</code> (e.g. https://your-site.atlassian.net), <code>JIRA_EMAIL</code> and <code>JIRA_API_TOKEN</code> in <code>open-tesseract/.env</code>, then restart <code>pnpm dev</code>. Tasks sync every ~2 minutes.
+          Jira is not connected. Set <code>JIRA_BASE_URL</code> (e.g. https://your-site.atlassian.net), <code>JIRA_EMAIL</code> and <code>JIRA_API_TOKEN</code> in <code>tesserax/.env</code>, then restart <code>pnpm dev</code>. Tasks sync every ~2 minutes.
         </CardContent></Card>
       )}
       <div className="flex flex-wrap items-center gap-2">

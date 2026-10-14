@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
-import type { MetricsReport, WorkflowDefinition } from '@ot/contracts';
-import type { Db } from '@ot/db';
-import type { SkillCatalog } from '@ot/mod-skills';
+import type { MetricsReport, WorkflowDefinition } from '@tesserax/contracts';
+import type { Db } from '@tesserax/db';
+import type { SkillCatalog } from '@tesserax/mod-skills';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const round = (x: number | null, d = 2) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);

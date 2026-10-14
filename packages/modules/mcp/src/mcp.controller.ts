@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import type { McpList } from '@ot/contracts';
+import type { McpList } from '@tesserax/contracts';
 import { McpService } from './mcp.service';
 
 @Controller('mcp')

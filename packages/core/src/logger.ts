@@ -1,5 +1,5 @@
 import pino, { type Logger } from 'pino';
-import { loadConfig } from '@ot/config';
+import { loadConfig } from '@tesserax/config';
 import { WorkContext } from './work-context';
 
 let root: Logger | undefined;

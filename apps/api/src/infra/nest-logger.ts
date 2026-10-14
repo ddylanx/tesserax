@@ -1,5 +1,5 @@
 import type { LoggerService } from '@nestjs/common';
-import { createLogger } from '@ot/core';
+import { createLogger } from '@tesserax/core';
 
 const log = createLogger('nest');
 

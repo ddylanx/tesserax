@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
-import { loadConfig } from '@ot/config';
-import { createLogger } from '@ot/core';
+import { loadConfig } from '@tesserax/config';
+import { createLogger } from '@tesserax/core';
 import { AppModule } from './app.module';
 import { correlationMiddleware } from './infra/correlation.middleware';
 import { PinoNestLogger } from './infra/nest-logger';

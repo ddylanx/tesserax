@@ -1,5 +1,5 @@
 {
-  "name": "@ot/web",
+  "name": "@tesserax/web",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -9,8 +9,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@ot/contracts": "workspace:*",
-    "@ot/mod-skills": "workspace:*",
+    "@tesserax/contracts": "workspace:*",
+    "@tesserax/mod-skills": "workspace:*",
     "@tanstack/react-query": "^5.85.0",
     "@tanstack/react-router": "^1.131.0",
     "@xyflow/react": "^12.12.0",

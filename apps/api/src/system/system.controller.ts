@@ -1,10 +1,10 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { sql } from 'kysely';
-import type { AppConfig } from '@ot/config';
-import { jiraConfigured } from '@ot/config';
-import type { Health, SystemInfo } from '@ot/contracts';
-import { CONFIG, DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@ot/core';
-import type { Db } from '@ot/db';
+import type { AppConfig } from '@tesserax/config';
+import { jiraConfigured } from '@tesserax/config';
+import type { Health, SystemInfo } from '@tesserax/contracts';
+import { CONFIG, DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 
 @Controller()
 export class SystemController {

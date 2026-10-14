@@ -1,5 +1,5 @@
-import type { Db } from '@ot/db';
-import { createLogger } from '@ot/core';
+import type { Db } from '@tesserax/db';
+import { createLogger } from '@tesserax/core';
 import { readTranscriptUsage } from '../transcript-usage';
 
 export const USAGE_JOB = 'agents.usage';

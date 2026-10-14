@@ -1,10 +1,10 @@
 {
-  "name": "@ot/db",
+  "name": "@tesserax/db",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": { "typecheck": "tsc -p tsconfig.json", "migrate": "node -r @swc-node/register src/cli.ts migrate", "seed": "node -r @swc-node/register src/cli.ts seed" },
-  "dependencies": { "@ot/config": "workspace:*", "kysely": "^0.28.17", "pg": "^8.16.0" },
+  "dependencies": { "@tesserax/config": "workspace:*", "kysely": "^0.28.17", "pg": "^8.16.0" },
   "devDependencies": { "@types/pg": "^8.15.0", "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }
 }

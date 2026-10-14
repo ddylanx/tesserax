@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { createLocalTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@ot/contracts';
+import { createLocalTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')

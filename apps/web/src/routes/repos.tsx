@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FolderGit2, GitBranch, Pencil, Plus, Search, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import type { RepoInspection, RepoRegistryView, Repository } from '@ot/contracts';
+import type { RepoInspection, RepoRegistryView, Repository } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

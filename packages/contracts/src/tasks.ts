@@ -63,7 +63,7 @@ export type ReviewTarget = z.infer<typeof reviewTargetSchema>;
 
 export const LOCAL_TASK_TYPES = ['Bug', 'Story', 'Task', 'Question', 'Code review'] as const;
 
-/** "New task": a task kept only in Open Tesseract, in the Company or Personal workspace. */
+/** "New task": a task kept only in Tesserax, in the Company or Personal workspace. */
 export const createLocalTaskSchema = z.object({
   workspace: z.enum(['personal', 'company']),
   title: z.string().min(1).max(300),

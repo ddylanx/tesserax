@@ -1,6 +1,6 @@
 import { sql } from 'kysely';
-import type { Db } from '@ot/db';
-import { createLogger } from '@ot/core';
+import type { Db } from '@tesserax/db';
+import { createLogger } from '@tesserax/core';
 
 export const SWEEP_JOB = 'agents.sweep';
 const log = createLogger('agents.sweep');

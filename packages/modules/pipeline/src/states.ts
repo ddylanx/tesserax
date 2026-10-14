@@ -1,4 +1,4 @@
-import type { PipelineState } from '@ot/db';
+import type { PipelineState } from '@tesserax/db';
 
 /** Allowed transitions. Every change goes through PipelineService.transition (UPDATE … WHERE state IN expected). */
 export const TRANSITIONS: Record<PipelineState, readonly PipelineState[]> = {

@@ -1,8 +1,8 @@
-import type { AppConfig } from '@ot/config';
-import type { RunResult } from '@ot/contracts';
-import { createLogger, type JobMeta, type Queue } from '@ot/core';
-import type { Db } from '@ot/db';
-import { diffInfo, isAlive, readOutcome, stopProcess } from '@ot/agent-runtime';
+import type { AppConfig } from '@tesserax/config';
+import type { RunResult } from '@tesserax/contracts';
+import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
+import { diffInfo, isAlive, readOutcome, stopProcess } from '@tesserax/agent-runtime';
 import type { PipelineService } from '../pipeline.service';
 import { STEPS, STEP_RETRY, type StepJobData } from '../states';
 

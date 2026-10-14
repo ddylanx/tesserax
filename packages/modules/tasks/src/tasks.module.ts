@@ -1,7 +1,7 @@
 import { Inject, Module, type OnModuleInit } from '@nestjs/common';
-import { jiraConfigured, type AppConfig } from '@ot/config';
-import { CONFIG, DB, SCHEDULES, createLogger, type ScheduleRegistry } from '@ot/core';
-import type { Db } from '@ot/db';
+import { jiraConfigured, type AppConfig } from '@tesserax/config';
+import { CONFIG, DB, SCHEDULES, createLogger, type ScheduleRegistry } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 import { JIRA_SYNC_JOB, runJiraSync } from './jobs/jira-sync.job';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';

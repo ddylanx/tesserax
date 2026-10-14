@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { dataDir, type AppConfig } from '@ot/config';
-import type { ConfirmAction } from '@ot/contracts';
-import { CONFIG, DB } from '@ot/core';
-import type { Db, NodeRun, WorkflowRun } from '@ot/db';
-import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@ot/agent-runtime';
-import { repoRegistry } from '@ot/mod-repos';
-import { TasksService } from '@ot/mod-tasks';
+import { dataDir, type AppConfig } from '@tesserax/config';
+import type { ConfirmAction } from '@tesserax/contracts';
+import { CONFIG, DB } from '@tesserax/core';
+import type { Db, NodeRun, WorkflowRun } from '@tesserax/db';
+import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@tesserax/agent-runtime';
+import { repoRegistry } from '@tesserax/mod-repos';
+import { TasksService } from '@tesserax/mod-tasks';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
 
 @Injectable()
@@ -17,7 +17,7 @@ export class WorkflowVcsService {
   ) {}
 
   /**
-   * The run's worktree on branch ot/<KEY>, created from the project's base branch the first time a node needs code.
+   * The run's worktree on branch tx/<KEY>, created from the project's base branch the first time a node needs code.
    */
   async ensureRunWorktree(runId: string): Promise<{
     worktree: string;
@@ -39,7 +39,7 @@ export class WorkflowVcsService {
     }
     const baseRef = await resolveBaseRef(entry.path, entry.base);
     const fetched = await fetchBase(entry.path, baseRef);
-    const branch = run.branch ?? `ot/${task?.key ?? run.id.slice(0, 8)}`;
+    const branch = run.branch ?? `tx/${task?.key ?? run.id.slice(0, 8)}`;
     const { path, created } = await ensureWorktree(entry.path, branch, dataDir(this.config), baseRef);
 
     await this.db

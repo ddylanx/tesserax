@@ -1,6 +1,6 @@
 import { Inject, Module, type OnModuleInit } from '@nestjs/common';
-import { DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@ot/core';
-import type { Db } from '@ot/db';
+import { DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 import { AgentsController } from './agents.controller';
 import { AgentsService } from './agents.service';
 import { SWEEP_JOB, runSweepJob } from './jobs/sweep.job';

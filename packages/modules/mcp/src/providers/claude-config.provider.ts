@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
-import type { McpServerDto } from '@ot/contracts';
+import type { McpServerDto } from '@tesserax/contracts';
 import type { McpStatusProvider } from '../provider';
 
 type ServerCfg = { type?: string; url?: string; command?: string; env?: Record<string, unknown> };

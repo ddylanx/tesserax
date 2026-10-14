@@ -17,8 +17,8 @@ test('run args always deny push/merge/remote changes, whatever the playbook allo
 });
 
 test('branch names are checked', () => {
-  assert.equal(checkBranch('ot/PAY-12'), 'ot/PAY-12');
-  for (const bad of ['-x', 'a..b', 'a b', 'x.lock', 'ot/']) assert.throws(() => checkBranch(bad), bad);
+  assert.equal(checkBranch('tx/PAY-12'), 'tx/PAY-12');
+  for (const bad of ['-x', 'a..b', 'a b', 'x.lock', 'tx/']) assert.throws(() => checkBranch(bad), bad);
 });
 
 test('worktree is created on its own branch, reused on re-run, and the main checkout is untouched', async () => {
@@ -31,16 +31,16 @@ test('worktree is created on its own branch, reused on re-run, and the main chec
   g(repo, 'add', '-A');
   g(repo, '-c', 'user.name=t', '-c', 'user.email=t@t', '-c', 'commit.gpgsign=false', 'commit', '-qm', 'init');
 
-  const wt = await ensureWorktree(repo, 'ot/T-1', join(root, 'data'));
+  const wt = await ensureWorktree(repo, 'tx/T-1', join(root, 'data'));
   assert.equal(wt.created, true);
-  assert.equal(g(wt.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'ot/T-1');
+  assert.equal(g(wt.path, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'tx/T-1');
   writeFileSync(join(wt.path, 'a.txt'), 'a\nb\n');
   writeFileSync(join(wt.path, 'new.txt'), 'n\n');
   const d = await diffInfo(wt.path, 'main');
   assert.equal(d.insertions, 1);
   assert.deepEqual(d.untracked, ['new.txt']);
   assert.equal(d.files, 2);
-  assert.equal((await ensureWorktree(repo, 'ot/T-1', join(root, 'data'))).created, false);
+  assert.equal((await ensureWorktree(repo, 'tx/T-1', join(root, 'data'))).created, false);
   assert.equal(g(repo, 'status', '--porcelain'), '');
   assert.equal(g(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main');
 });
@@ -62,7 +62,7 @@ test('new issue branches start from the default branch, not the main checkout\'s
   const { resolveBaseRef } = await import('./git');
   assert.equal(await resolveBaseRef(repo, 'develop'), 'develop');
   await assert.rejects(resolveBaseRef(repo, 'nope'), /not found/);
-  const wt = await ensureWorktree(repo, 'ot/T-2', join(root, 'data'), 'develop');
+  const wt = await ensureWorktree(repo, 'tx/T-2', join(root, 'data'), 'develop');
   assert.equal(g(wt.path, 'rev-parse', 'HEAD').trim(), developSha);
   assert.equal((await diffInfo(wt.path, 'develop')).files, 0);
   assert.equal(g(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'bugfix/someone-else');

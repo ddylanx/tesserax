@@ -35,7 +35,7 @@ Non-goals for P1: parallel branches, sub-workflows, scheduling, multi-user, Tele
 | `trigger.jira` | Start: the issue (description, comments, attachments) becomes the run's input | `next` | JQL filter, auto-start on new issue (on/off) |
 | `ai.step` | `claude -p` with a skill + prompt template; writes an artifact. Read-only tools by default | `next` | skill, prompt template, input artifacts, output artifact name, model, budget, allowed tools |
 | `human.gate` | Waits for you: approve / edit then approve / reject / send feedback and re-run the previous node | `approved`, `rejected` | which artifacts to show, which fields to choose (e.g. executor), required note |
-| `agent.run` | Claude Code headless in the ticket worktree (branch `ot/<KEY>` from `origin/develop`), follows the approved spec; commits locally | `done`, `failed` | skill, permission mode, allowed tools, budget, timeout |
+| `agent.run` | Claude Code headless in the ticket worktree (branch `tx/<KEY>` from `origin/develop`), follows the approved spec; commits locally | `done`, `failed` | skill, permission mode, allowed tools, budget, timeout |
 | `check.command` | Runs commands in the worktree, records pass/fail and output | `pass`, `fail` | commands (default for TC/SHOP: `composer test`, `vendor/bin/pint --test`), timeout |
 | `ai.review` | The same agent reviews the diff against the spec with review skills; writes a review artifact with a verdict | `pass`, `fail` | skills, rubric, verdict rule |
 | `doc.write` | Writes the ticket document into the repo (e.g. `docs/<KEY>-<slug>.md`) and commits it on the ticket branch | `next` | skill, path pattern, commit message pattern |

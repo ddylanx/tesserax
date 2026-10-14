@@ -2,12 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type {
   Classification, DecisionInput, FeedbackStats, PipelineEventDto, PipelineList, PipelineRunDetail, PipelineRunDto, RunResult,
-} from '@ot/contracts';
-import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@ot/core';
-import type { Database, Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@ot/db';
+} from '@tesserax/contracts';
+import { DB, QUEUE, WorkContext, createLogger, type Queue } from '@tesserax/core';
+import type { Database, Db, PipelineRun, PipelineRunUpdate, PipelineState } from '@tesserax/db';
 import type { Transaction } from 'kysely';
-import { TasksService } from '@ot/mod-tasks';
-import { isAlive, resolveBaseRef, stopProcess } from '@ot/agent-runtime';
+import { TasksService } from '@tesserax/mod-tasks';
+import { isAlive, resolveBaseRef, stopProcess } from '@tesserax/agent-runtime';
 import { RepoMapStore } from './repo-map';
 import { STATE_GROUPS, STEPS, STEP_RETRY, TransitionConflict, canTransition, type StepJobData, type StepName } from './states';
 

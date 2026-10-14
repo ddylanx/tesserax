@@ -1,8 +1,8 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { findRepoRoot } from '@ot/config';
-import { routingSchema, validateWorkflow, workflowSchema, type WorkflowDefinition, type WorkflowRouting } from '@ot/contracts';
+import { findRepoRoot } from '@tesserax/config';
+import { routingSchema, validateWorkflow, workflowSchema, type WorkflowDefinition, type WorkflowRouting } from '@tesserax/contracts';
 
 export const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 

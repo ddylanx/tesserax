@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { envSchema } from '@ot/config';
+import { envSchema } from '@tesserax/config';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -10,7 +10,7 @@ import { dirname } from 'node:path';
 const PARENT_SESSION_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CLAUDE_PID$|CLAUDE_EFFORT$|CLAUDE_PREVIEW_|ANTHROPIC_BASE_URL$)/;
 
 /**
- * Open Tesseract's own settings (<repo>/.env is loaded into process.env). A child process works in someone else's
+ * Tesserax's own settings (<repo>/.env is loaded into process.env). A child process works in someone else's
  * repo: it must not inherit our database URL or tokens (a Laravel test run connected to our Postgres through
  * DATABASE_URL). Generic names (NODE_ENV, LOG_LEVEL) are kept.
  */

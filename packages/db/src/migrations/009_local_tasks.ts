@@ -1,6 +1,6 @@
 import { type Kysely } from 'kysely';
 
-/** Tasks created in Open Tesseract (not from Jira) and, for code reviews, which PR/branches to review. */
+/** Tasks created in Tesserax (not from Jira) and, for code reviews, which PR/branches to review. */
 export async function up(db: Kysely<any>): Promise<void> {
   await db.schema
     .alterTable('tasks')

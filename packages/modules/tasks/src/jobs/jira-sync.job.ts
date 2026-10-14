@@ -1,7 +1,7 @@
 import { sql } from 'kysely';
-import type { AppConfig } from '@ot/config';
-import { createLogger } from '@ot/core';
-import type { Db } from '@ot/db';
+import type { AppConfig } from '@tesserax/config';
+import { createLogger } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 import { DEFAULT_JQL, JiraClient, type JiraCredentials } from '../jira/client';
 import { mapDetail, mapIssue } from '../jira/map';
 

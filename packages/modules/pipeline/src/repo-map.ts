@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, isAbsolute, join, resolve } from 'node:path';
-import { findRepoRoot } from '@ot/config';
-import { repoRegistry } from '@ot/mod-repos';
-import { repoMapSchema, type RepoMap } from '@ot/contracts';
+import { findRepoRoot } from '@tesserax/config';
+import { repoRegistry } from '@tesserax/mod-repos';
+import { repoMapSchema, type RepoMap } from '@tesserax/contracts';
 
 /** config/repos.json (gitignored): Jira project key -> local git repo path. */
 export class RepoMapStore {

@@ -1,8 +1,8 @@
 import { Global, Inject, Module, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
-import { loadConfig, type AppConfig } from '@ot/config';
-import { CONFIG, DB, QUEUE, SCHEDULES, Queue, ScheduleRegistry, createLogger } from '@ot/core';
+import { loadConfig, type AppConfig } from '@tesserax/config';
+import { CONFIG, DB, QUEUE, SCHEDULES, Queue, ScheduleRegistry, createLogger } from '@tesserax/core';
 import { sql } from 'kysely';
-import { createDb, migrateToLatest, seed, type Db } from '@ot/db';
+import { createDb, migrateToLatest, seed, type Db } from '@tesserax/db';
 
 const log = createLogger('infra');
 

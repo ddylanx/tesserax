@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import type { McpList } from '@ot/contracts';
+import type { McpList } from '@tesserax/contracts';
 import { MCP_STATUS_PROVIDER, type McpStatusProvider } from './provider';
 
 /** Extra project folders to scan (e.g. where agents ran). */

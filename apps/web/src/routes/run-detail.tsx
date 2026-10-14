@@ -4,7 +4,7 @@ import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Ed
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AGENT_EXECUTORS, AI_ENGINES, HUMAN_NODE_TYPES, NODE_PORTS, type NodeType, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
+import { AGENT_EXECUTORS, AI_ENGINES, HUMAN_NODE_TYPES, NODE_PORTS, type NodeType, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@tesserax/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
 import { agentOf, agentTitle, nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';

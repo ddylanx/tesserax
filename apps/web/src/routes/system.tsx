@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { FeedbackStats, SystemInfo } from '@ot/contracts';
+import type { FeedbackStats, SystemInfo } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

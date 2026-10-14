@@ -1,14 +1,14 @@
-import type { AppConfig } from '@ot/config';
-import { nodeConfigSchemas, type AgentExecutor } from '@ot/contracts';
-import type { Db } from '@ot/db';
-import { diffInfo } from '@ot/agent-runtime';
-import { ClassificationService } from '@ot/mod-classify';
-import { TasksService } from '@ot/mod-tasks';
+import type { AppConfig } from '@tesserax/config';
+import { nodeConfigSchemas, type AgentExecutor } from '@tesserax/contracts';
+import type { Db } from '@tesserax/db';
+import { diffInfo } from '@tesserax/agent-runtime';
+import { ClassificationService } from '@tesserax/mod-classify';
+import { TasksService } from '@tesserax/mod-tasks';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';
 import { prepareAgent } from './executors';
 import type { NodeContext } from './executors/types';
-import { SkillCatalog } from '@ot/mod-skills';
+import { SkillCatalog } from '@tesserax/mod-skills';
 
 /** Choosing who does an agent step, and finishing work done by you in an editor. Built by the controller. */
 export class HandoffService {

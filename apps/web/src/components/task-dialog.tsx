@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto } from '@ot/contracts';
+import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto } from '@tesserax/contracts';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';

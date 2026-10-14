@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import type { NodeType, WorkflowNode } from '@ot/contracts';
+import type { NodeType, WorkflowNode } from '@tesserax/contracts';
 import { ConditionEditor } from '@/components/conditions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

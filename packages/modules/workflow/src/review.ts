@@ -3,12 +3,12 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
-import type { AppConfig } from '@ot/config';
-import { dataDir } from '@ot/config';
-import type { TaskDetailDto } from '@ot/contracts';
-import type { WorkflowRun } from '@ot/db';
-import { resolveBaseRef } from '@ot/agent-runtime';
-import { repoRegistry } from '@ot/mod-repos';
+import type { AppConfig } from '@tesserax/config';
+import { dataDir } from '@tesserax/config';
+import type { TaskDetailDto } from '@tesserax/contracts';
+import type { WorkflowRun } from '@tesserax/db';
+import { resolveBaseRef } from '@tesserax/agent-runtime';
+import { repoRegistry } from '@tesserax/mod-repos';
 import { BitbucketClient, commentOnPr, findOpenPr, parseBitbucketRemote, parsePrUrl, remoteUrl } from './bitbucket';
 import type { WorkflowEngine } from './engine.service';
 import { FatalNodeError } from './executors/types';
@@ -19,7 +19,7 @@ const git = (cwd: string, args: string[], timeout = 120_000) => exec('git', args
 
 /**
  * Worktree for reviewing a member's branch: checked out (detached, read-only use) at <remote>/<source>, compared with
- * <remote>/<target>. Separate from the ot/<KEY> branches used for our own work; your checkouts are not touched.
+ * <remote>/<target>. Separate from the tx/<KEY> branches used for our own work; your checkouts are not touched.
  */
 export async function ensureReviewWorktree(engine: WorkflowEngine, config: AppConfig, run: WorkflowRun, task: TaskDetailDto) {
   const review = task.review!;

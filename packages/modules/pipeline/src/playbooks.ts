@@ -2,8 +2,8 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
-import { findRepoRoot } from '@ot/config';
-import { ISSUE_TYPES, type PlaybookDto, type TaskDetailDto } from '@ot/contracts';
+import { findRepoRoot } from '@tesserax/config';
+import { ISSUE_TYPES, type PlaybookDto, type TaskDetailDto } from '@tesserax/contracts';
 
 const frontmatterSchema = z.object({
   id: z.string().regex(/^[a-z0-9-]+$/),

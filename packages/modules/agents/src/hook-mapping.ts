@@ -1,5 +1,5 @@
-import type { ClaudeHookPayload } from '@ot/contracts';
-import type { AgentSessionStatus } from '@ot/db';
+import type { ClaudeHookPayload } from '@tesserax/contracts';
+import type { AgentSessionStatus } from '@tesserax/db';
 
 const clip = (s: unknown, n: number) => (typeof s === 'string' ? (s.length > n ? `${s.slice(0, n)}…` : s) : undefined);
 

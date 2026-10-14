@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
-import { claudeHookPayloadSchema, type AgentEventDto, type AgentSessionList } from '@ot/contracts';
+import { claudeHookPayloadSchema, type AgentEventDto, type AgentSessionList } from '@tesserax/contracts';
 import { AgentsService } from './agents.service';
 
 @Controller('agents')

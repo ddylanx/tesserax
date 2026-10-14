@@ -1,4 +1,4 @@
-import type { Classification, TaskDetailDto } from '@ot/contracts';
+import type { Classification, TaskDetailDto } from '@tesserax/contracts';
 
 export interface ClassifierContext {
   task: TaskDetailDto;

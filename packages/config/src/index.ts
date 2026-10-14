@@ -25,7 +25,7 @@ export const envSchema = z.object({
   API_HOST: z.string().default('127.0.0.1'),
   API_PORT: z.coerce.number().int().default(4400),
   WEB_PORT: z.coerce.number().int().default(5180),
-  DATABASE_URL: z.string().url().default('postgres://ot:ot@127.0.0.1:54329/open_tesseract'),
+  DATABASE_URL: z.string().url().default('postgres://tesserax:tesserax@127.0.0.1:54329/tesserax'),
 
   /** https://your-site.atlassian.net, or just your-site.atlassian.net (https:// is added). */
   JIRA_BASE_URL: optional
@@ -56,7 +56,7 @@ export const envSchema = z.object({
   /** Model alias for playbook runs (empty: the CLI's default). */
   PLAYBOOK_MODEL: optional,
   /** Runtime data (worktrees, run logs). Default <repo>/.data */
-  OT_DATA_DIR: optional,
+  TESSERAX_DATA_DIR: optional,
   /** Max seconds for one headless playbook run. */
   PLAYBOOK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(1800),
   /** Base URL of the web app, for links in notifications. */
@@ -97,4 +97,4 @@ export function loadConfig(): AppConfig {
 export const jiraConfigured = (c: AppConfig) => Boolean(c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN);
 
 /** Runtime data: worktrees and run logs (gitignored). */
-export const dataDir = (c: AppConfig) => c.OT_DATA_DIR ?? join(findRepoRoot(), '.data');
+export const dataDir = (c: AppConfig) => c.TESSERAX_DATA_DIR ?? join(findRepoRoot(), '.data');

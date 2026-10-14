@@ -1,4 +1,4 @@
-import type { TaskDetailDto } from '@ot/contracts';
+import type { TaskDetailDto } from '@tesserax/contracts';
 
 export interface RenderContext {
   task: TaskDetailDto;

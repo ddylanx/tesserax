@@ -6,7 +6,7 @@ export interface SkillsLogger {
 
 /** What the host app gives the Skills module. Nothing else from the host is imported. */
 export interface SkillsModuleOptions {
-  /** Folder that contains the skills folder (Open Tesseract: the repo root). */
+  /** Folder that contains the skills folder (Tesserax: the repo root). */
   rootDir: string;
   /** Skills folder, relative to rootDir. Default 'skills'. */
   skillsDir?: string;

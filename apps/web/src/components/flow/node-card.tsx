@@ -1,7 +1,7 @@
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react';
 import { Bot, Copy, EyeOff, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { AGENT_EXECUTOR_INFO, AI_ENGINE_TITLES, ENGINE_NODE_TYPES, type AgentExecutor, type AiEngine, type WorkflowNode } from '@ot/contracts';
+import { AGENT_EXECUTOR_INFO, AI_ENGINE_TITLES, ENGINE_NODE_TYPES, type AgentExecutor, type AiEngine, type WorkflowNode } from '@tesserax/contracts';
 import { cn } from '@/lib/utils';
 import { metaOf, portTone } from './meta';
 

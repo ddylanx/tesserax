@@ -1,5 +1,5 @@
 import { Plus, X } from 'lucide-react';
-import { CONDITION_FIELDS, type Condition } from '@ot/contracts';
+import { CONDITION_FIELDS, type Condition } from '@tesserax/contracts';
 import { Button } from '@/components/ui/button';
 
 const FIELD_LABEL: Record<string, string> = {

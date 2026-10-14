@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Post, Put } from '@nestjs/common';
-import type { RepoInspection, RepoRegistryView } from '@ot/contracts';
-import { DB } from '@ot/core';
+import type { RepoInspection, RepoRegistryView } from '@tesserax/contracts';
+import { DB } from '@tesserax/core';
 import { sql, type Kysely } from 'kysely';
 import { RepoRegistryStore } from './store';
 

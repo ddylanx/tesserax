@@ -2,7 +2,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
-import { cleanEnv, isAlive } from '@ot/agent-runtime';
+import { cleanEnv, isAlive } from '@tesserax/agent-runtime';
 
 /**
  * Antigravity CLI (`agy --print <prompt> --output-format stream-json`, v1.3). One JSON event per stdout line
@@ -139,9 +139,9 @@ export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir:
   writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt, 'accept-edits'), { mode: 0o600 });
   const args = ['--mode', 'accept-edits', '--output-format', 'stream-json', ...(o.model ? ['--model', o.model] : [])];
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
-  const script = '"$OT_BIN" "$@" "--print=$(cat "$OT_RUN_DIR/prompt.md")" > "$OT_RUN_DIR/stdout.json" 2> "$OT_RUN_DIR/stderr.log"; echo $? > "$OT_RUN_DIR/exit_code"';
+  const script = '"$TESSERAX_BIN" "$@" "--print=$(cat "$TESSERAX_RUN_DIR/prompt.md")" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';
   const child = spawn('/bin/sh', ['-c', script, 'ot-run', ...args], {
-    cwd: o.cwd, detached: true, stdio: 'ignore', env: cleanEnv(process.env, { OT_BIN: o.bin, OT_RUN_DIR: o.runDir }),
+    cwd: o.cwd, detached: true, stdio: 'ignore', env: cleanEnv(process.env, { TESSERAX_BIN: o.bin, TESSERAX_RUN_DIR: o.runDir }),
   });
   child.unref();
   if (!child.pid) throw new Error('Could not start Antigravity CLI');

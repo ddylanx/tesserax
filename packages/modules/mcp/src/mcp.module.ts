@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import { Module } from '@nestjs/common';
-import { findRepoRoot } from '@ot/config';
-import { createLogger } from '@ot/core';
+import { findRepoRoot } from '@tesserax/config';
+import { createLogger } from '@tesserax/core';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
 import { MCP_STATUS_PROVIDER, type McpStatusProvider } from './provider';

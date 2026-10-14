@@ -48,7 +48,7 @@ test('pipeline notices: decision, verify, failed; nothing for other states', asy
     id: 'r1', state: 'awaiting_decision', trigger: 'manual', attempt: 1,
     task: { id: 't', workspace: 'company', source: 'jira', key: 'DEMO-1', title: 'Login <broken>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
     classification: { type: 'bug', automation: 'assisted', playbook: 'investigate-bug', repo: null, confidence: 0.82, reasoning: '' },
-    classificationEngine: 'claude-cli', decision: null, playbookId: 'fix-bug', repoPath: null, branch: 'ot/DEMO-1', worktreePath: null,
+    classificationEngine: 'claude-cli', decision: null, playbookId: 'fix-bug', repoPath: null, branch: 'tx/DEMO-1', worktreePath: null,
     agentSessionId: null, result: { exitCode: 0, isError: false, subtype: 'success', summary: '', durationMs: 1, costUsd: 0, numTurns: 1, diff: { files: 2, insertions: 3, deletions: 1, stat: '', untracked: [] }, commits: ['abc x'], signal: 'ok' },
     error: 'quota: limit', errorStep: 'run', verifyNote: null, jiraCommentId: null, createdAt: '', stateChangedAt: '',
   } as never;
@@ -56,7 +56,7 @@ test('pipeline notices: decision, verify, failed; nothing for other states', asy
   assert.match(d, /DEMO-1.*needs your decision/);
   assert.match(d, /Login &lt;broken&gt;/);
   assert.match(d, /inbox\?run=r1/);
-  assert.match(formatPipelineNotice(run, 'awaiting_verify', 'http://x')!, /2 files, \+3 −1, 1 commits on ot\/DEMO-1/);
+  assert.match(formatPipelineNotice(run, 'awaiting_verify', 'http://x')!, /2 files, \+3 −1, 1 commits on tx\/DEMO-1/);
   assert.match(formatPipelineNotice(run, 'failed', 'http://x')!, /failed at run/);
   assert.equal(formatPipelineNotice(run, 'queued', 'http://x'), null);
 });

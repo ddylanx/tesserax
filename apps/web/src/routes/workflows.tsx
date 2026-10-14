@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Plus, Save, X } from 'lucide-react';
-import type { WorkflowRouting } from '@ot/contracts';
+import type { WorkflowRouting } from '@tesserax/contracts';
 import { ConditionEditor } from '@/components/conditions';
 import { useState } from 'react';
 import { Page, QueryState } from '@/components/page';

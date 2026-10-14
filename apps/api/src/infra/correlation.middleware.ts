@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { WorkContext, createLogger } from '@ot/core';
+import { WorkContext, createLogger } from '@tesserax/core';
 
 const log = createLogger('http');
 const HEADER = 'x-correlation-id';

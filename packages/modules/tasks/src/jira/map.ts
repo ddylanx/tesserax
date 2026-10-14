@@ -1,4 +1,4 @@
-import type { TaskStatusCategory } from '@ot/db';
+import type { TaskStatusCategory } from '@tesserax/db';
 import { richText } from './adf';
 import type { JiraIssue } from './client';
 

@@ -1,4 +1,4 @@
-# Open Tesseract (local)
+# Tesserax (local)
 
 A personal backoffice for managing AI coding work, running on your own machine: tasks, agents (Claude Code sessions), MCP servers and system health on one page.
 
@@ -12,7 +12,7 @@ Local mode: one backend process, bound to 127.0.0.1, no login.
 ## Run
 
 ```bash
-cd open-tesseract
+cd tesserax
 cp .env.example .env        # first time only; defaults work as-is
 pnpm install
 pnpm dev                    # starts Postgres (Docker), the API and the web app
@@ -39,7 +39,7 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 Each ticket runs through a **workflow**: a graph of nodes stored in `workflows/<id>.workflow.json` (see [spec 0001](docs/specs/0001-workflow-engine.md)). The default one:
 
 ```
-Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you approve → Implement (agent, worktree ot/<KEY>)
+Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you approve → Implement (agent, worktree tx/<KEY>)
   → Tests + lint (fail → implement, max 2) → AI review vs spec (fail → implement, max 2) → you review the result → Score
 ```
 
@@ -63,8 +63,8 @@ Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you appr
   - **Antigravity, Antigravity IDE, Cursor or VS Code**: the worktree opens in that app; copy the prompt (approved spec included) into its agent, work there, then click **Done** (or **Couldn't finish**); the run continues with tests, AI review and docs. Your choice is reused if the work loops back (tests or review failed). Set `executor` on the node to skip the question.
   - Read-only AI steps (analysis, spec, review, docs, Jira comment) have an `engine` setting: `claude` (default), `gemini` or `antigravity`, e.g. to save Claude quota.
   - Antigravity CLI: install with `curl -fsSL https://antigravity.google/cli/install.sh | bash` (lands in `~/.local/bin/agy`, override with `ANTIGRAVITY_BIN`) and sign in once by running `agy`. Read-only steps use `--mode plan`; agent runs use `--mode accept-edits`. Shell commands cannot be approved headless, so they are refused.
-  - Gemini CLI must be signed in once (`gemini` → Login with Google) and trust the worktree folder (`open-tesseract/.data/worktrees`) before it may edit files.
-- **New task** (Tasks page): local tasks that live only in Open Tesseract, in the Company or Personal workspace (keys `C-1`, `P-1`; branch `ot/C-1`). Pick the project (repo) so workflows know where to work; edit status or delete them later. Jira tasks stay read-only. The Jira comment step is skipped for local tasks.
+  - Gemini CLI must be signed in once (`gemini` → Login with Google) and trust the worktree folder (`tesserax/.data/worktrees`) before it may edit files.
+- **New task** (Tasks page): local tasks that live only in Tesserax, in the Company or Personal workspace (keys `C-1`, `P-1`; branch `tx/C-1`). Pick the project (repo) so workflows know where to work; edit status or delete them later. Jira tasks stay read-only. The Jira comment step is skipped for local tasks.
 - **Code review of a member's PR**: create a task of type **Code review** with the member's branch (and optionally the target branch and the PR link). The routing rule starts the `pr-review` workflow: the branch is checked out read-only in its own worktree (`review__<KEY>`; nothing is pushed), tests run on it, the AI reviews the diff against the target branch (skills `pr-review` + `project-conventions`), you edit/approve the review, then **Comment on the PR** posts it on Bitbucket after you confirm (needs `BITBUCKET_API_TOKEN` with `read:pullrequest`/`write:pullrequest`; otherwise Skip and copy it yourself). The classifier also knows a `review` type.
 - **Classify + skip rules**: the default workflow starts with a **Classify** node (Claude CLI, rules as fallback) that labels the ticket bug / feature / chore / research / question and stores it on the run. Any node can have **"skip this node when …"** conditions (AI type, Jira type, project, priority, status, labels, components) and a port to continue through. In the default workflow, question/research tickets skip implement, tests, AI review and the result review. Skipped nodes are shown dashed on the run graph.
 - **Which workflow a ticket starts**: rules on the Workflows page (saved to `workflows/routing.json`), e.g. "project is COL → workflow col"; first match wins, otherwise the default. On the Tasks page you can also pick a workflow before clicking "Start workflow".
@@ -82,7 +82,7 @@ Jira issue ─▶ AI classifies ─▶ YOU decide ─▶ AI runs a playbook ─�
 1. **New issue**: a Jira issue seen for the first time (not the first import), or "Run pipeline" on the Tasks page, creates a run. One active run per issue.
 2. **Classify**: the local `claude -p` (your Claude Code login, no API key) returns type (bug/feature/chore/research/question), automation (auto/assisted/manual), playbook, confidence and reasoning, validated with Zod. Issue text is passed as delimited, untrusted data. If the CLI is missing, not logged in or answers badly, a rules classifier (issue type, labels, title) is used and the reason is shown in the run's history.
 3. **Decide** (you): accept or change type, automation and playbook, add a note for the agent, classify again, or reject. The issue's Jira project must map to a local repo in `config/repos.json` (copy `config/repos.example.json`): a path, or `{ "path": …, "base": "develop" }` to choose the branch new issue branches start from (default: the remote's default branch, `origin/HEAD`, never the branch your main checkout happens to be on). If a project is not mapped, the Inbox asks for the path and saves it.
-4. **Run**: a git worktree on branch `ot/<ISSUE-KEY>` is created under `.data/worktrees/`, and Claude Code runs the playbook there headless (`claude -p`, prompt from a file, permission mode and allowed tools from the playbook, a budget cap). Push, merge, rebase, remote changes, `gh`, `curl` and `rm -rf` are always denied. Nothing is pushed or merged. The run survives an API restart; Cancel stops it.
+4. **Run**: a git worktree on branch `tx/<ISSUE-KEY>` is created under `.data/worktrees/`, and Claude Code runs the playbook there headless (`claude -p`, prompt from a file, permission mode and allowed tools from the playbook, a budget cap). Push, merge, rebase, remote changes, `gh`, `curl` and `rm -rf` are always denied. Nothing is pushed or merged. The run survives an API restart; Cancel stops it.
 5. **Verify** (you): the Inbox shows the agent's summary, diff stats and full diff, branch and worktree path. Mark it correct (true) or not (false) with a note; this is stored with the classification and playbook as labeled feedback (System page shows the totals). Optionally **Post result to Jira** as a comment, after you confirm the exact text in a dialog. That is the only thing ever written to Jira.
 
 Playbooks are Markdown files in `playbooks/` (frontmatter: `id`, `name`, `applies_to`, `steps`, `permission_mode`, `allowed_tools`, `makes_changes`, `max_budget_usd`; body: the prompt template with `{{issue}}`, `{{steps}}`, `{{branch}}`, `{{worktree_path}}`, `{{user_note}}`). Shipped: `investigate-bug` (read-only), `fix-bug` (edits, runs tests, commits locally), `research-question` (read-only).
@@ -99,7 +99,7 @@ Settings (`.env`): `CLAUDE_BIN` (default `claude`), `CLASSIFIER_ENGINE` (`claude
 pnpm fake-jira                    # terminal 1: fake Jira with 3 fixture issues (DEMO-1, DEMO-2, OPS-7)
 scripts/make-demo-repo.sh         # a throwaway git repo at .data/demo-repo for project DEMO
 CLAUDE_BIN=$PWD/scripts/fake-claude.mjs scripts/dev-fake.sh   # terminal 2: API against the fake Jira and a fake CLI
-pnpm --filter @ot/web dev         # terminal 3: web
+pnpm --filter @tesserax/web dev         # terminal 3: web
 ```
 Then on Tasks, "Run pipeline" on DEMO-1, and enter `<repo>/.data/demo-repo` as its repo in the Inbox. Drop `CLAUDE_BIN=…` to use the real `claude`.
 
@@ -166,7 +166,7 @@ What is stored: session id, folder, branch (read from `.git/HEAD`), model, statu
 |---|---|
 | Web (Vite) | 5180 |
 | API (NestJS) | 4400 |
-| Postgres | 54329 (set `OT_PG_PORT` and `DATABASE_URL` to change) |
+| Postgres | 54329 (set `TESSERAX_PG_PORT` and `DATABASE_URL` to change) |
 
 ## Other commands
 

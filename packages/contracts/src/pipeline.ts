@@ -33,7 +33,7 @@ export const decisionSchema = z.object({
   playbookId: z.string().min(1),
   repoPath: z.string().min(1).optional(),
   note: z.string().max(2000).optional(),
-  /** Set by the server: where ot/<KEY> branches from. */
+  /** Set by the server: where tx/<KEY> branches from. */
   baseRef: z.string().optional(),
 });
 export type DecisionInput = z.infer<typeof decisionSchema>;

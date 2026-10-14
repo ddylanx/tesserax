@@ -1,5 +1,5 @@
 {
-  "name": "@ot/mod-repos",
+  "name": "@tesserax/mod-repos",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",
@@ -8,9 +8,9 @@
   "dependencies": {
     "kysely": "^0.28.17",
     "@nestjs/common": "^11.1.6",
-    "@ot/config": "workspace:*",
-    "@ot/contracts": "workspace:*",
-    "@ot/core": "workspace:*"
+    "@tesserax/config": "workspace:*",
+    "@tesserax/contracts": "workspace:*",
+    "@tesserax/core": "workspace:*"
   },
   "devDependencies": { "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }
 }

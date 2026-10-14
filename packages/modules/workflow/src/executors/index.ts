@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import type { AgentExecutor, NodeType } from '@ot/contracts';
-import { cleanEnv, diffInfo, diffPatch, git } from '@ot/agent-runtime';
+import type { AgentExecutor, NodeType } from '@tesserax/contracts';
+import { cleanEnv, diffInfo, diffPatch, git } from '@tesserax/agent-runtime';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, relative } from 'node:path';
 import { renderTemplate, withSkills } from '../render';

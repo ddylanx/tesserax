@@ -21,11 +21,11 @@ test('opens a PR, or returns the open one for the branch; never echoes the token
     return Response.json({ values: open });
   }) as unknown as typeof fetch;
   const c = new BitbucketClient({ baseUrl: 'https://api.bitbucket.org/2.0', email: 'a@b.c', token: 'tok' }, fake);
-  const p = { workspace: 'ws', slug: 'repo', title: 'T', description: 'D', source: 'ot/X-1', destination: 'develop' };
+  const p = { workspace: 'ws', slug: 'repo', title: 'T', description: 'D', source: 'tx/X-1', destination: 'develop' };
   const first = await c.openPullRequest(p);
   assert.deepEqual([first.id, first.existing], [7, false]);
   assert.equal(calls[1]!.body.destination.branch.name, 'develop');
-  assert.match(decodeURIComponent(calls[0]!.url), /source\.branch\.name="ot\/X-1"/);
+  assert.match(decodeURIComponent(calls[0]!.url), /source\.branch\.name="tx\/X-1"/);
   assert.equal((await c.openPullRequest(p)).existing, true);
 
   const denied = new BitbucketClient({ baseUrl: 'https://x', email: 'a', token: 'secret-tok' }, (async () => new Response('{"error":{"message":"bad secret-tok"}}', { status: 401 })) as unknown as typeof fetch);

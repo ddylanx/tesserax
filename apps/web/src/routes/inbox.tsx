@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   AUTOMATION_LEVELS, ISSUE_TYPES,
   type DecisionInput, type PipelineList, type PipelineRunDetail, type PipelineRunDto, type PlaybookDto,
-} from '@ot/contracts';
+} from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -268,7 +268,7 @@ function DecisionPanel({ run }: { run: PipelineRunDetail }) {
         </label>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Accepting creates a git worktree on a new branch <code>ot/{run.task.key}</code>{run.baseRef ? <> from <code>{run.baseRef}</code></> : null} (your
+        Accepting creates a git worktree on a new branch <code>tx/{run.task.key}</code>{run.baseRef ? <> from <code>{run.baseRef}</code></> : null} (your
         own checkouts are not touched) and runs Claude Code there headless. Nothing is pushed or merged.
       </p>
       <div className="mt-3 flex flex-wrap gap-2">

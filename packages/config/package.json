@@ -1,5 +1,5 @@
 {
-  "name": "@ot/config",
+  "name": "@tesserax/config",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",

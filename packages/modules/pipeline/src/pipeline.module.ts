@@ -1,9 +1,9 @@
 import { Inject, Module, type OnApplicationBootstrap, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type { AppConfig } from '@ot/config';
-import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@ot/core';
-import type { Db } from '@ot/db';
-import { TasksModule, TasksService } from '@ot/mod-tasks';
-import { ClassificationService, ClassifyModule } from '@ot/mod-classify';
+import type { AppConfig } from '@tesserax/config';
+import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
+import { TasksModule, TasksService } from '@tesserax/mod-tasks';
+import { ClassificationService, ClassifyModule } from '@tesserax/mod-classify';
 import { runClassifyJob } from './jobs/classify.job';
 import { runFinalizeJob, scanRunningPlaybooks } from './jobs/finalize.job';
 import { runPlaybookJob } from './jobs/run-playbook.job';

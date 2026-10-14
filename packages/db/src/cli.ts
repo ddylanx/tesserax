@@ -1,4 +1,4 @@
-import { loadConfig } from '@ot/config';
+import { loadConfig } from '@tesserax/config';
 import { createDb } from './client';
 import { migrateToLatest } from './migrate';
 import { seed } from './seed';

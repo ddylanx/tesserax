@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { cleanEnv, isAlive } from '@ot/agent-runtime';
+import { cleanEnv, isAlive } from '@tesserax/agent-runtime';
 
 /**
  * Gemini CLI (`gemini -p … -o json`). Output on stdout:
@@ -39,7 +39,7 @@ export function geminiSignal(o: { out: GeminiOutput | null; stderr: string; exit
   }
   if (/RESOURCE_EXHAUSTED|quota|rate limit|\b429\b/i.test(err)) return { signal: 'quota', message: (o.out?.error?.message ?? err).trim().slice(0, 400) };
   if (o.needsEdits && /not trusted/i.test(o.stderr)) {
-    return { signal: 'untrusted', message: 'Gemini does not trust the worktree folder, so it may not edit files. Run `gemini` once inside open-tesseract/.data/worktrees and trust the folder.' };
+    return { signal: 'untrusted', message: 'Gemini does not trust the worktree folder, so it may not edit files. Run `gemini` once inside tesserax/.data/worktrees and trust the folder.' };
   }
   if (o.timedOut) return { signal: 'timeout', message: 'Timed out and was stopped.' };
   if (o.out?.error) return { signal: 'error', message: (o.out.error.message ?? 'Gemini error').slice(0, 500) };
@@ -85,9 +85,9 @@ export function launchGeminiDetached(o: { bin: string; cwd: string; runDir: stri
   writeFileSync(join(o.runDir, 'prompt.md'), o.prompt, { mode: 0o600 });
   const args = geminiArgs('auto_edit', o.model);
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'gemini', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
-  const script = '"$OT_BIN" "$@" < "$OT_RUN_DIR/prompt.md" > "$OT_RUN_DIR/stdout.json" 2> "$OT_RUN_DIR/stderr.log"; echo $? > "$OT_RUN_DIR/exit_code"';
+  const script = '"$TESSERAX_BIN" "$@" < "$TESSERAX_RUN_DIR/prompt.md" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';
   const child = spawn('/bin/sh', ['-c', script, 'ot-run', ...args], {
-    cwd: o.cwd, detached: true, stdio: 'ignore', env: cleanEnv(process.env, { OT_BIN: o.bin, OT_RUN_DIR: o.runDir }),
+    cwd: o.cwd, detached: true, stdio: 'ignore', env: cleanEnv(process.env, { TESSERAX_BIN: o.bin, TESSERAX_RUN_DIR: o.runDir }),
   });
   child.unref();
   if (!child.pid) throw new Error('Could not start Gemini CLI');

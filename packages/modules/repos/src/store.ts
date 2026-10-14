@@ -2,11 +2,11 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
-import { findRepoRoot } from '@ot/config';
+import { findRepoRoot } from '@tesserax/config';
 import {
   repoRegistrySchema, repositorySchema, workplaceSchema,
   type RepoInspection, type RepoRegistry, type Repository, type ResolvedWorkplace, type Workplace, type WorkplaceStatus,
-} from '@ot/contracts';
+} from '@tesserax/contracts';
 
 const git = (cwd: string, args: string[]) =>
   execFileSync('git', args, { cwd, encoding: 'utf8', timeout: 10_000, stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } }).trim();

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Claude Code hooks that report sessions to the local Open Tesseract API.
+// Claude Code hooks that report sessions to the local Tesserax API.
 //
 //   node scripts/claude-hooks.mjs print                       show the settings snippet (changes nothing)
 //   node scripts/claude-hooks.mjs install --file <settings>   merge into a settings file (backup first)
@@ -71,7 +71,7 @@ if (cmd === 'print') {
     for (const [event, groups] of Object.entries(snippet().hooks)) settings.hooks[event] = [...(settings.hooks[event] ?? []), ...groups];
   }
   write(file, settings);
-  console.log(`${cmd === 'install' ? 'Added' : 'Removed'} Open Tesseract hooks (${EVENTS.length} events) ${cmd === 'install' ? 'to' : 'from'} ${file}`);
+  console.log(`${cmd === 'install' ? 'Added' : 'Removed'} Tesserax hooks (${EVENTS.length} events) ${cmd === 'install' ? 'to' : 'from'} ${file}`);
   console.log('New Claude Code sessions pick this up; restart running ones (or open /hooks) to apply.');
 } else {
   console.error('usage: claude-hooks.mjs print | install (--file <path> | --user) | uninstall (--file <path> | --user)');

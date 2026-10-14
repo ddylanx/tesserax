@@ -4,17 +4,17 @@ import {
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import type { AppConfig } from '@ot/config';
+import type { AppConfig } from '@tesserax/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
-} from '@ot/contracts';
-import { CONFIG, DB } from '@ot/core';
-import type { Db } from '@ot/db';
-import { diffInfo, diffPatch } from '@ot/agent-runtime';
-import { ClassificationService } from '@ot/mod-classify';
-import { TasksService } from '@ot/mod-tasks';
-import { repoRegistry } from '@ot/mod-repos';
+} from '@tesserax/contracts';
+import { CONFIG, DB } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
+import { diffInfo, diffPatch } from '@tesserax/agent-runtime';
+import { ClassificationService } from '@tesserax/mod-classify';
+import { TasksService } from '@tesserax/mod-tasks';
+import { repoRegistry } from '@tesserax/mod-repos';
 import { askClaude } from './executors/claude';
 import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
@@ -22,7 +22,7 @@ import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
 import { postReviewComment } from './review';
 import { computeMetrics } from './metrics';
-import { SkillCatalog } from '@ot/mod-skills';
+import { SkillCatalog } from '@tesserax/mod-skills';
 
 async function guard<T>(fn: () => Promise<T>): Promise<T> {
   try {

@@ -1,8 +1,8 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { useState } from 'react';
-import type { TaskList } from '@ot/contracts';
-import { SkillsClientProvider, SkillsWorkspace, type SkillsClient } from '@ot/mod-skills/web';
+import type { TaskList } from '@tesserax/contracts';
+import { SkillsClientProvider, SkillsWorkspace, type SkillsClient } from '@tesserax/mod-skills/web';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';

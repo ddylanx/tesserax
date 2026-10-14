@@ -1,4 +1,4 @@
-import type { AgentSessionList, McpList, PipelineRunDto, TaskList, WorkflowRunDto } from '@ot/contracts';
+import type { AgentSessionList, McpList, PipelineRunDto, TaskList, WorkflowRunDto } from '@tesserax/contracts';
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const MAX = 3900; // Telegram limit is 4096

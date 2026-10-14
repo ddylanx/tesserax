@@ -1,7 +1,7 @@
 import { Bot, type Context } from 'grammy';
 import type { UserFromGetMe } from 'grammy/types';
-import type { AgentSessionList, McpList, TaskList } from '@ot/contracts';
-import { WorkContext, createLogger } from '@ot/core';
+import type { AgentSessionList, McpList, TaskList } from '@tesserax/contracts';
+import { WorkContext, createLogger } from '@tesserax/core';
 import { formatAgents, formatMcp, formatTasks } from './format';
 
 const log = createLogger('telegram');
@@ -13,7 +13,7 @@ export interface BotDeps {
 }
 
 export const HELP = [
-  '<b>Open Tesseract</b> (read-only)',
+  '<b>Tesserax</b> (read-only)',
   '/tasks open Jira tasks',
   '/agents Claude Code sessions',
   '/mcp enabled MCP servers',

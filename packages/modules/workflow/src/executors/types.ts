@@ -1,10 +1,10 @@
-import type { AppConfig } from '@ot/config';
-import type { TaskDetailDto, WorkflowNode } from '@ot/contracts';
-import type { NodeRun, WorkflowRun } from '@ot/db';
-import type { ClassificationService } from '@ot/mod-classify';
-import type { TasksService } from '@ot/mod-tasks';
+import type { AppConfig } from '@tesserax/config';
+import type { TaskDetailDto, WorkflowNode } from '@tesserax/contracts';
+import type { NodeRun, WorkflowRun } from '@tesserax/db';
+import type { ClassificationService } from '@tesserax/mod-classify';
+import type { TasksService } from '@tesserax/mod-tasks';
 import type { WorkflowEngine } from '../engine.service';
-import type { SkillCatalog } from '@ot/mod-skills';
+import type { SkillCatalog } from '@tesserax/mod-skills';
 
 export interface NodeContext {
   engine: WorkflowEngine;

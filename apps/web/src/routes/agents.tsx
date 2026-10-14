@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, GitBranch } from 'lucide-react';
 import { Fragment, useState } from 'react';
-import type { AgentEventDto, AgentSessionDto, AgentSessionList } from '@ot/contracts';
+import type { AgentEventDto, AgentSessionDto, AgentSessionList } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';

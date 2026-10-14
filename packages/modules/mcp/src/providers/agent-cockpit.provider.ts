@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import type { McpServerDto } from '@ot/contracts';
+import type { McpServerDto } from '@tesserax/contracts';
 import type { McpStatusProvider } from '../provider';
 
 type CockpitServer = Omit<McpServerDto, 'envKeys'> & { envKeys?: string[] };

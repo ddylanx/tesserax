@@ -1,5 +1,5 @@
 {
-  "name": "@ot/contracts",
+  "name": "@tesserax/contracts",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",

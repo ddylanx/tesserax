@@ -17,7 +17,7 @@ export function Layout() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
       <aside className="flex shrink-0 items-center gap-1 border-b bg-card px-3 py-2 md:w-52 md:flex-col md:items-stretch md:border-r md:border-b-0 md:py-4">
-        <div className="mr-3 px-2 text-sm font-semibold md:mr-0 md:mb-4">Open Tesseract</div>
+        <div className="mr-3 px-2 text-sm font-semibold md:mr-0 md:mb-4">Tesserax</div>
         {nav.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Check, Copy, GitBranch, Send, X } from 'lucide-react';
 import { useState } from 'react';
-import type { PipelineRunDetail, RunDiff } from '@ot/contracts';
+import type { PipelineRunDetail, RunDiff } from '@tesserax/contracts';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -47,7 +47,7 @@ function DiffView({ runId }: { runId: string }) {
 /** Text proposed for the Jira comment; the user edits it in the dialog before confirming. */
 const defaultComment = (run: PipelineRunDetail) =>
   [
-    `Open Tesseract: playbook "${run.playbookId}" ran on branch ${run.branch} (local, not pushed).`,
+    `Tesserax: playbook "${run.playbookId}" ran on branch ${run.branch} (local, not pushed).`,
     run.state === 'verified_true' ? 'Result verified by the developer.' : run.state === 'verified_false' ? 'Result checked by the developer: not correct yet.' : '',
     run.verifyNote ? `Note: ${run.verifyNote}` : '',
     run.result?.summary ?? '',

@@ -1,11 +1,11 @@
 import {
   BadRequestException, Body, ConflictException, Controller, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query,
 } from '@nestjs/common';
-import { decisionSchema, postCommentSchema, verifySchema, type FeedbackStats, type PipelineList, type PipelineRunDetail, type PlaybookDto, type RepoMap, type RunDiff } from '@ot/contracts';
-import { TasksService } from '@ot/mod-tasks';
+import { decisionSchema, postCommentSchema, verifySchema, type FeedbackStats, type PipelineList, type PipelineRunDetail, type PlaybookDto, type RepoMap, type RunDiff } from '@tesserax/contracts';
+import { TasksService } from '@tesserax/mod-tasks';
 import { PipelineService } from './pipeline.service';
 import { PlaybookRegistry } from './playbooks';
-import { diffPatch, resolveBaseRef } from '@ot/agent-runtime';
+import { diffPatch, resolveBaseRef } from '@tesserax/agent-runtime';
 import { checkRepoPath } from './repo-map';
 import { TransitionConflict } from './states';
 
@@ -22,7 +22,7 @@ async function guard<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-export const branchFor = (key: string | null, runId: string) => `ot/${(key ?? runId.slice(0, 8)).replace(/[^A-Za-z0-9._-]+/g, '-')}`;
+export const branchFor = (key: string | null, runId: string) => `tx/${(key ?? runId.slice(0, 8)).replace(/[^A-Za-z0-9._-]+/g, '-')}`;
 
 @Controller('pipeline')
 export class PipelineController {

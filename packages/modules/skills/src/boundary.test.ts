@@ -8,7 +8,7 @@ const files = (d: string): string[] =>
 const importsOf = (f: string) => [...readFileSync(f, 'utf8').matchAll(/from '([^']+)'/g)].map(m => m[1]!);
 
 test('the module imports nothing from the host app', () => {
-  const bad = files(__dirname).flatMap(f => importsOf(f).filter(i => i.startsWith('@ot/') || i.startsWith('@/')).map(i => `${f}: ${i}`));
+  const bad = files(__dirname).flatMap(f => importsOf(f).filter(i => i.startsWith('@tesserax/') || i.startsWith('@/')).map(i => `${f}: ${i}`));
   assert.deepEqual(bad, []);
 });
 

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import type { RepoRegistryView } from '@ot/contracts';
+import type { RepoRegistryView } from '@tesserax/contracts';
 import { Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
 

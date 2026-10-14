@@ -1,5 +1,5 @@
 {
-  "name": "@ot/mod-tasks",
+  "name": "@tesserax/mod-tasks",
   "version": "0.0.0",
   "private": true,
   "main": "src/index.ts",
@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@nestjs/common": "^11.1.6",
-    "@ot/contracts": "workspace:*",
-    "@ot/core": "workspace:*",
-    "@ot/db": "workspace:*",
+    "@tesserax/contracts": "workspace:*",
+    "@tesserax/core": "workspace:*",
+    "@tesserax/db": "workspace:*",
     "kysely": "^0.28.17",
-    "@ot/config": "workspace:*"
+    "@tesserax/config": "workspace:*"
   },
   "devDependencies": {
     "@swc-node/register": "^1.10.10",

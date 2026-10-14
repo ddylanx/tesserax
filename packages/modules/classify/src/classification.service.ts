@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { createLogger } from '@ot/core';
-import type { Classification } from '@ot/contracts';
+import { createLogger } from '@tesserax/core';
+import type { Classification } from '@tesserax/contracts';
 import type { Classifier, ClassifierContext } from './classifier';
 import { RulesClassifier } from './rules.classifier';
 

@@ -1,4 +1,4 @@
-import type { Classification } from '@ot/contracts';
+import type { Classification } from '@tesserax/contracts';
 import type { Classifier, ClassifierContext } from './classifier';
 
 /** Deterministic fallback: issue type, labels and title only. */

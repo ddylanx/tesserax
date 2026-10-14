@@ -1,6 +1,6 @@
-import type { JobMeta } from '@ot/core';
-import type { TasksService } from '@ot/mod-tasks';
-import type { ClassificationService } from '@ot/mod-classify';
+import type { JobMeta } from '@tesserax/core';
+import type { TasksService } from '@tesserax/mod-tasks';
+import type { ClassificationService } from '@tesserax/mod-classify';
 import type { PipelineService } from '../pipeline.service';
 import type { PlaybookRegistry } from '../playbooks';
 import type { StepJobData } from '../states';

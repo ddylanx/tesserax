@@ -1,10 +1,10 @@
 import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { validateWorkflow, type TaskDetailDto, type WorkflowDefinition } from '@ot/contracts';
+import { validateWorkflow, type TaskDetailDto, type WorkflowDefinition } from '@tesserax/contracts';
 import { renderTemplate, withSkills } from './render';
 import { WorkflowStore } from './stores';
-import { LocalSkillStore } from '@ot/mod-skills';
+import { LocalSkillStore } from '@tesserax/mod-skills';
 
 const root = join(__dirname, '../../../..');
 
@@ -65,7 +65,7 @@ test('workflow store finds workflows that reference a path', () => {
 });
 
 test('conditions: case-insensitive, list fields, not_in; routing picks the first matching rule', async () => {
-  const { conditionsMatch, routeWorkflow } = await import('@ot/contracts');
+  const { conditionsMatch, routeWorkflow } = await import('@tesserax/contracts');
   const issue = { type: 'Bug', project: 'TC', labels: ['Frontend', 'p1'] };
   assert.ok(conditionsMatch([{ field: 'issue.type', op: 'in', values: ['bug'] }], { issue }));
   assert.ok(conditionsMatch([{ field: 'issue.labels', op: 'in', values: ['frontend'] }], { issue }));

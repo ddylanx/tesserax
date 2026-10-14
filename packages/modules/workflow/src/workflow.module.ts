@@ -1,16 +1,16 @@
 import { Inject, Module, type OnApplicationBootstrap, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
-import type { AppConfig } from '@ot/config';
-import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@ot/core';
-import type { Db } from '@ot/db';
-import { ClassificationService, ClassifyModule } from '@ot/mod-classify';
-import { TasksModule, TasksService } from '@ot/mod-tasks';
+import type { AppConfig } from '@tesserax/config';
+import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
+import { ClassificationService, ClassifyModule } from '@tesserax/mod-classify';
+import { TasksModule, TasksService } from '@tesserax/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, WorkflowEngine } from './engine.service';
 import { finalizeAgentJob, runNodeJob, scanAgentNodes, type JobDeps } from './jobs';
 import { WorkflowController } from './workflow.controller';
 import { ArtifactService } from './artifact.service';
 import { WorkflowQueryService } from './query.service';
 import { WorkflowVcsService } from './vcs.service';
-import { SkillCatalog } from '@ot/mod-skills';
+import { SkillCatalog } from '@tesserax/mod-skills';
 
 const log = createLogger('workflow');
 

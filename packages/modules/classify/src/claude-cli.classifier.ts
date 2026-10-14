@@ -1,8 +1,8 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { AUTOMATION_LEVELS, ISSUE_TYPES, classificationSchema, type Classification } from '@ot/contracts';
-import { runClaude } from '@ot/agent-runtime';
+import { AUTOMATION_LEVELS, ISSUE_TYPES, classificationSchema, type Classification } from '@tesserax/contracts';
+import { runClaude } from '@tesserax/agent-runtime';
 import type { Classifier, ClassifierContext } from './classifier';
 
 const SYSTEM = [

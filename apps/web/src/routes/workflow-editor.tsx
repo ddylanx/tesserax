@@ -7,8 +7,8 @@ import {
 import '@xyflow/react/dist/style.css';
 import { AlertTriangle, LayoutGrid, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { validateWorkflow, type NodeType, type WorkflowDefinition, type WorkflowNode } from '@ot/contracts';
-import type { PackageSkill } from '@ot/mod-skills/contracts';
+import { validateWorkflow, type NodeType, type WorkflowDefinition, type WorkflowNode } from '@tesserax/contracts';
+import type { PackageSkill } from '@tesserax/mod-skills/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { tidyLayout } from '@/components/flow/layout';
 import { nodeTypes, type CardData } from '@/components/flow/node-card';

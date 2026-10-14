@@ -1,16 +1,16 @@
 import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
-import { dataDir, type AppConfig } from '@ot/config';
-import type { DecisionInput } from '@ot/contracts';
-import type { JobMeta } from '@ot/core';
-import type { TasksService } from '@ot/mod-tasks';
-import { ensureWorktree, fetchBase, launchDetached } from '@ot/agent-runtime';
+import { dataDir, type AppConfig } from '@tesserax/config';
+import type { DecisionInput } from '@tesserax/contracts';
+import type { JobMeta } from '@tesserax/core';
+import type { TasksService } from '@tesserax/mod-tasks';
+import { ensureWorktree, fetchBase, launchDetached } from '@tesserax/agent-runtime';
 import type { PipelineService } from '../pipeline.service';
 import { renderPlaybook, type PlaybookRegistry } from '../playbooks';
 import type { StepJobData } from '../states';
 
 /**
- * queued -> running_playbook: worktree + branch ot/<KEY>, then `claude -p` started detached in it.
+ * queued -> running_playbook: worktree + branch tx/<KEY>, then `claude -p` started detached in it.
  * The job ends once the agent is started; pipeline.finalize picks up the result (see watcher).
  */
 export async function runPlaybookJob(

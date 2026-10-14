@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
-import { jiraConfigured, type AppConfig } from '@ot/config';
+import { jiraConfigured, type AppConfig } from '@tesserax/config';
 import { randomUUID } from 'node:crypto';
-import type { CreateLocalTask, TaskDetailDto, TaskDto, TaskList, TaskQuery, UpdateLocalTask } from '@ot/contracts';
-import { CONFIG, DB, QUEUE, type Queue } from '@ot/core';
-import type { Db } from '@ot/db';
+import type { CreateLocalTask, TaskDetailDto, TaskDto, TaskList, TaskQuery, UpdateLocalTask } from '@tesserax/contracts';
+import { CONFIG, DB, QUEUE, type Queue } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
 import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
 
@@ -148,7 +148,7 @@ export class TasksService {
       .executeTakeFirstOrThrow();
   }
 
-  /** Keys like C-12 (Company) or P-3 (Personal); used for branch names (ot/C-12). */
+  /** Keys like C-12 (Company) or P-3 (Personal); used for branch names (tx/C-12). */
   private async nextLocalKey(sourceId: string, workspace: 'personal' | 'company') {
     const prefix = workspace === 'company' ? 'C' : 'P';
     const r = await this.db

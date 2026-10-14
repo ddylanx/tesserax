@@ -1,7 +1,7 @@
 import { closeSync, existsSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { dataDir } from '@ot/config';
-import type { AppConfig } from '@ot/config';
+import { dataDir } from '@tesserax/config';
+import type { AppConfig } from '@tesserax/config';
 import type { NodeContext } from './types';
 
 /** Directory that holds a node run's files (prompt, stdout, live log). Same one agent steps already use. */

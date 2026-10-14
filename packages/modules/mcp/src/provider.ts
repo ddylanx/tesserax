@@ -1,4 +1,4 @@
-import type { McpServerDto } from '@ot/contracts';
+import type { McpServerDto } from '@tesserax/contracts';
 
 /** Where the MCP server list comes from. Read-only: never starts, stops or edits servers. */
 export interface McpStatusProvider {

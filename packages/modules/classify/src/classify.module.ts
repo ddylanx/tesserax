@@ -1,6 +1,6 @@
 import { Inject, Module, type OnModuleInit } from '@nestjs/common';
-import type { AppConfig } from '@ot/config';
-import { CONFIG, createLogger } from '@ot/core';
+import type { AppConfig } from '@tesserax/config';
+import { CONFIG, createLogger } from '@tesserax/core';
 import { ClassificationService } from './classification.service';
 import { ClaudeCliClassifier } from './claude-cli.classifier';
 

@@ -1,9 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import type { TaskDetailDto } from '@ot/contracts';
+import type { TaskDetailDto } from '@tesserax/contracts';
 import { ClaudeCliClassifier, buildClassifyPrompt, extractJson } from './claude-cli.classifier';
-import { cleanEnv, detectSignal, runClaude } from '@ot/agent-runtime';
+import { cleanEnv, detectSignal, runClaude } from '@tesserax/agent-runtime';
 
 const FAKE = join(__dirname, '../../../../scripts/fake-claude.mjs');
 const task: TaskDetailDto = {
@@ -15,8 +15,8 @@ const task: TaskDetailDto = {
 const ctx = { task, playbooks: [{ id: 'investigate-bug', name: 'Investigate', appliesTo: ['bug'], description: 'x' }], mappedRepo: '/repo' };
 
 test('cleanEnv keeps our own settings and secrets away from child processes', () => {
-  const e = cleanEnv({ PATH: '/bin', NODE_ENV: 'development', DATABASE_URL: 'postgres://ot@127.0.0.1:54329/x', JIRA_API_TOKEN: 't', TELEGRAM_BOT_TOKEN: 't', DB_HOST: 'theirs' }, { OT_RUN_DIR: '/r' });
-  assert.deepEqual(e, { PATH: '/bin', NODE_ENV: 'development', DB_HOST: 'theirs', OT_RUN_DIR: '/r' });
+  const e = cleanEnv({ PATH: '/bin', NODE_ENV: 'development', DATABASE_URL: 'postgres://tesserax@127.0.0.1:54329/x', JIRA_API_TOKEN: 't', TELEGRAM_BOT_TOKEN: 't', DB_HOST: 'theirs' }, { TESSERAX_RUN_DIR: '/r' });
+  assert.deepEqual(e, { PATH: '/bin', NODE_ENV: 'development', DB_HOST: 'theirs', TESSERAX_RUN_DIR: '/r' });
 });
 
 test('cleanEnv drops variables a parent Claude Code session injects', () => {

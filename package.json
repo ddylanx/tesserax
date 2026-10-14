@@ -1,5 +1,5 @@
 {
-  "name": "open-tesseract",
+  "name": "tesserax",
   "private": true,
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
@@ -13,8 +13,8 @@
     "test": "turbo run test",
     "db:up": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
-    "db:migrate": "pnpm --filter @ot/db migrate",
-    "db:seed": "pnpm --filter @ot/db seed",
+    "db:migrate": "pnpm --filter @tesserax/db migrate",
+    "db:seed": "pnpm --filter @tesserax/db seed",
     "hooks:print": "node scripts/claude-hooks.mjs print",
     "hooks:install": "node scripts/claude-hooks.mjs install",
     "hooks:uninstall": "node scripts/claude-hooks.mjs uninstall",

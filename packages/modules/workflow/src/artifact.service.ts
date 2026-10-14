@@ -1,6 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { DB } from '@ot/core';
-import type { Db } from '@ot/db';
+import { DB } from '@tesserax/core';
+import type { Db } from '@tesserax/db';
 
 @Injectable()
 export class ArtifactService {

@@ -43,7 +43,7 @@ export class Queue {
   private started = false;
 
   constructor(connectionString: string) {
-    this.boss = new PgBoss({ connectionString, schema: 'pgboss', application_name: 'open-tesseract' });
+    this.boss = new PgBoss({ connectionString, schema: 'pgboss', application_name: 'tesserax' });
     this.boss.on('error', err => log.error({ err }, 'pg-boss error'));
   }
 

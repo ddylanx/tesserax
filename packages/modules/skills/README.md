@@ -1,4 +1,4 @@
-# @ot/mod-skills
+# @tesserax/mod-skills
 
 Skills for AI agents: prompt instructions written in `SKILL.md` files (Claude Code skill format), plus external skill packages installed from git repositories. When packages are installed, only `.md`/`.txt` text files and `LICENSE` are copied into `skills/_packages/<id>/`, never executing any scripts or git hooks.
 
@@ -27,7 +27,7 @@ Exports provided by package:
 Register `SkillsModule.forRoot(...)` in your root NestJS application module:
 
 ```ts
-import { SkillsModule, SkillCatalog } from '@ot/mod-skills';
+import { SkillsModule, SkillCatalog } from '@tesserax/mod-skills';
 
 @Module({
   imports: [
@@ -79,7 +79,7 @@ Endpoints are mounted by `SkillsController` and `SkillPackagesController` (under
 Wrap the workspace in `SkillsClientProvider` and provide an API adapter matching `SkillsClient`:
 
 ```tsx
-import { SkillsClientProvider, SkillsWorkspace, type SkillsClient } from '@ot/mod-skills/web';
+import { SkillsClientProvider, SkillsWorkspace, type SkillsClient } from '@tesserax/mod-skills/web';
 
 const client: SkillsClient = {
   fetchJson: async (path, init) => {
@@ -108,7 +108,7 @@ If using Tailwind CSS v4 in the host app, add a `@source` directive in your main
 
 ```css
 @import "tailwindcss";
-@source "path/to/node_modules/@ot/mod-skills/src/web";
+@source "path/to/node_modules/@tesserax/mod-skills/src/web";
 ```
 
 The UI primitives rely on standard CSS design tokens (shadcn style):

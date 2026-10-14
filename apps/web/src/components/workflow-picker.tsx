@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Play, X } from 'lucide-react';
 import { useState } from 'react';
-import { canSwitchWorkflow, conditionsMatch, type ConditionContext, type WorkflowRouting, type WorkflowRunDetail, type WorkflowRunList } from '@ot/contracts';
+import { canSwitchWorkflow, conditionsMatch, type ConditionContext, type WorkflowRouting, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
 import { api } from '@/lib/api';

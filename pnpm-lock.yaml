@@ -29,40 +29,40 @@ importers:
       '@nestjs/platform-express':
         specifier: ^11.1.6
         version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.2.7)
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@ot/db':
+      '@tesserax/db':
         specifier: workspace:*
         version: link:../../packages/db
-      '@ot/mod-agents':
+      '@tesserax/mod-agents':
         specifier: workspace:*
         version: link:../../packages/modules/agents
-      '@ot/mod-mcp':
+      '@tesserax/mod-mcp':
         specifier: workspace:*
         version: link:../../packages/modules/mcp
-      '@ot/mod-pipeline':
+      '@tesserax/mod-pipeline':
         specifier: workspace:*
         version: link:../../packages/modules/pipeline
-      '@ot/mod-repos':
+      '@tesserax/mod-repos':
         specifier: workspace:*
         version: link:../../packages/modules/repos
-      '@ot/mod-skills':
+      '@tesserax/mod-skills':
         specifier: workspace:*
         version: link:../../packages/modules/skills
-      '@ot/mod-tasks':
+      '@tesserax/mod-tasks':
         specifier: workspace:*
         version: link:../../packages/modules/tasks
-      '@ot/mod-telegram':
+      '@tesserax/mod-telegram':
         specifier: workspace:*
         version: link:../../packages/modules/telegram
-      '@ot/mod-workflow':
+      '@tesserax/mod-workflow':
         specifier: workspace:*
         version: link:../../packages/modules/workflow
       kysely:
@@ -87,18 +87,18 @@ importers:
 
   apps/web:
     dependencies:
-      '@ot/contracts':
-        specifier: workspace:*
-        version: link:../../packages/contracts
-      '@ot/mod-skills':
-        specifier: workspace:*
-        version: link:../../packages/modules/skills
       '@tanstack/react-query':
         specifier: ^5.85.0
         version: 5.104.1(react@19.3.0)
       '@tanstack/react-router':
         specifier: ^1.131.0
         version: 1.170.42(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@tesserax/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
+      '@tesserax/mod-skills':
+        specifier: workspace:*
+        version: link:../../packages/modules/skills
       '@xyflow/react':
         specifier: ^12.12.0
         version: 12.12.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
@@ -145,7 +145,7 @@ importers:
 
   packages/agent-runtime:
     dependencies:
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../config
     devDependencies:
@@ -170,7 +170,7 @@ importers:
 
   packages/core:
     dependencies:
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../config
       pg-boss:
@@ -185,7 +185,7 @@ importers:
 
   packages/db:
     dependencies:
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../config
       kysely:
@@ -210,13 +210,13 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
-      '@ot/db':
+      '@tesserax/db':
         specifier: workspace:*
         version: link:../../db
       kysely:
@@ -235,16 +235,16 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/agent-runtime':
+      '@tesserax/agent-runtime':
         specifier: workspace:*
         version: link:../../agent-runtime
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
@@ -260,13 +260,13 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
     devDependencies:
@@ -282,28 +282,28 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/agent-runtime':
+      '@tesserax/agent-runtime':
         specifier: workspace:*
         version: link:../../agent-runtime
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
-      '@ot/db':
+      '@tesserax/db':
         specifier: workspace:*
         version: link:../../db
-      '@ot/mod-classify':
+      '@tesserax/mod-classify':
         specifier: workspace:*
         version: link:../classify
-      '@ot/mod-repos':
+      '@tesserax/mod-repos':
         specifier: workspace:*
         version: link:../repos
-      '@ot/mod-tasks':
+      '@tesserax/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
       kysely:
@@ -328,13 +328,13 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
       kysely:
@@ -390,16 +390,16 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
-      '@ot/db':
+      '@tesserax/db':
         specifier: workspace:*
         version: link:../../db
       kysely:
@@ -418,28 +418,28 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
-      '@ot/mod-agents':
+      '@tesserax/mod-agents':
         specifier: workspace:*
         version: link:../agents
-      '@ot/mod-mcp':
+      '@tesserax/mod-mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@ot/mod-pipeline':
+      '@tesserax/mod-pipeline':
         specifier: workspace:*
         version: link:../pipeline
-      '@ot/mod-tasks':
+      '@tesserax/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
-      '@ot/mod-workflow':
+      '@tesserax/mod-workflow':
         specifier: workspace:*
         version: link:../workflow
       grammy:
@@ -458,31 +458,31 @@ importers:
       '@nestjs/common':
         specifier: ^11.1.6
         version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@ot/agent-runtime':
+      '@tesserax/agent-runtime':
         specifier: workspace:*
         version: link:../../agent-runtime
-      '@ot/config':
+      '@tesserax/config':
         specifier: workspace:*
         version: link:../../config
-      '@ot/contracts':
+      '@tesserax/contracts':
         specifier: workspace:*
         version: link:../../contracts
-      '@ot/core':
+      '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
-      '@ot/db':
+      '@tesserax/db':
         specifier: workspace:*
         version: link:../../db
-      '@ot/mod-classify':
+      '@tesserax/mod-classify':
         specifier: workspace:*
         version: link:../classify
-      '@ot/mod-repos':
+      '@tesserax/mod-repos':
         specifier: workspace:*
         version: link:../repos
-      '@ot/mod-skills':
+      '@tesserax/mod-skills':
         specifier: workspace:*
         version: link:../skills
-      '@ot/mod-tasks':
+      '@tesserax/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
       kysely:

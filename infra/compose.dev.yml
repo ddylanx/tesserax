@@ -1,17 +1,17 @@
-name: open-tesseract
+name: tesserax
 services:
   postgres:
     image: pgvector/pgvector:pg16
     environment:
-      POSTGRES_USER: ot
-      POSTGRES_PASSWORD: ot
-      POSTGRES_DB: open_tesseract
+      POSTGRES_USER: tesserax
+      POSTGRES_PASSWORD: tesserax
+      POSTGRES_DB: tesserax
     ports:
-      - "127.0.0.1:${OT_PG_PORT:-54329}:5432"
+      - "127.0.0.1:${TESSERAX_PG_PORT:-54329}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ot -d open_tesseract"]
+      test: ["CMD-SHELL", "pg_isready -U tesserax -d tesserax"]
       interval: 2s
       timeout: 3s
       retries: 30
