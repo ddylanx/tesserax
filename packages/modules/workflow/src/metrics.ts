@@ -1,13 +1,13 @@
 import { sql } from 'kysely';
 import type { MetricsReport, WorkflowDefinition } from '@ot/contracts';
 import type { Db } from '@ot/db';
-import type { SkillStore } from './stores';
+import type { SkillCatalog } from '@ot/mod-skills';
 
 const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const round = (x: number | null, d = 2) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);
 
 /** Aggregates for tuning workflows and skills. Everything is computed from runs started in the last `days` days. */
-export async function computeMetrics(db: Db, skills: SkillStore, opts: { days: number; workflowId?: string }): Promise<MetricsReport> {
+export async function computeMetrics(db: Db, skills: SkillCatalog, opts: { days: number; workflowId?: string }): Promise<MetricsReport> {
   let q = db
     .selectFrom('workflow_runs as r')
     .innerJoin('tasks as t', 't.id', 'r.task_id')

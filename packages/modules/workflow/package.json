@@ -11,6 +11,7 @@
     "@ot/config": "workspace:*",
     "@ot/contracts": "workspace:*",
     "@ot/core": "workspace:*",
+    "@ot/mod-skills": "workspace:*",
     "@ot/db": "workspace:*",
     "@ot/agent-runtime": "workspace:*",
     "@ot/mod-classify": "workspace:*",

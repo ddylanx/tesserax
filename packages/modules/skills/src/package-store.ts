@@ -1,14 +1,12 @@
 import { execFile } from 'node:child_process';
-import { createHash } from 'node:crypto';
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative } from 'node:path';
 import { promisify } from 'node:util';
-import { findRepoRoot } from '@ot/config';
-import { skillPackageManifestSchema, type InstallSkillPackage, type PackageSkill, type SkillPackage, type SkillPackageManifest } from '@ot/contracts';
+import { skillPackageManifestSchema, type InstallSkillPackage, type PackageSkill, type SkillPackage, type SkillPackageManifest } from './contracts';
+import { frontmatterField, sha } from './frontmatter';
 
 const exec = promisify(execFile);
-const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 
 /** Clones `source` at `ref` into `dir` and returns the commit. Swappable in tests. */
 export type Fetcher = (source: string, ref: string | null, dir: string) => Promise<string>;
@@ -33,22 +31,6 @@ export const gitFetcher: Fetcher = async (source, ref, dir) => {
   }
   return (await exec('git', ['rev-parse', 'HEAD'], { cwd: dir, env })).stdout.trim();
 };
-
-/** Frontmatter field, including YAML folded/literal blocks (`description: >`). */
-export function frontmatterField(text: string, key: string): string {
-  const fm = text.match(/^---\r?\n([\s\S]*?)\r?\n---/)?.[1] ?? '';
-  const lines = fm.split(/\r?\n/);
-  const i = lines.findIndex(l => l.startsWith(`${key}:`));
-  if (i < 0) return '';
-  const first = lines[i]!.slice(key.length + 1).trim();
-  if (!/^[>|][-+]?$/.test(first)) return first.replace(/^(["'])(.*)\1$/, '$2');
-  const block: string[] = [];
-  for (const l of lines.slice(i + 1)) {
-    if (l.trim() && !/^\s/.test(l)) break;
-    block.push(l.trim());
-  }
-  return block.join(first.startsWith('|') ? '\n' : ' ').trim();
-}
 
 /**
  * Where a repo keeps its skills: skills/<name>/SKILL.md, else <name>/SKILL.md at the top level, else a single root
@@ -106,9 +88,14 @@ export class SkillPackageStore {
   readonly manifestFile: string;
   readonly dir: string;
 
-  constructor(readonly root = findRepoRoot(), private readonly fetch: Fetcher = gitFetcher) {
-    this.manifestFile = join(root, 'skills', 'packages.json');
-    this.dir = join(root, 'skills', '_packages');
+  constructor(
+    readonly root: string,
+    private readonly fetch: Fetcher = gitFetcher,
+    private readonly usedByHost: (pathPrefix: string) => string[] = () => [],
+    readonly skillsDir = 'skills',
+  ) {
+    this.manifestFile = join(root, skillsDir, 'packages.json');
+    this.dir = join(root, skillsDir, '_packages');
   }
 
   read(): SkillPackageManifest {
@@ -118,7 +105,7 @@ export class SkillPackageStore {
 
   private write(m: SkillPackageManifest) {
     m.packages.sort((a, b) => a.category.localeCompare(b.category) || a.id.localeCompare(b.id));
-    mkdirSync(join(this.root, 'skills'), { recursive: true });
+    mkdirSync(join(this.root, this.skillsDir), { recursive: true });
     writeFileSync(`${this.manifestFile}.tmp`, `${JSON.stringify(m, null, 2)}\n`);
     renameSync(`${this.manifestFile}.tmp`, this.manifestFile);
   }
@@ -129,14 +116,9 @@ export class SkillPackageStore {
     return p;
   }
 
-  /** Workflow ids whose nodes reference a skill of this package. */
+  /** Host things (workflows) that reference a skill of this package. */
   usedBy(id: string): string[] {
-    const wf = join(this.root, 'workflows');
-    if (!existsSync(wf)) return [];
-    const needle = `skills/_packages/${id}/`;
-    return readdirSync(wf)
-      .filter(f => f.endsWith('.workflow.json') && readFileSync(join(wf, f), 'utf8').includes(needle))
-      .map(f => f.replace(/\.workflow\.json$/, ''));
+    return this.usedByHost(`${this.skillsDir}/_packages/${id}/`);
   }
 
   list() {
@@ -150,7 +132,7 @@ export class SkillPackageStore {
         .map(s => {
           const text = readFileSync(join(this.dir, p.id, s, 'SKILL.md'), 'utf8');
           return {
-            path: `skills/_packages/${p.id}/${s}/SKILL.md`,
+            path: `${this.skillsDir}/_packages/${p.id}/${s}/SKILL.md`,
             name: frontmatterField(text, 'name') || s,
             description: frontmatterField(text, 'description'),
             hash: sha(text),
@@ -163,7 +145,7 @@ export class SkillPackageStore {
 
   skillContent(id: string, skill: string): { path: string; content: string; hash: string } {
     if (!this.get(id).skills.includes(skill)) throw new Error(`Package ${id} has no skill ${skill}`);
-    const path = `skills/_packages/${id}/${skill}/SKILL.md`;
+    const path = `${this.skillsDir}/_packages/${id}/${skill}/SKILL.md`;
     const content = readFileSync(join(this.root, path), 'utf8');
     return { path, content, hash: sha(content) };
   }

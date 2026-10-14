@@ -415,13 +415,6 @@ export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: stri
   evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },
 };
 
-export const skillFileSchema = z.object({
-  content: z
-    .string()
-    .min(1)
-    .max(200_000)
-    .refine(s => /^---\r?\n[\s\S]*?^name:\s*\S+[\s\S]*?^description:\s*\S+[\s\S]*?\r?\n---/m.test(s), 'Needs frontmatter with name: and description:'),
-});
 
 export const trySkillSchema = z.object({
   taskId: z.string().uuid(),

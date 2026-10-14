@@ -1,0 +1,45 @@
+{
+  "name": "@ot/mod-skills",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Skills for AI agents: SKILL.md files you write, plus skill packages installed from git. NestJS module + React UI.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./web": "./src/web/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json",
+    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
+  },
+  "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.3.1",
+    "zod": "^4.1.13"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@tanstack/react-query": "^5.0.0",
+    "lucide-react": ">=0.400.0",
+    "react": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@nestjs/common": { "optional": true },
+    "@tanstack/react-query": { "optional": true },
+    "lucide-react": { "optional": true },
+    "react": { "optional": true }
+  },
+  "devDependencies": {
+    "@nestjs/common": "^11.1.6",
+    "@swc-node/register": "^1.10.10",
+    "@swc/core": "^1.13.5",
+    "@tanstack/react-query": "^5.85.0",
+    "@types/react": "^19.1.10",
+    "lucide-react": "^0.540.0",
+    "react": "^19.1.1"
+  }
+}

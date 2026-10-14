@@ -49,3 +49,17 @@ export type PackageSkill = z.infer<typeof packageSkillSchema>;
 export interface SkillPackageList {
   packages: (SkillPackage & { usedBy: string[] })[]; // usedBy: workflow ids whose nodes reference the package's skills
 }
+
+export const skillFileSchema = z.object({
+  content: z
+    .string()
+    .min(1)
+    .max(200_000)
+    .refine(s => /^---\r?\n[\s\S]*?^name:\s*\S+[\s\S]*?^description:\s*\S+[\s\S]*?\r?\n---/m.test(s), 'Needs frontmatter with name: and description:'),
+});
+
+/** GET /api/skills: the repo's own skills (no body). */
+export interface SkillInfo { path: string; name: string; description: string; hash: string }
+
+/** GET /api/skills/:name and GET /api/skill-packages/:id/skills/:skill */
+export interface SkillContent { path: string; content: string; hash: string }

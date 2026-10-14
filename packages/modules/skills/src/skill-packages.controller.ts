@@ -1,9 +1,7 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
-import { installSkillPackageSchema, patchSkillPackageSchema, type PackageSkill, type SkillPackageList } from '@ot/contracts';
-import { createLogger } from '@ot/core';
-import { SkillPackageStore } from './store';
-
-const log = createLogger('skill-packages');
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, Inject, Logger, Param, Patch, Post, Query } from '@nestjs/common';
+import { installSkillPackageSchema, patchSkillPackageSchema, type PackageSkill, type SkillPackageList } from './contracts';
+import { SKILLS_OPTIONS, type SkillsLogger, type SkillsModuleOptions } from './options';
+import { SkillPackageStore } from './package-store';
 
 async function guard<T>(fn: () => T | Promise<T>): Promise<T> {
   try {
@@ -19,7 +17,12 @@ async function guard<T>(fn: () => T | Promise<T>): Promise<T> {
 export class SkillPackagesController {
   // Installs and updates touch the same folder; one at a time.
   private busy: Promise<unknown> = Promise.resolve();
-  constructor(private readonly store: SkillPackageStore) {}
+  private readonly log: SkillsLogger;
+
+  constructor(private readonly store: SkillPackageStore, @Inject(SKILLS_OPTIONS) opts: SkillsModuleOptions) {
+    const nest = new Logger('skills');
+    this.log = opts.logger ?? { info: (obj, msg) => nest.log(`${msg} ${JSON.stringify(obj)}`) };
+  }
 
   private serial<T>(fn: () => Promise<T>): Promise<T> {
     const next = this.busy.then(fn, fn);
@@ -49,7 +52,7 @@ export class SkillPackagesController {
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
     return guard(() => this.serial(async () => {
       const p = await this.store.install(parsed.data);
-      log.info({ id: p.id, source: p.source, commit: p.commit, skills: p.skills }, 'skill package installed');
+      this.log.info({ id: p.id, source: p.source, commit: p.commit, skills: p.skills }, 'skill package installed');
       return p;
     }));
   }
@@ -59,7 +62,7 @@ export class SkillPackagesController {
   update(@Param('id') id: string) {
     return guard(() => this.serial(async () => {
       const p = await this.store.update(id);
-      log.info({ id, commit: p.commit, changed: p.changed }, 'skill package updated');
+      this.log.info({ id, commit: p.commit, changed: p.changed }, 'skill package updated');
       return p;
     }));
   }
@@ -75,7 +78,7 @@ export class SkillPackagesController {
   remove(@Param('id') id: string, @Query('force') force?: string) {
     return guard(() => this.serial(async () => {
       const r = this.store.remove(id, force === '1');
-      log.info({ id, usedBy: r.usedBy }, 'skill package removed');
+      this.log.info({ id, usedBy: r.usedBy }, 'skill package removed');
       return r;
     }));
   }

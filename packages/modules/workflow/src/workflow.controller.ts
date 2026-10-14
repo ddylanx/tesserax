@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, skillFileSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
@@ -22,7 +22,7 @@ import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
 import { postReviewComment } from './review';
 import { computeMetrics } from './metrics';
-import { SkillStore } from './stores';
+import { SkillCatalog } from '@ot/mod-skills';
 
 async function guard<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -38,7 +38,7 @@ async function guard<T>(fn: () => Promise<T>): Promise<T> {
 export class WorkflowController {
   constructor(
     private readonly engine: WorkflowEngine,
-    private readonly skills: SkillStore,
+    private readonly skills: SkillCatalog,
     private readonly tasks: TasksService,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
@@ -154,27 +154,6 @@ export class WorkflowController {
     return guard(async () => this.engine.routing.save(parsed.data, id => this.engine.workflows.exists(id)));
   }
 
-  @Get('skills/:name')
-  skill(@Param('name') name: string) {
-    return guard(async () => this.skills.read(name));
-  }
-
-  @Put('skills/:name')
-  saveSkill(@Param('name') name: string, @Body() body: unknown) {
-    const parsed = skillFileSchema.safeParse(body);
-    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => i.message).join('; '));
-    return guard(async () => this.skills.save(name, parsed.data.content));
-  }
-
-  @Post('skills')
-  createSkill(@Body() body: { name?: string; description?: string }) {
-    return guard(async () => {
-      const name = String(body?.name ?? '');
-      const content = `---\nname: ${name}\ndescription: ${body?.description?.trim() || 'What this skill does and when to use it.'}\n---\n# ${name}\n\nInstructions for the AI.\n`;
-      return this.skills.save(name, content, true);
-    });
-  }
-
   /**
    * Runs a skill once on a ticket, read-only, to tune it without starting a workflow. Uses the project's repo
    * (read-only tools only) when it is mapped, otherwise an empty folder.
@@ -185,7 +164,7 @@ export class WorkflowController {
     const parsed = trySkillSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => i.message).join('; '));
     return guard(async () => {
-      const skill = this.skills.get(this.skills.pathOf(name));
+      const skill = this.skills.get(this.skills.local.pathOf(name));
       const task = await this.tasks.getTask(parsed.data.taskId);
       if (!task) throw new Error('Task not found');
       const repo = repoRegistry.resolve(task)?.path ?? null;
@@ -212,11 +191,6 @@ export class WorkflowController {
   @Get('workflows/:id')
   workflow(@Param('id') id: string) {
     return guard(async () => this.engine.workflows.load(id));
-  }
-
-  @Get('skills')
-  listSkills() {
-    return this.skills.list().map(({ body: _b, ...s }) => s);
   }
 
   @Get('workflow-runs')

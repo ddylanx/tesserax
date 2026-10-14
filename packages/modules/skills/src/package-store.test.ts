@@ -3,7 +3,8 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { checkSource, defaultId, discoverSkills, frontmatterField, SkillPackageStore, type Fetcher } from './store';
+import { frontmatterField } from './frontmatter';
+import { checkSource, defaultId, discoverSkills, SkillPackageStore, type Fetcher } from './package-store';
 
 function fakeRepo(files: Record<string, string>): string {
   const dir = mkdtempSync(join(tmpdir(), 'ot-fake-repo-'));
@@ -45,7 +46,7 @@ test('install, list, recategorize, update, remove', async () => {
     'package.json': '{"version":"5.2.0"}',
   });
   const root = mkdtempSync(join(tmpdir(), 'ot-root-'));
-  const store = new SkillPackageStore(root, fetcherFor(repo));
+  const store = new SkillPackageStore(root, fetcherFor(repo), p => (p === 'skills/_packages/pkg/' ? ['w'] : []));
   const p = await store.install({ source: 'https://example.com/a/pkg.git', category: 'code-review' });
   assert.equal(p.id, 'pkg');
   assert.equal(p.version, '5.2.0');
@@ -63,8 +64,6 @@ test('install, list, recategorize, update, remove', async () => {
   assert.equal(updated.changed, true);
   assert.equal(updated.category, 'testing');
 
-  mkdirSync(join(root, 'workflows'));
-  writeFileSync(join(root, 'workflows/w.workflow.json'), '{"skills":["skills/_packages/pkg/review/SKILL.md"]}');
   assert.deepEqual(store.list().packages[0]!.usedBy, ['w']);
   assert.throws(() => store.remove('pkg'), /Still used by workflow w/);
   store.remove('pkg', true);

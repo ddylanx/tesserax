@@ -10,7 +10,7 @@ import { EXECUTORS } from './executors';
 import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
-import type { SkillStore } from './stores';
+import type { SkillCatalog } from '@ot/mod-skills';
 
 const log = createLogger('workflow.jobs');
 
@@ -19,7 +19,7 @@ export interface JobDeps {
   engine: WorkflowEngine;
   tasks: TasksService;
   classifier: ClassificationService;
-  skills: SkillStore;
+  skills: SkillCatalog;
   config: AppConfig;
   queue: Queue;
 }

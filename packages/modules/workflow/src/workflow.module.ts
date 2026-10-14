@@ -6,11 +6,11 @@ import { ClassificationService, ClassifyModule } from '@ot/mod-classify';
 import { TasksModule, TasksService } from '@ot/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, WorkflowEngine } from './engine.service';
 import { finalizeAgentJob, runNodeJob, scanAgentNodes, type JobDeps } from './jobs';
-import { SkillStore } from './stores';
 import { WorkflowController } from './workflow.controller';
 import { ArtifactService } from './artifact.service';
 import { WorkflowQueryService } from './query.service';
 import { WorkflowVcsService } from './vcs.service';
+import { SkillCatalog } from '@ot/mod-skills';
 
 const log = createLogger('workflow');
 
@@ -22,7 +22,6 @@ const log = createLogger('workflow');
     WorkflowQueryService,
     WorkflowVcsService,
     WorkflowEngine,
-    { provide: SkillStore, useFactory: () => new SkillStore() },
   ],
   exports: [WorkflowEngine, ArtifactService, WorkflowQueryService, WorkflowVcsService],
 })
@@ -37,7 +36,7 @@ export class WorkflowModule implements OnModuleInit, OnApplicationBootstrap, OnM
     @Inject(SCHEDULES) private readonly schedules: ScheduleRegistry,
     private readonly engine: WorkflowEngine,
     private readonly tasks: TasksService,
-    private readonly skills: SkillStore,
+    private readonly skills: SkillCatalog,
     private readonly classifier: ClassificationService,
   ) {}
 

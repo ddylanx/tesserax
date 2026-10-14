@@ -4,13 +4,13 @@ import type { NodeRun, WorkflowRun } from '@ot/db';
 import type { ClassificationService } from '@ot/mod-classify';
 import type { TasksService } from '@ot/mod-tasks';
 import type { WorkflowEngine } from '../engine.service';
-import type { SkillStore } from '../stores';
+import type { SkillCatalog } from '@ot/mod-skills';
 
 export interface NodeContext {
   engine: WorkflowEngine;
   tasks: TasksService;
   classifier: ClassificationService;
-  skills: SkillStore;
+  skills: SkillCatalog;
   appConfig: AppConfig;
   run: WorkflowRun;
   nodeRun: NodeRun;

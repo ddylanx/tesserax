@@ -8,7 +8,7 @@ import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';
 import { prepareAgent } from './executors';
 import type { NodeContext } from './executors/types';
-import { SkillStore } from './stores';
+import { SkillCatalog } from '@ot/mod-skills';
 
 /** Choosing who does an agent step, and finishing work done by you in an editor. Built by the controller. */
 export class HandoffService {
@@ -17,7 +17,7 @@ export class HandoffService {
     private readonly config: AppConfig,
     private readonly engine: WorkflowEngine,
     private readonly tasks: TasksService,
-    private readonly skills: SkillStore,
+    private readonly skills: SkillCatalog,
     private readonly classifier: ClassificationService,
   ) {}
 

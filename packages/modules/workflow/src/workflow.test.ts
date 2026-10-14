@@ -3,14 +3,15 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { validateWorkflow, type TaskDetailDto, type WorkflowDefinition } from '@ot/contracts';
 import { renderTemplate, withSkills } from './render';
-import { SkillStore, WorkflowStore } from './stores';
+import { WorkflowStore } from './stores';
+import { LocalSkillStore } from '@ot/mod-skills';
 
 const root = join(__dirname, '../../../..');
 
 test('the shipped default workflow is valid and its skills exist', () => {
   const { def, problems } = new WorkflowStore(join(root, 'workflows')).load('default');
   assert.deepEqual(problems, []);
-  const skills = new SkillStore(root);
+  const skills = new LocalSkillStore(root);
   for (const n of def.nodes) {
     const c = n.config as { skill?: string; skills?: string[] };
     for (const p of [c.skill, ...(c.skills ?? [])].filter(Boolean) as string[]) assert.ok(skills.get(p).body.length > 50, p);
@@ -57,20 +58,10 @@ test('templates fill issue, artifacts and feedback; issue stays delimited', () =
   assert.match(withSkills('do it', [{ name: 's', body: 'rules' }]), /# Skill: s[\s\S]*rules[\s\S]*# Task[\s\S]*do it/);
 });
 
-test('skill store creates, reads and saves skills; rejects bad names and paths', async () => {
-  const { mkdtempSync } = await import('node:fs');
-  const { tmpdir } = await import('node:os');
-  const dir = mkdtempSync(join(tmpdir(), 'ot-skills-'));
-  const store = new SkillStore(dir);
-  store.save('my-skill', '---\nname: my-skill\ndescription: d\n---\nBody', true);
-  assert.throws(() => store.save('my-skill', 'x', true), /already exists/);
-  assert.equal(store.get('skills/my-skill/SKILL.md').body, 'Body');
-  const h1 = store.read('my-skill').hash;
-  store.save('my-skill', '---\nname: my-skill\ndescription: d\n---\nBody 2');
-  assert.notEqual(store.read('my-skill').hash, h1);
-  assert.throws(() => store.pathOf('../etc'), /lowercase/);
-  assert.throws(() => store.get('../../etc/passwd'), /outside the repo/);
-  assert.deepEqual(store.list().map(s => s.name), ['my-skill']);
+test('workflow store finds workflows that reference a path', () => {
+  const store = new WorkflowStore(join(root, 'workflows'));
+  assert.ok(store.referencing('skills/write-spec/').length > 0);
+  assert.deepEqual(store.referencing('skills/_packages/does-not-exist/'), []);
 });
 
 test('conditions: case-insensitive, list fields, not_in; routing picks the first matching rule', async () => {
