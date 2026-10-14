@@ -139,9 +139,9 @@ export async function prepareAgent(ctx: NodeContext) {
 /** executor "ask": wait for you to pick (CLI agent or an editor); otherwise start right away. */
 const agentRun: NodeExecutor = async ctx => {
   const prepared = await prepareAgent(ctx);
-  // a loop back to this step (tests failed, review said fail) reuses the executor you picked the first time
-  const remembered = ((ctx.run.vars ?? {}) as { executor?: Record<string, AgentExecutor> }).executor?.[ctx.node.id];
-  const executor = ctx.config.executor === 'ask' ? remembered : ctx.config.executor;
+  // the executor you picked for this run (on the run page, or when the step asked) wins; a loop back reuses it
+  const picked = ((ctx.run.vars ?? {}) as { executor?: Record<string, AgentExecutor> }).executor?.[ctx.node.id];
+  const executor = picked ?? (ctx.config.executor === 'ask' ? undefined : ctx.config.executor);
   if (!executor) return { wait: true, output: { choose: true, worktree: prepared.worktree } };
   const started = await startAgent(ctx, executor, prepared);
   return started.mode === 'running' ? { async: true } : { wait: true, output: started.output };

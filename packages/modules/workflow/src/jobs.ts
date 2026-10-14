@@ -78,6 +78,9 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     const task = await d.tasks.getTask(run.task_id);
     if (!task) throw new FatalNodeError('The task no longer exists');
     const config = nodeConfigSchemas[node.type].parse(node.config);
+    // the agent picked on the run page for this run only wins over the workflow's engine
+    const engineOverride = ((run.vars ?? {}) as { engine?: Record<string, string> }).engine?.[node.id];
+    if (engineOverride && 'engine' in config) Object.assign(config, { engine: engineOverride });
     const input = (nr.input ?? {}) as { feedback?: string };
     const result = await executor({
       engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: d.skills, appConfig: d.config, run, nodeRun: nr, node, config, task,

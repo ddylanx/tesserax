@@ -4,10 +4,10 @@ import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Ed
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
+import { AGENT_EXECUTORS, AI_ENGINES, NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
-import { nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
+import { agentOf, agentTitle, nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
 import { MarkdownPanel } from '@/components/markdown';
 import { QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -19,6 +19,10 @@ import { RUN_STATUS } from './runs';
 import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker';
 
 
+
+/** The agent picked for a step in this run only (run vars `engine` / `executor`). */
+const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
+  (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
 
 const mmss = (ms: number) => {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -87,7 +91,7 @@ export function RunDetailPage() {
         (n): Node<CardData> => ({
           id: n.id, type: 'card', position: n.position, selected: n.id === selected,
           data: {
-            node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id),
+            node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id), agentOverride: agentOverrideOf(r, n),
             state: (latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle') as NodeState,
           },
         }),
@@ -248,6 +252,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {cfg.commands && <p className="text-xs text-muted-foreground">commands: {cfg.commands.join(' · ')}</p>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
+        {agentOf(node) && ['running', 'waiting', 'failed'].includes(run.status) && last?.status !== 'running' && !(waiting && node.type === 'agent.run') && <AgentPicker run={run} node={node} />}
         {last && ['ai.step', 'ai.review', 'agent.run', 'doc.write', 'jira.comment', 'git.pr'].includes(node.type) && last.status !== 'waiting' && <LiveLog runId={run.id} nodeRun={last} />}
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
@@ -448,6 +453,45 @@ function ExecutorPicker({ run, error }: { run: WorkflowRunDetail; error: string 
       {pick.isPending && <p className="text-xs text-muted-foreground">Starting…</p>}
       {pick.error && <p className="text-sm text-red-600">{(pick.error as Error).message}</p>}
       <p className="text-[11px] text-muted-foreground">If the work loops back here (tests or review failed), the same choice is reused.</p>
+    </div>
+  );
+}
+
+/** Who does this step in this run only. The workflow keeps its own choice; a failed step can be retried with another agent. */
+function AgentPicker({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }) {
+  const qc = useQueryClient();
+  const action = useRunAction(run.id);
+  const opts = useQuery({ queryKey: ['wf', 'executors'], queryFn: () => api<ExecutorOption[]>('/api/agent-executors') });
+  const set = useMutation({
+    mutationFn: (agent: string | null) => api(`/api/workflow-runs/${run.id}/agent`, { method: 'POST', body: JSON.stringify({ nodeId: node.id, agent }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  const isAgent = node.type === 'agent.run';
+  const ids: readonly string[] = isAgent ? AGENT_EXECUTORS : AI_ENGINES;
+  const available = (id: string) => opts.data?.find(o => o.id === (isAgent ? id : `${id}-cli`))?.available ?? true;
+  const fromWorkflow = agentOf(node)!;
+  const override = agentOverrideOf(run, node);
+  const failedHere = run.status === 'failed' && run.nodeRuns.at(-1)?.nodeId === node.id;
+  return (
+    <div className="flex flex-col gap-1.5 rounded-md border p-2">
+      <label className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-medium">Agent for this run</span>
+        <select
+          className="rounded border bg-card px-1 py-1 text-xs"
+          value={override ?? ''}
+          disabled={set.isPending}
+          onChange={e => set.mutate(e.target.value || null)}
+        >
+          <option value="">Workflow default ({agentTitle(fromWorkflow)})</option>
+          {ids.map(id => <option key={id} value={id} disabled={!available(id)}>{agentTitle(id)}{available(id) ? '' : ' (not installed)'}</option>)}
+        </select>
+        {failedHere && <Button size="sm" disabled={action.isPending} onClick={() => action.mutate({ path: 'retry' })}>Retry with {agentTitle(override ?? fromWorkflow)}</Button>}
+      </label>
+      <p className="text-[11px] text-muted-foreground">
+        Only this run changes; the workflow keeps {agentTitle(fromWorkflow)}. Used the next time this step starts (also a retry or a loop back).
+      </p>
+      {set.error && <p className="text-xs text-red-600">{(set.error as Error).message}</p>}
+      {action.error && <p className="text-xs text-red-600">{(action.error as Error).message}</p>}
     </div>
   );
 }

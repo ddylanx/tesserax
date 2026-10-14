@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { AppConfig } from '@ot/config';
 import {
-  CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
+  AGENT_EXECUTORS, AI_ENGINES, ENGINE_NODE_TYPES, CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
   type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@ot/contracts';
@@ -356,6 +356,30 @@ export class WorkflowEngine {
     const last = await this.db.selectFrom('node_runs').selectAll().where('run_id', '=', runId).orderBy('seq', 'desc').executeTakeFirstOrThrow();
     await this.event(runId, 'user', 'retry', { node: last.node_id });
     await this.enqueue(runId, last.node_id, last.via_edge, (last.input ?? {}) as Record<string, unknown>);
+  }
+
+  /**
+   * Who does one step in this run only: an engine (AI steps) or an executor (agent.run); null = the workflow's choice.
+   * Stored in run vars (`engine` / `executor`, keyed by node id) and read when the step starts, so it also covers a retry.
+   */
+  async setNodeAgent(runId: string, nodeId: string, agent: string | null) {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    if (!ACTIVE.includes(run.status as (typeof ACTIVE)[number])) throw new RunConflict(`The run is ${run.status}; nothing will run again.`);
+    const node = this.graph(run).nodes.find(n => n.id === nodeId);
+    if (!node) throw new RunConflict(`No step ${nodeId} in this run.`);
+    const key = node.type === 'agent.run' ? 'executor' : (ENGINE_NODE_TYPES as readonly string[]).includes(node.type) ? 'engine' : null;
+    if (!key) throw new RunConflict(`“${node.label}” has no agent to choose.`);
+    const allowed: readonly string[] = key === 'engine' ? AI_ENGINES : AGENT_EXECUTORS;
+    if (agent !== null && !allowed.includes(agent)) throw new RunConflict(`Pick one of: ${allowed.join(', ')}.`);
+    const live = await this.db.selectFrom('node_runs').select('id').where('run_id', '=', runId).where('node_id', '=', nodeId).where('status', '=', 'running').executeTakeFirst();
+    if (live) throw new RunConflict(`“${node.label}” is running now; change the agent after it ends (e.g. before a retry).`);
+    const vars = (run.vars ?? {}) as Record<string, unknown>;
+    const map = { ...((vars[key] ?? {}) as Record<string, string>) };
+    if (agent === null) delete map[nodeId];
+    else map[nodeId] = agent;
+    await this.patchRun(runId, { vars: JSON.stringify({ ...vars, [key]: map }) });
+    await this.event(runId, 'user', 'agent_changed', { node: nodeId, agent: agent ?? 'workflow default' });
+    return { nodeId, agent };
   }
 
   async cancel(runId: string) {

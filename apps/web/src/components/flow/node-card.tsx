@@ -1,7 +1,7 @@
 import { Handle, NodeToolbar, Position, type NodeProps, type Node } from '@xyflow/react';
-import { Copy, EyeOff, Trash2 } from 'lucide-react';
+import { Bot, Copy, EyeOff, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { WorkflowNode } from '@ot/contracts';
+import { AGENT_EXECUTOR_INFO, AI_ENGINE_TITLES, ENGINE_NODE_TYPES, type AgentExecutor, type AiEngine, type WorkflowNode } from '@ot/contracts';
 import { cn } from '@/lib/utils';
 import { metaOf, portTone } from './meta';
 
@@ -19,7 +19,22 @@ export type CardData = {
   runs?: number;
   /** which ports were taken in the run */
   taken?: string[];
+  /** agent picked for this run only (engine or executor id) */
+  agentOverride?: string;
 };
+
+/** Who does the step: the engine of an AI step or the executor of an agent step; null for other node types. */
+export function agentOf(node: WorkflowNode): string | null {
+  const c = node.config as { engine?: string; executor?: string };
+  if (node.type === 'agent.run') return c.executor ?? 'ask';
+  if ((ENGINE_NODE_TYPES as readonly string[]).includes(node.type)) return c.engine ?? 'claude';
+  return null;
+}
+
+export function agentTitle(id: string): string {
+  if (id === 'ask') return 'you pick at run time';
+  return AI_ENGINE_TITLES[id as AiEngine] ?? AGENT_EXECUTOR_INFO[id as AgentExecutor]?.title ?? id;
+}
 
 const STATE: Record<NodeState, { ring: string; badge: string; label: string }> = {
   idle: { ring: '', badge: '', label: '' },
@@ -38,6 +53,7 @@ export function NodeCard({ id, data, selected }: NodeProps<Node<CardData>>) {
   const Icon = meta.icon;
   const st = STATE[data.state ?? 'idle'];
   const subtitle = summary(data.node);
+  const agent = data.agentOverride ?? agentOf(data.node);
   return (
     <>
       {data.onDelete && (
@@ -65,6 +81,11 @@ export function NodeCard({ id, data, selected }: NodeProps<Node<CardData>>) {
           </div>
         </div>
         <div className="flex flex-wrap gap-1 px-3 pt-1.5">
+          {agent && (
+            <Pill className={data.agentOverride ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}>
+              <Bot className="size-2.5" />{agentTitle(agent)}{data.agentOverride ? ' · this run' : ''}
+            </Pill>
+          )}
           {!!data.node.skipIf?.length && <Pill className="bg-muted text-muted-foreground"><EyeOff className="size-2.5" />skippable</Pill>}
           {st.label && <Pill className={st.badge}>{st.label}{data.runs && data.runs > 1 ? ` · ${data.runs}×` : ''}</Pill>}
           {data.invalid && <Pill className="bg-red-500/15 text-red-600">needs attention</Pill>}

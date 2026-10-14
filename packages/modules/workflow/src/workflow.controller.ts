@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
@@ -61,6 +61,15 @@ export class WorkflowController {
     const parsed = executorActionSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('Pick one of the listed executors.');
     return guard(() => this.handoff.choose(id, parsed.data.executor));
+  }
+
+  /** Who does one step in this run only (engine for AI steps, executor for agent steps); agent null = the workflow's choice. */
+  @Post('workflow-runs/:id/agent')
+  @HttpCode(200)
+  setNodeAgent(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = nodeAgentActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0]?.message ?? 'Invalid body');
+    return guard(() => this.engine.setNodeAgent(id, parsed.data.nodeId, parsed.data.agent));
   }
 
   /** Post the approved review on the member's PR (confirm: true + the exact text), or skip. */

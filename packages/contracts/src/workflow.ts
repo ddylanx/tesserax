@@ -19,6 +19,13 @@ export const AGENT_EXECUTOR_INFO: Record<AgentExecutor, { title: string; descrip
   'editor:vscode': { title: 'VS Code', description: 'Opens the worktree in VS Code; you work there, then click Done.', kind: 'editor' },
 };
 
+/** CLIs that can do an AI step (the `engine` field of ai.step, ai.review, doc.write, jira.comment, git.pr). */
+export const AI_ENGINES = ['claude', 'gemini', 'antigravity'] as const;
+export type AiEngine = (typeof AI_ENGINES)[number];
+export const AI_ENGINE_TITLES: Record<AiEngine, string> = { claude: 'Claude Code', gemini: 'Gemini CLI', antigravity: 'Antigravity CLI' };
+/** Node types whose config has an `engine`. */
+export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr'] as const;
+
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
 
@@ -34,8 +41,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName,
     allowedTools: tools,
-    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -68,8 +75,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName.default('review'),
     allowedTools: tools,
-    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(900),
@@ -83,8 +90,8 @@ export const nodeConfigSchemas = {
     path: z.string().min(1).default('docs/{{issue_key}}-{{slug}}.md'),
     commitMessage: z.string().min(1).default('{{issue_key}}: add ticket document'),
     allowedTools: tools,
-    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -95,8 +102,8 @@ export const nodeConfigSchemas = {
     inputs: z.array(artifactName).default([]),
     output: artifactName.default('jira_comment'),
     allowedTools: tools,
-    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -110,8 +117,8 @@ export const nodeConfigSchemas = {
     /** Target branch; empty = the run's base branch (e.g. develop). */
     targetBranch: z.string().optional(),
     allowedTools: tools,
-    /** Which CLI does this step: Claude Code (default) or Gemini CLI. */
-    engine: z.enum(['claude', 'gemini', 'antigravity']).default('claude'),
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
     model: z.string().optional(),
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
@@ -380,6 +387,12 @@ export type ConfirmAction = z.infer<typeof confirmActionSchema>;
 
 /** Pick who does a waiting agent.run step, or finish an editor hand-off. */
 export const executorActionSchema = z.object({ executor: z.enum(AGENT_EXECUTORS) });
+/**
+ * Who does one step in this run only (the workflow is not changed): an engine for AI steps, an executor for agent.run.
+ * null = back to the workflow's choice. Applies the next time the step starts (also a retry or a loop back).
+ */
+export const nodeAgentActionSchema = z.object({ nodeId: z.string().min(1).max(200), agent: z.string().min(1).max(100).nullable() });
+export type NodeAgentAction = z.infer<typeof nodeAgentActionSchema>;
 export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
 export const prCommentActionSchema = z.discriminatedUnion('action', [
