@@ -1,5 +1,6 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { cleanEnv, isAlive } from '@ot/agent-runtime';
 
@@ -50,7 +51,7 @@ export function antigravitySignal(o: { out: AntigravityOutput | null; stderr: st
   if (!o.out?.response?.trim()) {
     if (o.out?.denied_actions?.length) {
       const what = [...new Set(o.out.denied_actions.map(a => a.action ?? a.display_name ?? 'a tool'))].join(', ');
-      return { signal: 'denied', message: `Antigravity was refused ${what} (headless mode cannot ask for permission) and answered nothing. The step is retried; if it keeps failing, choose another engine.` };
+      return { signal: 'denied', message: `Antigravity was refused ${what} (headless mode cannot ask for permission) and stopped with no answer. Retry the step, or pick another agent for it on the run page.` };
     }
     return { signal: 'no_output', message: o.stderr.trim().split('\n').at(-1)?.slice(0, 300) || `No result (exit ${o.exitCode}).` };
   }
@@ -75,9 +76,29 @@ export function gitCommonDir(cwd: string): string | null {
   }
 }
 
-/** Shell commands are refused headless and make the model give up silently, so tell it up front. */
-export const withToolHint = (prompt: string) =>
-  `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. Shell commands are not available, and you may only read files inside the working folder. Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused, do not stop: answer from what you have.)`;
+/** Shell commands Antigravity may run headless: the `command(<prefix>)` rules under permissions.allow in its settings. */
+export function allowedCommands(settingsFile = join(homedir(), '.gemini', 'antigravity-cli', 'settings.json')): string[] {
+  try {
+    const allow = (JSON.parse(readFileSync(settingsFile, 'utf8')) as { permissions?: { allow?: unknown[] } }).permissions?.allow ?? [];
+    return allow.flatMap(r => (typeof r === 'string' ? [/^command\((.+)\)$/.exec(r.trim())?.[1]] : [])).filter((c): c is string => !!c);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Any shell command outside the allow rules is refused headless, and Antigravity then ends the whole run with no answer
+ * and no edits (seen with `sed -n`), so tell the model up front exactly what it may run.
+ */
+export const withToolHint = (prompt: string, mode: 'plan' | 'accept-edits' = 'plan', allowed: string[] = allowedCommands()) => {
+  const shell = allowed.length
+    ? `The only shell commands allowed are: ${allowed.map(c => `\`${c}\``).join(', ')}. Any other command (for example sed, find, awk, npm, php, composer) is refused and ends this run with nothing, so never try one: read files and line ranges with the file viewer and search with grep / git grep.`
+    : 'Shell commands are not available.';
+  const files = mode === 'plan'
+    ? 'You may only read files inside the working folder.'
+    : 'Read and edit files inside the working folder with your file tools (not the shell).';
+  return `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. ${files} ${shell} Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused anyway, do not stop: answer from what you have.)`;
+};
 
 /** One headless call, read-only (`--mode plan`). */
 export function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
@@ -115,7 +136,7 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
 /** Detached agent run (`accept-edits`, no shell): prompt kept in runDir, output and exit code written there. */
 export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir: string; prompt: string; model?: string }): number {
   mkdirSync(o.runDir, { recursive: true });
-  writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt), { mode: 0o600 });
+  writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt, 'accept-edits'), { mode: 0o600 });
   const args = ['--mode', 'accept-edits', '--output-format', 'stream-json', ...(o.model ? ['--model', o.model] : [])];
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
   const script = '"$OT_BIN" "$@" "--print=$(cat "$OT_RUN_DIR/prompt.md")" > "$OT_RUN_DIR/stdout.json" 2> "$OT_RUN_DIR/stderr.log"; echo $? > "$OT_RUN_DIR/exit_code"';

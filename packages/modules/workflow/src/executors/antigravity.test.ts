@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { antigravityArgs, antigravitySignal, parseAntigravity, runAntigravity } from './antigravity';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { allowedCommands, antigravityArgs, antigravitySignal, parseAntigravity, runAntigravity, withToolHint } from './antigravity';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readLiveLog, renderLiveLog } from './livelog';
 import { askAgent } from './claude';
@@ -55,4 +55,16 @@ test('live log: the event stream is written while running and rendered as readab
   // a half-written last line is left for the next read
   const claude = '{"type":"assistant","message":{"content":[{"type":"text","text":"Looking at the diff"},{"type":"tool_use","name":"Read","input":{"file_path":"a.ts"}}]}}';
   assert.equal(renderLiveLog(`${claude}\n{"type":"res`), 'Looking at the diff\n→ Read  a.ts');
+});
+
+test('antigravity: the prompt lists the shell commands its settings allow', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agy-settings-'));
+  const file = join(dir, 'settings.json');
+  writeFileSync(file, JSON.stringify({ permissions: { allow: ['command(git diff)', 'command(grep)', 'view_file(*)'] } }));
+  assert.deepEqual(allowedCommands(file), ['git diff', 'grep']);
+  assert.deepEqual(allowedCommands(join(dir, 'missing.json')), []);
+  const hint = withToolHint('do it', 'accept-edits', ['git diff', 'grep']);
+  assert.match(hint, /only shell commands allowed are: `git diff`, `grep`/);
+  assert.match(hint, /edit files inside the working folder/);
+  assert.match(withToolHint('x', 'plan', []), /Shell commands are not available/);
 });
