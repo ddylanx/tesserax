@@ -13,8 +13,8 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/modules/*` feature modules (`@ot/mod-*`), each a Nest module with `jobs/` for its pg-boss handlers.
 - `packages/modules/classify` `ClassifyModule`, `ClassificationService`: rules engine + Claude CLI classifier; used by pipeline and workflow.
 - `packages/modules/pipeline` the automation pipeline: state machine (`states.ts`, `PipelineService.transition`), step jobs in `jobs/`.
-- `packages/modules/workflow` node-based workflow engine (spec: `docs/specs/0001-workflow-engine.md`): `engine.service.ts` (runs, routing, gates, loops), `executors/` (one per node type), `jobs.ts`. Workflows in `workflows/*.workflow.json`, skills in `skills/*/SKILL.md`; node config schemas in `@ot/contracts` (`workflow.ts`).
-- `packages/modules/skill-packages` external skill packages: git repos installed into `skills/_packages/<id>/` (only SKILL.md/.md text, plus LICENSE), manifest `skills/packages.json` (source, ref, commit, version, category). Package skills are referenced by path like any skill.
+- `packages/modules/workflow` node-based workflow engine (spec: `docs/specs/0001-workflow-engine.md`): `engine.service.ts` (runs, routing, gates, loops), `executors/` (one per node type), `jobs.ts`. Workflows in `workflows/*.workflow.json`, reads skills through `SkillCatalog` from `@ot/mod-skills`; node config schemas in `@ot/contracts` (`workflow.ts`).
+- `packages/modules/skills` (`@ot/mod-skills`) self-contained, extractable module: the repo's own skills (`skills/<name>/SKILL.md`) and external packages (git repos installed into `skills/_packages/<id>/`, only .md/.txt text plus LICENSE; manifest `skills/packages.json`). Entries: `.` (Nest `SkillsModule.forRoot`, `SkillCatalog`), `./contracts`, `./web` (React). It must not import `@ot/*` or `@/*` (enforced by `boundary.test.ts`); host things come in through `forRoot` options.
 - `packages/modules/repos` repos registry (Repos page): repositories (origin, base branch) and their workplaces (a local checkout per brand, with the Jira projects that default to it), stored in `config/workplaces.json` (gitignored; created from `config/repos.json` the first time). A task runs in its picked workplace (`tasks.workplace_id`), else the first workplace registered for its project; resolve with `repoRegistry.resolve(task)`.
 - `playbooks/*.md` playbook definitions (older pipeline) (frontmatter + prompt template). `config/repos.json` (gitignored) is the legacy project → repo map, still read as a fallback.
 - `.data/` (gitignored) worktrees and run logs. `scripts/fake-jira.mjs`, `scripts/fake-claude.mjs`, `fixtures/` for testing without accounts.
@@ -31,6 +31,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - Issue text is untrusted: keep it inside `<issue>` delimiters in every prompt. Never write to Jira except `postJiraComment`, which needs an explicit confirmed click.
 - Agent runs never push or merge (see `ALWAYS_DENIED` in `packages/agent-runtime/src/launcher.ts`).
 - Logs: use `createLogger(scope)`; correlationId is added automatically inside a WorkContext (HTTP requests, jobs, bot updates).
+- Extractable modules (currently @ot/mod-skills) follow docs/plans/0002-module-skills-tu-chua.md part 1: no host imports, own contracts, forRoot options/ports, peer deps for shared libs.
 
 ## Commands
 `pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180; the api does not restart on file changes so running steps are not interrupted: restart `pnpm dev` after editing api code, or use `pnpm --filter @ot/api dev:watch`) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down`
