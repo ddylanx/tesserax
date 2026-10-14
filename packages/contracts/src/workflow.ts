@@ -393,6 +393,8 @@ export const executorActionSchema = z.object({ executor: z.enum(AGENT_EXECUTORS)
  */
 export const nodeAgentActionSchema = z.object({ nodeId: z.string().min(1).max(200), agent: z.string().min(1).max(100).nullable() });
 export type NodeAgentAction = z.infer<typeof nodeAgentActionSchema>;
+/** Run a step that failed again (also when the run already moved on to a gate that waits for you). */
+export const rerunNodeActionSchema = z.object({ nodeId: z.string().min(1).max(200) });
 export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
 export const prCommentActionSchema = z.discriminatedUnion('action', [

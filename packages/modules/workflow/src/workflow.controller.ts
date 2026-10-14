@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, rerunNodeActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
@@ -279,6 +279,16 @@ export class WorkflowController {
   @HttpCode(200)
   async retry(@Param('id', ParseUUIDPipe) id: string) {
     await guard(() => this.engine.retry(id));
+    return { ok: true };
+  }
+
+  /** Run a failed step again, also after the run moved on to the gate that waits for you. */
+  @Post('workflow-runs/:id/rerun')
+  @HttpCode(200)
+  async rerun(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = rerunNodeActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('nodeId is required');
+    await guard(() => this.engine.rerunNode(id, parsed.data.nodeId));
     return { ok: true };
   }
 

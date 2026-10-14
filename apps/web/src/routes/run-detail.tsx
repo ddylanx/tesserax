@@ -4,7 +4,7 @@ import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Ed
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AGENT_EXECUTORS, AI_ENGINES, NODE_PORTS, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
+import { AGENT_EXECUTORS, AI_ENGINES, HUMAN_NODE_TYPES, NODE_PORTS, type NodeType, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@ot/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
 import { agentOf, agentTitle, nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
@@ -23,6 +23,15 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 /** The agent picked for a step in this run only (run vars `engine` / `executor`). */
 const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
+
+/** The step failed (or left through "failed") and nothing ran after it except gates waiting for you: it can run again. */
+const canRerun = (run: WorkflowRunDetail, nodeId: string) => {
+  if (run.status !== 'waiting' && run.status !== 'failed') return false;
+  const i = run.nodeRuns.findLastIndex(n => n.nodeId === nodeId);
+  const last = run.nodeRuns[i];
+  if (!last || !(last.status === 'failed' || (last.status === 'done' && last.port === 'failed'))) return false;
+  return run.nodeRuns.slice(i + 1).every(n => n.status === 'waiting' && HUMAN_NODE_TYPES.includes(n.nodeType as NodeType));
+};
 
 const mmss = (ms: number) => {
   const t = Math.max(0, Math.floor(ms / 1000));
@@ -471,7 +480,7 @@ function AgentPicker({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode
   const available = (id: string) => opts.data?.find(o => o.id === (isAgent ? id : `${id}-cli`))?.available ?? true;
   const fromWorkflow = agentOf(node)!;
   const override = agentOverrideOf(run, node);
-  const failedHere = run.status === 'failed' && run.nodeRuns.at(-1)?.nodeId === node.id;
+  const failedHere = canRerun(run, node.id);
   return (
     <div className="flex flex-col gap-1.5 rounded-md border p-2">
       <label className="flex flex-wrap items-center gap-2 text-xs">
@@ -485,7 +494,7 @@ function AgentPicker({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode
           <option value="">Workflow default ({agentTitle(fromWorkflow)})</option>
           {ids.map(id => <option key={id} value={id} disabled={!available(id)}>{agentTitle(id)}{available(id) ? '' : ' (not installed)'}</option>)}
         </select>
-        {failedHere && <Button size="sm" disabled={action.isPending} onClick={() => action.mutate({ path: 'retry' })}>Retry with {agentTitle(override ?? fromWorkflow)}</Button>}
+        {failedHere && <Button size="sm" disabled={action.isPending} onClick={() => action.mutate({ path: 'rerun', body: { nodeId: node.id } })}>Retry with {agentTitle(override ?? fromWorkflow)}</Button>}
       </label>
       <p className="text-[11px] text-muted-foreground">
         Only this run changes; the workflow keeps {agentTitle(fromWorkflow)}. Used the next time this step starts (also a retry or a loop back).

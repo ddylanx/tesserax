@@ -382,6 +382,28 @@ export class WorkflowEngine {
     return { nodeId, agent };
   }
 
+  /**
+   * Runs a failed step again: one that failed outright, or ended through its "failed" port and the run now waits at the
+   * next gate. The waiting gate after it is dropped (cancelled) and the step gets a new attempt with the same input.
+   */
+  async rerunNode(runId: string, nodeId: string) {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    if (run.status !== 'waiting' && run.status !== 'failed') throw new RunConflict(`The run is ${run.status}; a step can be run again when the run waits for you or failed.`);
+    const runs = await this.db.selectFrom('node_runs').selectAll().where('run_id', '=', runId).orderBy('seq', 'asc').execute();
+    const last = runs.filter(n => n.node_id === nodeId).at(-1);
+    const node = this.node(run, nodeId);
+    if (!last || !(last.status === 'failed' || (last.status === 'done' && last.port === 'failed'))) throw new RunConflict(`“${node.label}” did not fail, so there is nothing to run again.`);
+    const after = runs.filter(n => n.seq > last.seq);
+    if (after.some(n => n.status !== 'waiting' || !HUMAN_NODE_TYPES.includes(this.node(run, n.node_id).type))) {
+      throw new RunConflict(`The run already went on after “${node.label}”; send it back from the gate instead.`);
+    }
+    if (after.length) {
+      await this.db.updateTable('node_runs').set({ status: 'cancelled', ended_at: new Date() }).where('id', 'in', after.map(n => n.id)).where('status', '=', 'waiting').execute();
+    }
+    await this.event(runId, 'user', 'retry', { node: nodeId, dropped: after.map(n => n.node_id) });
+    await this.enqueue(runId, nodeId, last.via_edge, (last.input ?? {}) as Record<string, unknown>);
+  }
+
   async cancel(runId: string) {
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
     if (!ACTIVE.includes(run.status as (typeof ACTIVE)[number])) throw new RunConflict(`The run is already ${run.status}.`);
