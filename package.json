@@ -1,6 +1,7 @@
 {
   "name": "open-tesseract",
   "private": true,
+  "license": "MIT",
   "packageManager": "pnpm@10.33.0",
   "engines": {
     "node": ">=22"

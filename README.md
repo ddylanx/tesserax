@@ -177,3 +177,7 @@ pnpm db:seed
 ```
 
 See [CLAUDE.md](CLAUDE.md) for the code layout.
+
+## License
+
+MIT, see LICENSE.
