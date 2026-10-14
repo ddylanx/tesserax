@@ -1,6 +1,6 @@
 ---
 name: jira-comment
-description: Write the Jira comment that reports the finished work to PM/QA, in the team's tone.
+description: Write the Jira comment that reports the finished work to PM/QA: short, factual, easy to check.
 ---
 # Jira comment
 

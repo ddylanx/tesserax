@@ -1,0 +1,38 @@
+{
+  "id": "pr-review",
+  "name": "Code review: a member's PR",
+  "description": "For tasks of type \"Code review\": checks out the member's branch read-only, runs the tests, the AI reviews the diff against the target branch, you edit/approve the review, then (after you confirm) it is posted as a comment on the Bitbucket PR.",
+  "nodes": [
+    { "id": "trigger", "type": "trigger.jira", "label": "Review task", "position": { "x": 0, "y": 0 }, "config": {} },
+    {
+      "id": "checks", "type": "check.command", "label": "Tests on the PR branch", "position": { "x": 300, "y": 0 },
+      "config": { "commands": ["test -e vendor || ln -s \"{{repo_path}}/vendor\" vendor", "composer test", "vendor/bin/pint --test"], "output": "checks" }
+    },
+    {
+      "id": "review", "type": "ai.review", "label": "AI reviews the PR", "position": { "x": 600, "y": 0 },
+      "config": {
+        "skills": ["skills/pr-review/SKILL.md", "skills/project-conventions/SKILL.md"],
+        "inputs": ["checks"],
+        "output": "review",
+        "prompt": "Review the pull request from branch {{branch}} into {{base_ref}}.\n\nWhat the PR is for (task):\n{{issue}}\n\nTest results on the PR branch:\n{{artifact:checks}}\n\nDiff against {{base_ref}}:\n{{diff}}\n\n{{feedback}}"
+      }
+    },
+    {
+      "id": "gate_review", "type": "human.gate", "label": "Your review", "position": { "x": 900, "y": 0 },
+      "config": { "instructions": "Edit the review until you would post it yourself. Approve to go on to posting it on the PR; send back with feedback to have the AI look again.", "show": ["checks", "review"], "editable": ["review"] }
+    },
+    { "id": "pr_comment", "type": "pr.comment", "label": "Comment on the PR", "position": { "x": 1200, "y": 0 }, "config": { "from": "review" } },
+    { "id": "evaluate", "type": "evaluate", "label": "Score", "position": { "x": 1500, "y": 0 }, "config": { "criteria": ["Found the real problems", "No false alarms", "Useful suggestions", "Effort saved"] } }
+  ],
+  "edges": [
+    { "id": "e1", "source": "trigger", "port": "next", "target": "checks" },
+    { "id": "e2", "source": "checks", "port": "pass", "target": "review" },
+    { "id": "e3", "source": "checks", "port": "fail", "target": "review" },
+    { "id": "e4", "source": "review", "port": "pass", "target": "gate_review" },
+    { "id": "e5", "source": "review", "port": "fail", "target": "gate_review" },
+    { "id": "e6", "source": "gate_review", "port": "approved", "target": "pr_comment" },
+    { "id": "e7", "source": "gate_review", "port": "changes", "target": "review" },
+    { "id": "e8", "source": "pr_comment", "port": "posted", "target": "evaluate" },
+    { "id": "e9", "source": "pr_comment", "port": "skipped", "target": "evaluate" }
+  ]
+}

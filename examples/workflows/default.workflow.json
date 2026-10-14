@@ -1,0 +1,392 @@
+{
+  "id": "default",
+  "name": "Ticket: analyze → spec → implement → test → review → docs",
+  "description": "Shared workflow for every ticket type. Question/research tickets skip implement, tests, review and result review (they end with the analysis, the answer as spec, a ticket doc and a Jira comment). PRs are opened by hand for now.",
+  "nodes": [
+    {
+      "id": "trigger",
+      "type": "trigger.jira",
+      "label": "Jira ticket",
+      "position": {
+        "x": 0,
+        "y": 0
+      },
+      "config": {}
+    },
+    {
+      "id": "classify",
+      "type": "ai.classify",
+      "label": "Classify ticket",
+      "position": {
+        "x": 130,
+        "y": -150
+      },
+      "config": {}
+    },
+    {
+      "id": "analyze",
+      "type": "ai.step",
+      "label": "Analyze requirements",
+      "position": {
+        "x": 260,
+        "y": 0
+      },
+      "config": {
+        "skill": "skills/analyze-requirements/SKILL.md",
+        "output": "analysis",
+        "prompt": "Analyze this ticket for the repository in the current folder (branch {{branch}}).\n\n{{issue}}\n\n{{feedback}}"
+      }
+    },
+    {
+      "id": "gate_analysis",
+      "type": "human.gate",
+      "label": "Review analysis",
+      "position": {
+        "x": 520,
+        "y": 0
+      },
+      "config": {
+        "instructions": "Check the analysis, answer the open questions inside it, then approve. Or send it back with feedback.",
+        "show": [
+          "analysis"
+        ],
+        "editable": [
+          "analysis"
+        ]
+      }
+    },
+    {
+      "id": "spec",
+      "type": "ai.step",
+      "label": "Options + spec",
+      "position": {
+        "x": 780,
+        "y": 0
+      },
+      "config": {
+        "skill": "skills/write-spec/SKILL.md",
+        "inputs": [
+          "analysis"
+        ],
+        "output": "spec",
+        "prompt": "Write the options and the spec for this ticket.\n\n{{issue}}\n\nApproved analysis:\n{{artifact:analysis}}\n\n{{feedback}}"
+      }
+    },
+    {
+      "id": "gate_spec",
+      "type": "human.gate",
+      "label": "Approve spec",
+      "position": {
+        "x": 1040,
+        "y": 0
+      },
+      "config": {
+        "instructions": "Pick or adjust the option and approve the spec. The agent implements exactly this.",
+        "show": [
+          "analysis",
+          "spec"
+        ],
+        "editable": [
+          "spec"
+        ]
+      }
+    },
+    {
+      "id": "implement",
+      "type": "agent.run",
+      "label": "Implement (agent)",
+      "position": {
+        "x": 1040,
+        "y": 200
+      },
+      "config": {
+        "skill": "skills/implement-from-spec/SKILL.md",
+        "inputs": [
+          "spec"
+        ],
+        "output": "implementation",
+        "prompt": "Implement ticket {{issue_key}} on branch {{branch}}.\n\n{{issue}}\n\nApproved spec:\n{{artifact:spec}}\n\nIf this is a retry, fix what these reports say:\nTest results:\n{{artifact:checks}}\n\nReview:\n{{artifact:review}}\n\n{{feedback}}"
+      },
+      "skipIf": [
+        {
+          "field": "classification.type",
+          "op": "in",
+          "values": [
+            "question",
+            "research"
+          ]
+        }
+      ],
+      "skipPort": "done"
+    },
+    {
+      "id": "checks",
+      "type": "check.command",
+      "label": "Tests + lint",
+      "position": {
+        "x": 780,
+        "y": 200
+      },
+      "config": {
+        "commands": [
+          "test -e vendor || ln -s \"{{repo_path}}/vendor\" vendor",
+          "composer test",
+          "vendor/bin/pint --test"
+        ],
+        "output": "checks"
+      },
+      "skipIf": [
+        {
+          "field": "classification.type",
+          "op": "in",
+          "values": [
+            "question",
+            "research"
+          ]
+        }
+      ],
+      "skipPort": "pass"
+    },
+    {
+      "id": "review",
+      "type": "ai.review",
+      "label": "Review vs spec",
+      "position": {
+        "x": 520,
+        "y": 200
+      },
+      "config": {
+        "skills": [
+          "skills/code-review/SKILL.md",
+          "skills/project-conventions/SKILL.md"
+        ],
+        "inputs": [
+          "spec",
+          "checks"
+        ],
+        "output": "review",
+        "prompt": "Review the changes for {{issue_key}} against the spec.\n\nSpec:\n{{artifact:spec}}\n\nTest results:\n{{artifact:checks}}\n\nDiff against {{base_ref}}:\n{{diff}}"
+      },
+      "skipIf": [
+        {
+          "field": "classification.type",
+          "op": "in",
+          "values": [
+            "question",
+            "research"
+          ]
+        }
+      ],
+      "skipPort": "pass"
+    },
+    {
+      "id": "gate_result",
+      "type": "human.gate",
+      "label": "Review result",
+      "position": {
+        "x": 260,
+        "y": 200
+      },
+      "config": {
+        "instructions": "Look at the diff, test results and AI review. Approve, or send it back to the agent with what to change.",
+        "show": [
+          "implementation",
+          "checks",
+          "review"
+        ],
+        "editable": []
+      },
+      "skipIf": [
+        {
+          "field": "classification.type",
+          "op": "in",
+          "values": [
+            "question",
+            "research"
+          ]
+        }
+      ],
+      "skipPort": "approved"
+    },
+    {
+      "id": "doc",
+      "type": "doc.write",
+      "label": "Ticket document",
+      "position": {
+        "x": 260,
+        "y": 400
+      },
+      "config": {
+        "skill": "skills/ticket-doc/SKILL.md",
+        "inputs": [
+          "analysis",
+          "spec",
+          "implementation",
+          "checks",
+          "review"
+        ],
+        "output": "ticket_doc",
+        "path": "docs/{{issue_key}}-{{slug}}.md",
+        "commitMessage": "{{issue_key}}: add ticket document",
+        "prompt": "Write the ticket document for {{issue_key}} (branch {{branch}}).\n\n{{issue}}\n\nAnalysis:\n{{artifact:analysis}}\n\nSpec:\n{{artifact:spec}}\n\nImplementation summary:\n{{artifact:implementation}}\n\nTest results:\n{{artifact:checks}}\n\nReview:\n{{artifact:review}}\n\nFiles changed against {{base_ref}}:\n{{diff}}"
+      }
+    },
+    {
+      "id": "jira_comment",
+      "type": "jira.comment",
+      "label": "Comment on Jira",
+      "position": {
+        "x": 520,
+        "y": 400
+      },
+      "config": {
+        "skill": "skills/jira-comment/SKILL.md",
+        "inputs": [
+          "spec",
+          "implementation",
+          "checks"
+        ],
+        "output": "jira_comment",
+        "prompt": "Write the Jira comment reporting the finished work on {{issue_key}} (branch {{branch}}).\n\n{{issue}}\n\nApproved spec:\n{{artifact:spec}}\n\nImplementation summary:\n{{artifact:implementation}}\n\nTest results:\n{{artifact:checks}}"
+      }
+    },
+    {
+      "id": "evaluate",
+      "type": "evaluate",
+      "label": "Score + metrics",
+      "position": {
+        "x": 780,
+        "y": 400
+      },
+      "config": {
+        "criteria": [
+          "Meets the requirement",
+          "Code quality",
+          "Tests",
+          "Documentation",
+          "Effort saved"
+        ]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "e1",
+      "source": "trigger",
+      "port": "next",
+      "target": "classify"
+    },
+    {
+      "id": "e0",
+      "source": "classify",
+      "port": "next",
+      "target": "analyze"
+    },
+    {
+      "id": "e2",
+      "source": "analyze",
+      "port": "next",
+      "target": "gate_analysis"
+    },
+    {
+      "id": "e3",
+      "source": "gate_analysis",
+      "port": "approved",
+      "target": "spec"
+    },
+    {
+      "id": "e4",
+      "source": "gate_analysis",
+      "port": "changes",
+      "target": "analyze"
+    },
+    {
+      "id": "e5",
+      "source": "spec",
+      "port": "next",
+      "target": "gate_spec"
+    },
+    {
+      "id": "e6",
+      "source": "gate_spec",
+      "port": "approved",
+      "target": "implement"
+    },
+    {
+      "id": "e7",
+      "source": "gate_spec",
+      "port": "changes",
+      "target": "spec"
+    },
+    {
+      "id": "e8",
+      "source": "implement",
+      "port": "done",
+      "target": "checks"
+    },
+    {
+      "id": "e9",
+      "source": "implement",
+      "port": "failed",
+      "target": "gate_result"
+    },
+    {
+      "id": "e10",
+      "source": "checks",
+      "port": "pass",
+      "target": "review"
+    },
+    {
+      "id": "e11",
+      "source": "checks",
+      "port": "fail",
+      "target": "implement",
+      "maxLoops": 2,
+      "onLimit": "review"
+    },
+    {
+      "id": "e12",
+      "source": "review",
+      "port": "pass",
+      "target": "gate_result"
+    },
+    {
+      "id": "e13",
+      "source": "review",
+      "port": "fail",
+      "target": "implement",
+      "maxLoops": 2,
+      "onLimit": "gate_result"
+    },
+    {
+      "id": "e14",
+      "source": "gate_result",
+      "port": "approved",
+      "target": "doc"
+    },
+    {
+      "id": "e15",
+      "source": "gate_result",
+      "port": "changes",
+      "target": "implement"
+    },
+    {
+      "id": "e16",
+      "source": "doc",
+      "port": "next",
+      "target": "jira_comment"
+    },
+    {
+      "id": "e17",
+      "source": "jira_comment",
+      "port": "posted",
+      "target": "evaluate"
+    },
+    {
+      "id": "e18",
+      "source": "jira_comment",
+      "port": "skipped",
+      "target": "evaluate"
+    }
+  ]
+}

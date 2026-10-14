@@ -6,7 +6,7 @@ import { routingSchema, validateWorkflow, workflowSchema, type WorkflowDefinitio
 
 export const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12);
 
-/** workflows/<id>.workflow.json, versioned in git; the hash identifies the version a run used. */
+/** workflows/<id>.workflow.json, your own files (gitignored; start from examples/workflows/); the hash identifies the version a run used. */
 export class WorkflowStore {
   constructor(readonly dir = join(findRepoRoot(), 'workflows')) {}
 

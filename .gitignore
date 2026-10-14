@@ -11,3 +11,7 @@ coverage
 config/repos.json
 config/workplaces.json
 .data/
+
+# Your own workflows and skills (created from examples/ by `pnpm init:data`)
+/workflows/
+/skills/

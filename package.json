@@ -6,7 +6,8 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm db:up && turbo run dev",
+    "init:data": "node scripts/init-data.mjs",
+    "dev": "node scripts/init-data.mjs && pnpm db:up && turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:up": "docker compose -f infra/compose.dev.yml up -d --wait",

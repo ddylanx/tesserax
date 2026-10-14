@@ -1,0 +1,18 @@
+{
+  "default": "default",
+  "rules": [
+    {
+      "name": "Code reviews",
+      "when": [
+        {
+          "field": "issue.type",
+          "op": "in",
+          "values": [
+            "Code review"
+          ]
+        }
+      ],
+      "workflow": "pr-review"
+    }
+  ]
+}
