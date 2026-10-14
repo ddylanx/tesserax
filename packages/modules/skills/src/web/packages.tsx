@@ -1,18 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Download, Package, RefreshCw, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { SKILL_PACKAGE_CATEGORIES, type SkillPackage, type SkillPackageList } from '@ot/contracts';
-import { QueryState } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input, Select } from '@/components/ui/input';
-import { api } from '@/lib/api';
-import { cn } from '@/lib/utils';
+import { SKILL_PACKAGE_CATEGORIES, type SkillPackage, type SkillPackageList } from '../contracts';
+import { useSkillsApi } from './client';
+import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Input, QueryState, Select, cn } from './ui';
 
 export interface PackageSkillRef { id: string; skill: string }
 
-const usePackages = () => useQuery({ queryKey: ['skill-packages'], queryFn: () => api<SkillPackageList>('/api/skill-packages') });
+const usePackages = () => {
+  const api = useSkillsApi();
+  return useQuery({ queryKey: ['skill-packages'], queryFn: () => api<SkillPackageList>('/skill-packages') });
+};
 
 function useRefresh() {
   const qc = useQueryClient();
@@ -52,12 +50,13 @@ export function PackageList({ current, onSelect }: { current: PackageSkillRef | 
 }
 
 function InstallForm() {
+  const api = useSkillsApi();
   const refresh = useRefresh();
   const [source, setSource] = useState('');
   const [ref, setRef] = useState('');
   const [category, setCategory] = useState('general');
   const install = useMutation({
-    mutationFn: () => api<SkillPackage>('/api/skill-packages', { method: 'POST', body: JSON.stringify({ source: source.trim(), ref: ref.trim() || undefined, category }) }),
+    mutationFn: () => api<SkillPackage>('/skill-packages', { method: 'POST', body: JSON.stringify({ source: source.trim(), ref: ref.trim() || undefined, category }) }),
     onSuccess: () => { refresh(); setSource(''); setRef(''); },
   });
   return (
@@ -86,23 +85,24 @@ function CategorySelect({ value, onChange }: { value: string; onChange: (v: stri
 
 /** Right pane for a package skill: package details and actions, then the skill read-only (updates replace it). */
 export function PackageSkillView({ current, onRemoved }: { current: PackageSkillRef; onRemoved: () => void }) {
+  const api = useSkillsApi();
   const refresh = useRefresh();
   const list = usePackages();
   const pkg = list.data?.packages.find(p => p.id === current.id);
   const skill = useQuery({
     queryKey: ['skill-packages', current.id, current.skill],
-    queryFn: () => api<{ path: string; content: string; hash: string }>(`/api/skill-packages/${current.id}/skills/${current.skill}`),
+    queryFn: () => api<{ path: string; content: string; hash: string }>(`/skill-packages/${current.id}/skills/${current.skill}`),
   });
   const update = useMutation({
-    mutationFn: () => api<SkillPackage & { changed: boolean }>(`/api/skill-packages/${current.id}/update`, { method: 'POST' }),
+    mutationFn: () => api<SkillPackage & { changed: boolean }>(`/skill-packages/${current.id}/update`, { method: 'POST' }),
     onSuccess: refresh,
   });
   const setCategory = useMutation({
-    mutationFn: (category: string) => api(`/api/skill-packages/${current.id}`, { method: 'PATCH', body: JSON.stringify({ category }) }),
+    mutationFn: (category: string) => api(`/skill-packages/${current.id}`, { method: 'PATCH', body: JSON.stringify({ category }) }),
     onSuccess: refresh,
   });
   const remove = useMutation({
-    mutationFn: () => api(`/api/skill-packages/${current.id}${pkg?.usedBy.length ? '?force=1' : ''}`, { method: 'DELETE' }),
+    mutationFn: () => api(`/skill-packages/${current.id}${pkg?.usedBy.length ? '?force=1' : ''}`, { method: 'DELETE' }),
     onSuccess: () => { refresh(); onRemoved(); },
   });
   if (!pkg) return <QueryState isLoading={list.isLoading} error={list.error} />;

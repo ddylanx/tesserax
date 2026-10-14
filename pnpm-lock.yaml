@@ -90,6 +90,9 @@ importers:
       '@ot/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@ot/mod-skills':
+        specifier: workspace:*
+        version: link:../../packages/modules/skills
       '@tanstack/react-query':
         specifier: ^5.85.0
         version: 5.104.1(react@19.3.0)
