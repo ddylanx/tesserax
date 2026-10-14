@@ -261,7 +261,8 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {cfg.commands && <p className="text-xs text-muted-foreground">commands: {cfg.commands.join(' · ')}</p>}
       </CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
-        {agentOf(node) && ['running', 'waiting', 'failed'].includes(run.status) && last?.status !== 'running' && !(waiting && node.type === 'agent.run') && <AgentPicker run={run} node={node} />}
+        {node.type !== 'trigger.jira' && run.status !== 'running' && !waiting && <RunFrom run={run} node={node} />}
+        {agentOf(node) && ['running', 'waiting', 'failed', 'cancelled', 'done'].includes(run.status) && last?.status !== 'running' && !(waiting && node.type === 'agent.run') && <AgentPicker run={run} node={node} />}
         {last && ['ai.step', 'ai.review', 'agent.run', 'doc.write', 'jira.comment', 'git.pr'].includes(node.type) && last.status !== 'waiting' && <LiveLog runId={run.id} nodeRun={last} />}
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
@@ -462,6 +463,27 @@ function ExecutorPicker({ run, error }: { run: WorkflowRunDetail; error: string 
       {pick.isPending && <p className="text-xs text-muted-foreground">Starting…</p>}
       {pick.error && <p className="text-sm text-red-600">{(pick.error as Error).message}</p>}
       <p className="text-[11px] text-muted-foreground">If the work loops back here (tests or review failed), the same choice is reused.</p>
+    </div>
+  );
+}
+
+/** Pick the run up again at this step; analysis, spec and the worktree are kept, so earlier steps are not paid for again. */
+function RunFrom({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }) {
+  const action = useRunAction(run.id);
+  const finished = run.status === 'cancelled' || run.status === 'done';
+  return (
+    <div className="flex flex-col gap-1">
+      <div>
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={action.isPending}
+          onClick={() => confirm(`Run again from “${node.label}”?${finished ? ' The run is reopened.' : ' The step waiting now is dropped.'} Documents made so far are kept.`) && action.mutate({ path: 'run-from', body: { nodeId: node.id } })}
+        >
+          Run again from here
+        </Button>
+      </div>
+      {action.error && <p className="text-xs text-red-600">{(action.error as Error).message}</p>}
     </div>
   );
 }

@@ -364,7 +364,6 @@ export class WorkflowEngine {
    */
   async setNodeAgent(runId: string, nodeId: string, agent: string | null) {
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
-    if (!ACTIVE.includes(run.status as (typeof ACTIVE)[number])) throw new RunConflict(`The run is ${run.status}; nothing will run again.`);
     const node = this.graph(run).nodes.find(n => n.id === nodeId);
     if (!node) throw new RunConflict(`No step ${nodeId} in this run.`);
     const key = node.type === 'agent.run' ? 'executor' : (ENGINE_NODE_TYPES as readonly string[]).includes(node.type) ? 'engine' : null;
@@ -402,6 +401,31 @@ export class WorkflowEngine {
     }
     await this.event(runId, 'user', 'retry', { node: nodeId, dropped: after.map(n => n.node_id) });
     await this.enqueue(runId, nodeId, last.via_edge, (last.input ?? {}) as Record<string, unknown>);
+  }
+
+  /**
+   * Picks the run up again at `nodeId`, also after it was cancelled or finished: the documents it already made (analysis,
+   * spec…) and its worktree stay, so nothing before that step is paid for again. Steps still waiting or queued are dropped.
+   */
+  async runFrom(runId: string, nodeId: string) {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    if (run.status === 'running') throw new RunConflict('A step is running; wait for it or cancel the run first.');
+    const node = this.node(run, nodeId);
+    if (node.type === 'trigger.jira') throw new RunConflict('Start a new run to begin from the trigger.');
+    const cfg = node.config as { inputs?: string[]; show?: string[]; from?: string };
+    const needs = [...(cfg.inputs ?? []), ...(cfg.show ?? []), ...(cfg.from ? [cfg.from] : [])];
+    const have = await this.latestArtifacts(runId);
+    const missing = needs.filter(n => !(n in have));
+    if (missing.length) throw new RunConflict(`“${node.label}” needs ${missing.join(', ')}, which this run has not made yet; start from an earlier step.`);
+    await this.db.updateTable('node_runs').set({ status: 'cancelled', ended_at: new Date() }).where('run_id', '=', runId).where('status', 'in', ['queued', 'waiting']).execute();
+    try {
+      await this.patchRun(runId, { status: 'waiting', finished_at: null, error: null });
+    } catch (err) {
+      if ((err as { code?: string }).code === '23505') throw new RunConflict('This task already has another active run; cancel that one first.');
+      throw err;
+    }
+    await this.event(runId, 'user', 'run_from', { node: nodeId, previously: run.status });
+    await this.enqueue(runId, nodeId, null, {});
   }
 
   async cancel(runId: string) {

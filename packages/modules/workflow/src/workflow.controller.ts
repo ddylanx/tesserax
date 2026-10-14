@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@ot/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, rerunNodeActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@ot/contracts';
 import { CONFIG, DB } from '@ot/core';
@@ -289,6 +289,16 @@ export class WorkflowController {
     const parsed = rerunNodeActionSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException('nodeId is required');
     await guard(() => this.engine.rerunNode(id, parsed.data.nodeId));
+    return { ok: true };
+  }
+
+  /** Pick the run up again at a step (also a cancelled or finished run), keeping the documents it already made. */
+  @Post('workflow-runs/:id/run-from')
+  @HttpCode(200)
+  async runFrom(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = runFromActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException('nodeId is required');
+    await guard(() => this.engine.runFrom(id, parsed.data.nodeId));
     return { ok: true };
   }
 
