@@ -2,7 +2,7 @@
   "name": "@tesserax/mod-skills",
   "version": "0.1.0",
   "private": true,
-  "license": "MIT",
+  "license": "Apache-2.0",
   "description": "Skills for AI agents: SKILL.md files you write, plus skill packages installed from git. NestJS module + React UI.",
   "main": "src/index.ts",
   "types": "src/index.ts",

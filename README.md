@@ -180,4 +180,4 @@ See [CLAUDE.md](CLAUDE.md) for the code layout.
 
 ## License
 
-MIT, see LICENSE.
+Apache License 2.0, see LICENSE.
