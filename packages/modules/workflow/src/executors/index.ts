@@ -4,7 +4,7 @@ import type { AgentExecutor, NodeType } from '@tesserax/contracts';
 import { cleanEnv, diffInfo, diffPatch, git } from '@tesserax/agent-runtime';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, relative } from 'node:path';
-import { renderTemplate, withSkills } from '../render';
+import { buildShellEnv, renderShellTemplate, renderTemplate, withSkills } from '../render';
 import { askAgent } from './claude';
 import { liveLogFile } from './livelog';
 import { startAgent } from './agent';
@@ -72,12 +72,12 @@ const aiReview: NodeExecutor = async ctx => {
   };
 };
 
-function sh(cmd: string, cwd: string, timeoutMs: number): Promise<{ code: number | null; out: string; ms: number; timedOut: boolean }> {
+function sh(cmd: string, cwd: string, timeoutMs: number, extraEnv: Record<string, string> = {}): Promise<{ code: number | null; out: string; ms: number; timedOut: boolean }> {
   return new Promise(resolve => {
     const started = Date.now();
     let out = '';
     let timedOut = false;
-    const child = spawn('/bin/sh', ['-c', cmd], { cwd, env: cleanEnv(), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn('/bin/sh', ['-c', cmd], { cwd, env: cleanEnv(process.env, extraEnv), detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
     const keep = (d: Buffer) => {
       out = (out + d.toString()).slice(-200_000);
     };
@@ -103,13 +103,14 @@ const checkCommand: NodeExecutor = async ctx => {
   const c = ctx.config;
   const wt = await worktree(ctx);
   const rc = await renderCtx(ctx, wt);
+  const shellEnv = buildShellEnv(rc);
   const lines: string[] = [`# Checks in ${wt.worktree}`, ''];
   const results: { command: string; exitCode: number | null; seconds: number }[] = [];
   let ok = true;
   const deadline = Date.now() + c.timeoutSeconds * 1000;
   for (const raw of c.commands as string[]) {
-    const cmd = renderTemplate(raw, rc);
-    const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()));
+    const cmd = renderShellTemplate(raw, rc);
+    const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
     results.push({ command: cmd, exitCode: r.code, seconds: Math.round(r.ms / 100) / 10 });
     const passed = r.code === 0 && !r.timedOut;
     // PHP deprecation notices (hundreds of lines at boot) would push the actual failure out of the tail we keep

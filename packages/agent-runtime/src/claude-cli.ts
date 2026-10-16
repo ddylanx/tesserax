@@ -16,9 +16,28 @@ const PARENT_SESSION_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CLAUDE_
  */
 const OWN_ENV = new Set(Object.keys(envSchema.shape).filter(k => k !== 'NODE_ENV' && k !== 'LOG_LEVEL'));
 
+/**
+ * Ambient host credentials and secrets that must not leak to child processes (agents, tests, scripts)
+ * unless explicitly injected via `extra`.
+ */
+const AMBIENT_SECRETS_PREFIX = /^(AWS_|AZURE_|GCP_|GOOGLE_APPLICATION_CREDENTIALS|GITHUB_|GH_|GITLAB_|NPM_|PYPI_|DOCKER_|VAULT_|KUBECONFIG|HEROKU_|STRIPE_|SENTRY_|SSH_AUTH_SOCK|SSH_AGENT_PID|GPG_AGENT_INFO)/i;
+const SENSITIVE_KEY_SUFFIX = /(_TOKEN|_SECRET|_PASSWORD|_PRIVATE_KEY)$/i;
+
+/** Known AI engine API keys that agent CLI child processes legitimately need from the host environment. */
+const ALLOWED_AI_KEYS = new Set(['ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'OPENAI_API_KEY']);
+
+export function isSecretEnvKey(k: string): boolean {
+  if (ALLOWED_AI_KEYS.has(k)) return false;
+  return OWN_ENV.has(k) || AMBIENT_SECRETS_PREFIX.test(k) || SENSITIVE_KEY_SUFFIX.test(k);
+}
+
 export function cleanEnv(env: NodeJS.ProcessEnv = process.env, extra: Record<string, string> = {}): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {};
-  for (const [k, v] of Object.entries(env)) if (!PARENT_SESSION_ENV.test(k) && !OWN_ENV.has(k)) out[k] = v;
+  for (const [k, v] of Object.entries(env)) {
+    if (!PARENT_SESSION_ENV.test(k) && !isSecretEnvKey(k)) {
+      out[k] = v;
+    }
+  }
   return { ...out, ...extra };
 }
 

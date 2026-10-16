@@ -24,6 +24,21 @@ test('cleanEnv drops variables a parent Claude Code session injects', () => {
   assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_API_KEY', 'PATH']);
 });
 
+test('cleanEnv filters out ambient host secrets while preserving safe environment and allowed AI keys', () => {
+  const e = cleanEnv({
+    PATH: '/bin',
+    HOME: '/Users/test',
+    AWS_SECRET_ACCESS_KEY: 'secret',
+    GITHUB_TOKEN: 'ghp_xxx',
+    SSH_AUTH_SOCK: '/tmp/ssh.sock',
+    CUSTOM_API_SECRET: 'topsecret',
+    DB_PORT: '3306',
+    ANTHROPIC_API_KEY: 'sk-ant-test',
+    GEMINI_API_KEY: 'gm-test',
+  });
+  assert.deepEqual(Object.keys(e).sort(), ['ANTHROPIC_API_KEY', 'DB_PORT', 'GEMINI_API_KEY', 'HOME', 'PATH']);
+});
+
 test('prompt delimits the issue as data and strips fake closing tags', () => {
   const p = buildClassifyPrompt(ctx);
   assert.equal(p.match(/<\/issue>/g)?.length, 1);

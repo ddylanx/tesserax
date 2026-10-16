@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { validateWorkflow, type TaskDetailDto, type WorkflowDefinition } from '@tesserax/contracts';
-import { renderTemplate, withSkills } from './render';
+import { buildShellEnv, renderShellTemplate, renderTemplate, withSkills } from './render';
 import { WorkflowStore } from './stores';
 import { LocalSkillStore } from '@tesserax/mod-skills';
 
@@ -56,6 +56,24 @@ test('templates fill issue, artifacts and feedback; issue stays delimited', () =
   assert.equal(out.match(/<\/issue>/g)?.length, 1);
   assert.equal(renderTemplate('{{feedback}}', { task, artifacts: {} }), '');
   assert.match(withSkills('do it', [{ name: 's', body: 'rules' }]), /# Skill: s[\s\S]*rules[\s\S]*# Task[\s\S]*do it/);
+});
+
+test('renderShellTemplate parameterizes shell commands into TX_* environment variables and buildShellEnv populates them', () => {
+  const task = { id: 't1', key: 'PROJ-1', title: 'Fix bug; drop db', type: 'Bug', status: '', priority: '', labels: [], components: [], url: '', description: '', comments: [], attachments: [] } as unknown as TaskDetailDto;
+  const ctx = {
+    task,
+    artifacts: {},
+    repoPath: '/Users/test/my-repo; rm -rf /',
+    branch: 'feat/$(whoami)`touch evil`"hack',
+  };
+  const rendered = renderShellTemplate('test -e vendor || ln -s "{{repo_path}}/vendor" vendor && git checkout {{branch}}', ctx);
+  assert.equal(rendered, 'test -e vendor || ln -s "$TX_REPO_PATH/vendor" vendor && git checkout $TX_BRANCH');
+
+  const env = buildShellEnv(ctx);
+  assert.equal(env.TX_REPO_PATH, '/Users/test/my-repo; rm -rf /');
+  assert.equal(env.TX_BRANCH, 'feat/$(whoami)`touch evil`"hack');
+  assert.equal(env.TX_ISSUE_KEY, 'PROJ-1');
+  assert.equal(env.TX_ISSUE_TITLE, 'Fix bug; drop db');
 });
 
 test('workflow store finds workflows that reference a path', () => {
