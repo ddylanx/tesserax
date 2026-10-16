@@ -9,6 +9,8 @@ export interface RenderContext {
   worktreePath?: string | null;
   repoPath?: string | null;
   diff?: string;
+  /** The project's variables, used as {{project.<name>}}. */
+  projectVars?: Record<string, string>;
 }
 
 /** The ticket as delimited, untrusted data (the same framing as the classifier and playbooks). */
@@ -28,10 +30,11 @@ export function issueBlock(t: TaskDetailDto): string {
 
 /**
  * Fills {{issue}}, {{issue_key}}, {{branch}}, {{base_ref}}, {{worktree_path}}, {{repo_path}}, {{artifact:<name>}},
- * {{feedback}} (empty when there is none) and {{diff}}. Unknown placeholders are left as they are.
+ * {{feedback}} (empty when there is none), {{diff}} and {{project.<name>}} (the project's variables). Unknown placeholders are left as they are.
  */
 export function renderTemplate(template: string, c: RenderContext): string {
-  return template.replace(/\{\{\s*([\w:-]+)\s*\}\}/g, (all, key: string) => {
+  return template.replace(/\{\{\s*([\w:.-]+)\s*\}\}/g, (all, key: string) => {
+    if (key.startsWith('project.')) return c.projectVars?.[key.slice(8)] ?? all;
     if (key.startsWith('artifact:')) return c.artifacts[key.slice(9)]?.trim() || '(none yet)';
     switch (key) {
       case 'issue':

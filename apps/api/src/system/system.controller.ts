@@ -30,10 +30,8 @@ export class SystemController {
 
   @Get('system')
   async system(): Promise<SystemInfo> {
-    const workspaces = await this.db.selectFrom('workspaces').select(['id', 'slug', 'name', 'kind']).orderBy('created_at').execute();
     return {
       health: await this.health(),
-      workspaces,
       schedules: this.schedules.list(),
       integrations: [
         { name: 'Jira Cloud', configured: jiraConfigured(this.config), note: 'JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN' },

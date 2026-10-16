@@ -2,8 +2,8 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { jiraConfigured, type AppConfig } from '@tesserax/config';
 import { randomUUID } from 'node:crypto';
-import type { CreateLocalTask, TaskDetailDto, TaskDto, TaskList, TaskQuery, UpdateLocalTask } from '@tesserax/contracts';
-import { CONFIG, DB, QUEUE, type Queue } from '@tesserax/core';
+import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
+import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
 import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
@@ -20,23 +20,24 @@ export class TasksService {
     @Inject(DB) private readonly db: Db,
     @Inject(QUEUE) private readonly queue: Queue,
     @Inject(CONFIG) private readonly config: AppConfig,
+    @Inject(PROJECT_DIRECTORY) private readonly projects: ProjectDirectory,
   ) {}
 
   async list(f: TaskQuery, limit = 500): Promise<TaskList> {
     let q = this.db
       .selectFrom('tasks as t')
-      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
+      .innerJoin('projects as w', 'w.id', 't.project_id')
       .innerJoin('sources as s', 's.id', 't.source_id')
       .selectAll('t')
-      .select(['w.slug as workspace', 's.kind as source'])
+      .select(['w.slug as project_slug', 'w.color as project_color', 's.kind as source'])
       .orderBy(sql`case t.status_category when 'in_progress' then 0 when 'todo' then 1 else 2 end`)
       .orderBy('t.updated_at_source', sql`desc nulls last` as never)
       .limit(limit);
-    if (f.workspace) q = q.where('w.slug', '=', f.workspace);
+    if (f.project) q = q.where('w.slug', '=', f.project);
     if (f.source) q = q.where('s.kind', '=', f.source);
     if (f.statusCategory) q = q.where('t.status_category', '=', f.statusCategory);
     else if (f.includeDone !== '1') q = q.where('t.status_category', '!=', 'done');
-    if (f.project) q = q.where('t.project', '=', f.project);
+    if (f.board) q = q.where('t.project', '=', f.board);
     if (f.includeArchived !== '1') q = q.where('t.archived_at', 'is', null);
     if (f.q) {
       const like = `%${f.q.replace(/[%_\\]/g, '\\$&')}%`;
@@ -44,20 +45,20 @@ export class TasksService {
     }
     const rows = await q.execute();
 
-    const projects = await this.db.selectFrom('tasks').select('project').distinct().where('project', 'is not', null).orderBy('project').execute();
+    const boards = await this.db.selectFrom('tasks').select('project').distinct().where('project', 'is not', null).orderBy('project').execute();
     const sources = await this.db
       .selectFrom('sources as s')
-      .innerJoin('workspaces as w', 'w.id', 's.workspace_id')
+      .innerJoin('projects as w', 'w.id', 's.project_id')
       .leftJoin('tasks as t', join => join.onRef('t.source_id', '=', 's.id').on('t.archived_at', 'is', null))
-      .select(['s.id', 's.kind', 's.name', 's.last_synced_at', 's.last_error', 'w.slug as workspace', sql<number>`count(t.id)::int`.as('n')])
+      .select(['s.id', 's.kind', 's.name', 's.last_synced_at', 's.last_error', 'w.slug as project_slug', sql<number>`count(t.id)::int`.as('n')])
       .groupBy(['s.id', 'w.slug'])
       .execute();
 
     return {
       jiraConfigured: jiraConfigured(this.config),
-      projects: projects.map(p => p.project!).filter(Boolean),
+      boards: boards.map(p => p.project!).filter(Boolean),
       sources: sources.map(s => ({
-        id: s.id, workspace: s.workspace, kind: s.kind, name: s.name,
+        id: s.id, projectSlug: s.project_slug, kind: s.kind, name: s.name,
         lastSyncedAt: iso(s.last_synced_at), lastError: s.last_error, taskCount: s.n,
       })),
       tasks: rows.map(r => this.toDto(r)),
@@ -81,10 +82,10 @@ export class TasksService {
   async getTask(id: string): Promise<TaskDetailDto | null> {
     const r = await this.db
       .selectFrom('tasks as t')
-      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
+      .innerJoin('projects as w', 'w.id', 't.project_id')
       .innerJoin('sources as s', 's.id', 't.source_id')
       .selectAll('t')
-      .select(['w.slug as workspace', 's.kind as source'])
+      .select(['w.slug as project_slug', 'w.color as project_color', 's.kind as source'])
       .where('t.id', '=', id)
       .executeTakeFirst();
     return r ? this.toDetail(r) : null;
@@ -116,7 +117,9 @@ export class TasksService {
   private toDto(r: any): TaskDto {
     return {
       id: r.id,
-      workspace: r.workspace,
+      projectSlug: r.project_slug,
+      projectColor: r.project_color,
+      pinned: r.project_pinned === true,
       source: r.source,
       key: r.key,
       title: r.title,
@@ -137,20 +140,18 @@ export class TasksService {
 
   // ---------- local tasks (not from Jira) ----------
 
-  /** The "Local" source of a workspace, created on first use. */
-  private async localSource(workspace: 'personal' | 'company') {
-    const ws = await this.db.selectFrom('workspaces').select('id').where('slug', '=', workspace).executeTakeFirstOrThrow();
+  /** The "Local" source of a project, created on first use. */
+  private async localSource(projectId: string) {
     return this.db
       .insertInto('sources')
-      .values({ workspace_id: ws.id, kind: 'local', name: 'Local', config: JSON.stringify({}) })
-      .onConflict(oc => oc.columns(['workspace_id', 'kind', 'name']).doUpdateSet({ name: 'Local' }))
-      .returning(['id', 'workspace_id'])
+      .values({ project_id: projectId, kind: 'local', name: 'Local', config: JSON.stringify({}) })
+      .onConflict(oc => oc.columns(['project_id', 'kind', 'name']).doUpdateSet({ name: 'Local' }))
+      .returning(['id', 'project_id'])
       .executeTakeFirstOrThrow();
   }
 
-  /** Keys like C-12 (Company) or P-3 (Personal); used for branch names (tx/C-12). */
-  private async nextLocalKey(sourceId: string, workspace: 'personal' | 'company') {
-    const prefix = workspace === 'company' ? 'C' : 'P';
+  /** Keys like C-12 (Company) or P-3 (Personal), or the project's own prefix; used for branch names (tx/C-12). */
+  private async nextLocalKey(sourceId: string, prefix: string) {
     const r = await this.db
       .selectFrom('tasks')
       .select(sql<number>`coalesce(max(nullif(regexp_replace(key, '^[A-Z]+-', ''), '')::int), 0)`.as('n'))
@@ -160,20 +161,37 @@ export class TasksService {
   }
 
   async createLocal(input: CreateLocalTask): Promise<TaskDetailDto> {
-    const source = await this.localSource(input.workspace);
-    const key = await this.nextLocalKey(source.id, input.workspace);
+    const project = await this.projects.get(input.projectSlug);
+    if (!project) throw new Error(`Project "${input.projectSlug}" not found`);
+    const source = await this.localSource(project.id);
+    const key = await this.nextLocalKey(source.id, keyPrefixOf(project));
     const row = await this.db
       .insertInto('tasks')
       .values({
-        workspace_id: source.workspace_id, source_id: source.id, external_id: randomUUID(), key, title: input.title,
+        project_id: source.project_id, source_id: source.id, external_id: randomUUID(), key, title: input.title,
         description: input.description ?? null, status: 'To Do', status_category: 'todo', priority: input.priority ?? null,
-        project: input.project ?? null, type: input.type, labels: input.labels, due_at: input.dueAt ?? null,
+        project_pinned: true, project: input.project ?? null, type: input.type, labels: input.labels, due_at: input.dueAt ?? null,
         review: input.review ? JSON.stringify(input.review) : null, workplace_id: input.workplaceId ?? null, created_at_source: new Date(), updated_at_source: new Date(),
         raw: JSON.stringify({ local: true }), synced_at: new Date(), detail_synced_at: new Date(),
       })
       .returning('id')
       .executeTakeFirstOrThrow();
     return (await this.getTask(row.id))!;
+  }
+
+  /** Moves a task to a project by hand (it stays there); null hands it back to the rules. */
+  async moveToProject(id: string, projectId: string | null): Promise<TaskDetailDto> {
+    const t = await this.db.selectFrom('tasks').select(['id', 'project', 'source_id']).where('id', '=', id).executeTakeFirst();
+    if (!t) throw new Error('Task not found');
+    if (projectId) {
+      const target = await this.projects.get(projectId);
+      if (!target) throw new Error('Project not found');
+      await this.db.updateTable('tasks').set({ project_id: target.id, project_pinned: true }).where('id', '=', id).execute();
+    } else {
+      const target = await this.projects.resolveForTask({ project: t.project, sourceId: t.source_id });
+      await this.db.updateTable('tasks').set({ project_id: target.id, project_pinned: false }).where('id', '=', id).execute();
+    }
+    return (await this.getTask(id))!;
   }
 
   /** The workplace a task's workflow works in; any task (Jira too: this is our own field, not Jira's). */

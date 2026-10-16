@@ -4,14 +4,18 @@ export const taskStatusCategorySchema = z.enum(['todo', 'in_progress', 'done']);
 
 export const taskSchema = z.object({
   id: z.string(),
-  workspace: z.string(), // workspace slug
-  source: z.string(), // jira | google_tasks
+  projectSlug: z.string(),
+  projectColor: z.string().optional(),
+  /** Moved to its project by hand: sync does not move it. */
+  pinned: z.boolean().optional(),
+  source: z.string(), // jira | google_tasks | local
   key: z.string().nullable(),
   title: z.string(),
   status: z.string().nullable(),
   statusCategory: taskStatusCategorySchema,
   priority: z.string().nullable(),
   assignee: z.string().nullable(),
+  /** Jira key of the board (shown as "Board" in the UI). */
   project: z.string().nullable(),
   type: z.string().nullable(),
   labels: z.array(z.string()),
@@ -25,10 +29,12 @@ export const taskSchema = z.object({
 export type TaskDto = z.infer<typeof taskSchema>;
 
 export const taskQuerySchema = z.object({
-  workspace: z.string().optional(),
+  /** Project slug. */
+  project: z.string().optional(),
   source: z.string().optional(),
   statusCategory: taskStatusCategorySchema.optional(),
-  project: z.string().optional(),
+  /** Jira key. */
+  board: z.string().optional(),
   q: z.string().optional(),
   includeDone: z.enum(['0', '1']).optional(),
   includeArchived: z.enum(['0', '1']).optional(),
@@ -37,7 +43,7 @@ export type TaskQuery = z.infer<typeof taskQuerySchema>;
 
 export const taskSourceSchema = z.object({
   id: z.string(),
-  workspace: z.string(),
+  projectSlug: z.string(),
   kind: z.string(),
   name: z.string(),
   lastSyncedAt: z.string().nullable(),
@@ -47,7 +53,8 @@ export const taskSourceSchema = z.object({
 
 export const taskListSchema = z.object({
   tasks: z.array(taskSchema),
-  projects: z.array(z.string()),
+  /** Jira keys seen on tasks. */
+  boards: z.array(z.string()),
   sources: z.array(taskSourceSchema),
   jiraConfigured: z.boolean(),
 });
@@ -63,9 +70,9 @@ export type ReviewTarget = z.infer<typeof reviewTargetSchema>;
 
 export const LOCAL_TASK_TYPES = ['Bug', 'Story', 'Task', 'Question', 'Code review'] as const;
 
-/** "New task": a task kept only in Tesserax, in the Company or Personal workspace. */
+/** "New task": a task kept only in Tesserax, in a project. */
 export const createLocalTaskSchema = z.object({
-  workspace: z.enum(['personal', 'company']),
+  projectSlug: z.string().min(1).max(60),
   title: z.string().min(1).max(300),
   description: z.string().max(50_000).optional(),
   type: z.enum(LOCAL_TASK_TYPES).default('Task'),
@@ -81,7 +88,7 @@ export const createLocalTaskSchema = z.object({
 export type CreateLocalTask = z.infer<typeof createLocalTaskSchema>;
 
 export const updateLocalTaskSchema = createLocalTaskSchema
-  .omit({ workspace: true })
+  .omit({ projectSlug: true })
   .partial()
   .extend({ statusCategory: z.enum(['todo', 'in_progress', 'done']).optional(), review: reviewTargetSchema.nullable().optional() });
 export type UpdateLocalTask = z.infer<typeof updateLocalTaskSchema>;

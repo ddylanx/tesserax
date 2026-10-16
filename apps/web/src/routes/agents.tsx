@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { ProjectDot, useProjectScope } from '@/lib/project-context';
 import { fmtNumber, timeAgo } from '@/lib/utils';
 
 const STATUS: Record<string, { label: string; variant: 'green' | 'amber' | 'blue' | 'default' | 'outline' }> = {
@@ -58,7 +59,8 @@ function Usage({ s }: { s: AgentSessionDto }) {
 export function AgentsPage() {
   const [scope, setScope] = useState<'active' | 'all'>('active');
   const [open, setOpen] = useState<string | null>(null);
-  const q = useQuery({ queryKey: ['agents', scope], queryFn: () => api<AgentSessionList>(`/api/agents/sessions?scope=${scope}`), refetchInterval: 3_000 });
+  const { scopeParam, selected: scopeSelected } = useProjectScope();
+  const q = useQuery({ queryKey: ['agents', scope, scopeParam], queryFn: () => api<AgentSessionList>(`/api/agents/sessions?scope=${scope}&${scopeParam}`), refetchInterval: 3_000 });
   const sessions = q.data?.sessions ?? [];
   const c = q.data?.counts ?? {};
 
@@ -99,7 +101,7 @@ export function AgentsPage() {
                     <Td className="w-6 pr-0">{open === s.id ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}</Td>
                     <Td><StatusBadge s={s} /></Td>
                     <Td>
-                      <div className="font-medium">{s.project ?? '–'}</div>
+                      <div className="flex items-center gap-1.5 font-medium">{!scopeSelected && s.projectSlug && <ProjectDot color={s.projectColor} name={s.projectSlug} />}{s.project ?? '–'}</div>
                       {s.branch && <div className="flex items-center gap-1 text-xs"><GitBranch className="size-3" />{s.branch}</div>}
                       <div className="max-w-xs truncate text-xs text-muted-foreground" title={s.cwd ?? ''}>{s.cwd}</div>
                     </Td>

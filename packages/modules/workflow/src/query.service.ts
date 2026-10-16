@@ -22,15 +22,20 @@ export class WorkflowQueryService {
     private readonly tasks: TasksService,
   ) {}
 
-  async listRuns(status?: string): Promise<WorkflowRunList> {
+  /** `project` is a project slug: only runs of tasks in that project. */
+  async listRuns(status?: string, project?: string): Promise<WorkflowRunList> {
     let q = this.baseQuery().orderBy('r.updated_at', 'desc').limit(300);
     if (status && status !== 'all') q = q.where('r.status', '=', status as never);
+    if (project) q = q.where('w.slug', '=', project);
     const rows = await q.execute();
-    const counts = await this.db
-      .selectFrom('workflow_runs')
-      .select(['status', sql<number>`count(*)::int`.as('n')])
-      .groupBy('status')
-      .execute();
+    let cq = this.db
+      .selectFrom('workflow_runs as r')
+      .innerJoin('tasks as t', 't.id', 'r.task_id')
+      .innerJoin('projects as w', 'w.id', 't.project_id')
+      .select(['r.status', sql<number>`count(*)::int`.as('n')])
+      .groupBy('r.status');
+    if (project) cq = cq.where('w.slug', '=', project);
+    const counts = await cq.execute();
     return {
       runs: rows.map(r => this.toDto(r)),
       counts: Object.fromEntries(counts.map(c => [c.status, c.n])),
@@ -109,7 +114,7 @@ export class WorkflowQueryService {
     return this.db
       .selectFrom('workflow_runs as r')
       .innerJoin('tasks as t', 't.id', 'r.task_id')
-      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
+      .innerJoin('projects as w', 'w.id', 't.project_id')
       .innerJoin('sources as s', 's.id', 't.source_id')
       .selectAll('r')
       .select(eb => [
@@ -127,7 +132,9 @@ export class WorkflowQueryService {
         't.due_at as t_due_at',
         't.updated_at_source as t_updated',
         't.archived_at as t_archived_at',
-        'w.slug as t_workspace',
+        't.project_pinned as t_project_pinned',
+        'w.slug as t_project_slug',
+        'w.color as t_project_color',
         's.kind as t_source',
         eb.selectFrom('node_runs').select(sql<number>`coalesce(sum(cost_usd), 0)::float`.as('c')).whereRef('node_runs.run_id', '=', 'r.id').as('cost'),
       ]);
@@ -143,7 +150,9 @@ export class WorkflowQueryService {
       trigger: r.trigger,
       task: {
         id: r.t_id,
-        workspace: r.t_workspace,
+        projectSlug: r.t_project_slug,
+        projectColor: r.t_project_color,
+        pinned: r.t_project_pinned === true,
         source: r.t_source,
         key: r.t_key,
         title: r.t_title,

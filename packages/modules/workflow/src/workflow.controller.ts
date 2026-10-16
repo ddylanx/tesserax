@@ -151,16 +151,26 @@ export class WorkflowController {
     });
   }
 
+  /** Routing of a project (`?project=<slug>`; the default project when omitted). */
   @Get('workflow-routing')
-  routing() {
-    return this.engine.routing.read();
+  routing(@Query('project') project?: string) {
+    return guard(async () => {
+      const p = project ? await this.engine.projects.get(project) : (await this.engine.projects.list()).find(x => x.isDefault);
+      if (!p) throw new NotFoundException('Project not found');
+      return p.settings.routing;
+    });
   }
 
   @Put('workflow-routing')
-  saveRouting(@Body() body: unknown) {
+  saveRouting(@Body() body: unknown, @Query('project') project?: string) {
     const parsed = routingSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
-    return guard(async () => this.engine.routing.save(parsed.data, id => this.engine.workflows.exists(id)));
+    return guard(async () => {
+      for (const id of [parsed.data.default, ...parsed.data.rules.map(x => x.workflow)]) if (!this.engine.workflows.exists(id)) throw new Error(`Workflow ${id} does not exist`);
+      const p = project ? await this.engine.projects.get(project) : (await this.engine.projects.list()).find(x => x.isDefault);
+      if (!p) throw new NotFoundException('Project not found');
+      return (await this.engine.projects.saveRouting(p.id, parsed.data)).settings.routing;
+    });
   }
 
   /**
@@ -203,8 +213,8 @@ export class WorkflowController {
   }
 
   @Get('workflow-runs')
-  runs(@Query('status') status?: string): Promise<WorkflowRunList> {
-    return this.engine.listRuns(status);
+  runs(@Query('status') status?: string, @Query('project') project?: string): Promise<WorkflowRunList> {
+    return this.engine.listRuns(status, project);
   }
 
   @Get('workflow-runs/:id')

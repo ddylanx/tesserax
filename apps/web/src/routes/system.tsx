@@ -24,12 +24,6 @@ export function SystemPage() {
             </CardContent>
           </Card>
           <Card>
-            <CardHeader><CardTitle>Workspaces</CardTitle></CardHeader>
-            <CardContent className="flex flex-wrap gap-2">
-              {s.workspaces.map(w => <Badge key={w.id}>{w.name} <span className="text-muted-foreground">({w.kind})</span></Badge>)}
-            </CardContent>
-          </Card>
-          <Card>
             <CardHeader><CardTitle>Schedules (pg-boss)</CardTitle></CardHeader>
             <CardContent className="text-sm">
               {s.schedules.length === 0 && <p className="text-muted-foreground">No schedules registered.</p>}

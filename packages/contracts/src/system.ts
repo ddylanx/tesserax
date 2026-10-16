@@ -9,13 +9,6 @@ export const healthSchema = z.object({
 });
 export type Health = z.infer<typeof healthSchema>;
 
-export const workspaceSchema = z.object({
-  id: z.string(),
-  slug: z.string(),
-  name: z.string(),
-  kind: z.enum(['personal', 'company']),
-});
-export type WorkspaceDto = z.infer<typeof workspaceSchema>;
 
 export const scheduleInfoSchema = z.object({
   name: z.string(),
@@ -26,7 +19,6 @@ export const scheduleInfoSchema = z.object({
 
 export const systemInfoSchema = z.object({
   health: healthSchema,
-  workspaces: z.array(workspaceSchema),
   schedules: z.array(scheduleInfoSchema),
   integrations: z.array(z.object({ name: z.string(), configured: z.boolean(), note: z.string().optional() })),
 });

@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { createLocalTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
+import { createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -20,7 +20,7 @@ export class TasksController {
     return t;
   }
 
-  /** "New task": a local task in the Company or Personal workspace. */
+  /** "New task": a local task in a project. */
   @Post()
   async create(@Body() body: unknown): Promise<TaskDetailDto> {
     const parsed = createLocalTaskSchema.safeParse(body);
@@ -43,6 +43,16 @@ export class TasksController {
     const parsed = setTaskWorkplaceSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => i.message).join('; '));
     return this.tasks.setWorkplace(id, parsed.data.workplaceId).catch(e => {
+      throw new BadRequestException((e as Error).message);
+    });
+  }
+
+  /** Move a task to a project by hand (it stays pinned there); null hands it back to the project rules. */
+  @Patch(':id/project')
+  async setProject(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown): Promise<TaskDetailDto> {
+    const parsed = moveTaskSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => i.message).join('; '));
+    return this.tasks.moveToProject(id, parsed.data.projectId).catch(e => {
       throw new BadRequestException((e as Error).message);
     });
   }

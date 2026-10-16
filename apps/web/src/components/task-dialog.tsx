@@ -8,6 +8,7 @@ import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { WorkplaceInfo, WorkplaceSelect, resolveWorkplace, useRepoRegistry } from '@/components/workplace';
 import { suggestWorkflow, useWorkflowChoices } from '@/components/workflow-picker';
+import { useProjectScope } from '@/lib/project-context';
 
 type Form = Omit<CreateLocalTask, 'labels' | 'review' | 'workplaceId'> & {
   workplaceId: string;
@@ -18,11 +19,12 @@ type Form = Omit<CreateLocalTask, 'labels' | 'review' | 'workplaceId'> & {
   prUrl: string;
 };
 
-/** Create or edit a local task (Company or Personal). Code-review tasks also take the member's branch / PR. */
+/** Create or edit a local task (in a project). Code-review tasks also take the member's branch / PR. */
 export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto; onClose: () => void; onCreated?: (t: TaskDetailDto) => void }) {
   const qc = useQueryClient();
+  const scope = useProjectScope();
   const [f, setF] = useState<Form>(() => ({
-    workspace: (task?.workspace as 'company' | 'personal') ?? 'company',
+    projectSlug: task?.projectSlug ?? scope.selected ?? '',
     title: task?.title ?? '',
     description: task?.description ?? '',
     type: (LOCAL_TASK_TYPES as readonly string[]).includes(task?.type ?? '') ? (task!.type as Form['type']) : 'Task',
@@ -39,7 +41,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(prev => ({ ...prev, [k]: v }));
   const isReview = f.type === 'Code review';
   const body = () => ({
-    ...(task ? {} : { workspace: f.workspace }),
+    ...(task ? {} : { projectSlug: f.projectSlug || scope.projects.find(p => p.isDefault)?.slug || scope.projects[0]?.slug }),
     title: f.title.trim(),
     description: f.description || undefined,
     type: f.type,
@@ -54,7 +56,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
       : task ? null : undefined,
   });
   // new tasks: optionally start a workflow right away (the routing rules suggest one)
-  const { workflows, routing } = useWorkflowChoices();
+  const { workflows, routing } = useWorkflowChoices(f.projectSlug || scope.projects.find(p => p.isDefault)?.slug);
   const suggested = suggestWorkflow(routing, { type: f.type, project: f.project, priority: f.priority, labels: body().labels })?.id ?? null;
   const [startWith, setStartWith] = useState('');
   const navigate = useNavigate();
@@ -95,10 +97,9 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {!task && (
-            <label className="flex flex-col gap-1 text-xs">Workspace
-              <Select value={f.workspace} onChange={e => set('workspace', e.target.value as Form['workspace'])}>
-                <option value="company">Company</option>
-                <option value="personal">Personal</option>
+            <label className="flex flex-col gap-1 text-xs">Project
+              <Select value={f.projectSlug || scope.projects.find(p => p.isDefault)?.slug || ''} onChange={e => set('projectSlug', e.target.value)}>
+                {scope.projects.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}
               </Select>
             </label>
           )}

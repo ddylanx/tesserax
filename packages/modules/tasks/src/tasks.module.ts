@@ -1,6 +1,7 @@
 import { Inject, Module, type OnModuleInit } from '@nestjs/common';
 import { jiraConfigured, type AppConfig } from '@tesserax/config';
-import { CONFIG, DB, SCHEDULES, createLogger, type ScheduleRegistry } from '@tesserax/core';
+import type { ProjectDirectory } from '@tesserax/contracts';
+import { CONFIG, DB, PROJECT_DIRECTORY, SCHEDULES, createLogger, type ScheduleRegistry } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JIRA_SYNC_JOB, runJiraSync } from './jobs/jira-sync.job';
 import { TasksController } from './tasks.controller';
@@ -19,6 +20,7 @@ export class TasksModule implements OnModuleInit {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(SCHEDULES) private readonly schedules: ScheduleRegistry,
     private readonly tasks: TasksService,
+    @Inject(PROJECT_DIRECTORY) private readonly projects: ProjectDirectory,
   ) {}
 
   onModuleInit() {
@@ -32,6 +34,7 @@ export class TasksModule implements OnModuleInit {
       enabled,
       handler: async () => {
         const result = await runJiraSync(this.db, this.config);
+        await this.projects.reassign();
         if (result.inserted.length && !result.firstSync) await this.tasks.notifyNewTasks(result.inserted);
       },
     });

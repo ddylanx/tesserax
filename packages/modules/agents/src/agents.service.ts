@@ -2,8 +2,8 @@ import { hostname } from 'node:os';
 import { basename } from 'node:path';
 import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
-import type { AgentEventDto, AgentSessionDto, AgentSessionList, ClaudeHookPayload } from '@tesserax/contracts';
-import { DB, QUEUE, WorkContext, type Queue } from '@tesserax/core';
+import type { AgentEventDto, AgentSessionDto, AgentSessionList, ClaudeHookPayload, ProjectDirectory } from '@tesserax/contracts';
+import { DB, PROJECT_DIRECTORY, QUEUE, WorkContext, type Queue } from '@tesserax/core';
 import type { AgentSession, AgentSessionUpdate, Db } from '@tesserax/db';
 import { readBranch } from './git';
 import { STORED_EVENTS, USAGE_EVENTS, detailFor, modelName, statusFor } from './hook-mapping';
@@ -21,7 +21,19 @@ export class AgentsService {
   constructor(
     @Inject(DB) private readonly db: Db,
     @Inject(QUEUE) private readonly queue: Queue,
+    @Inject(PROJECT_DIRECTORY) private readonly projects: ProjectDirectory,
   ) {}
+
+  private projectCache = new Map<string, { id: string | null; at: number }>();
+
+  /** The project a folder belongs to; hooks fire many times a minute, so answers are kept for 30 s. */
+  private async projectIdFor(cwd: string): Promise<string | null> {
+    const hit = this.projectCache.get(cwd);
+    if (hit && Date.now() - hit.at < 30_000) return hit.id;
+    const id = (await this.projects.resolveForPath(cwd).catch(() => null))?.id ?? null;
+    this.projectCache.set(cwd, { id, at: Date.now() });
+    return id;
+  }
 
   private async agentId(kind: string, host: string): Promise<string> {
     const key = `${kind}|${host}`;
@@ -49,6 +61,7 @@ export class AgentsService {
     if (p.cwd) {
       update.cwd = p.cwd;
       update.branch = readBranch(p.cwd);
+      update.project_id = await this.projectIdFor(p.cwd);
     }
     if (p.transcript_path) update.transcript_path = p.transcript_path;
     if (p.permission_mode) update.permission_mode = p.permission_mode;
@@ -104,15 +117,18 @@ export class AgentsService {
     return { sessionId: row.id, status: row.status };
   }
 
-  async listSessions(scope: 'active' | 'all' = 'active', limit = 200): Promise<AgentSessionList> {
+  /** `project` is a project slug: only sessions in that project. */
+  async listSessions(scope: 'active' | 'all' = 'active', project?: string, limit = 200): Promise<AgentSessionList> {
     let q = this.db
       .selectFrom('agent_sessions as s')
       .innerJoin('agents as a', 'a.id', 's.agent_id')
+      .leftJoin('projects as p', 'p.id', 's.project_id')
       .selectAll('s')
-      .select(['a.kind as agent_kind', 'a.host as agent_host'])
+      .select(['a.kind as agent_kind', 'a.host as agent_host', 'p.slug as project_slug', 'p.color as project_color'])
       .orderBy('s.last_event_at', 'desc')
       .limit(limit);
     if (scope === 'active') q = q.where('s.status', '!=', 'ended');
+    if (project) q = q.where('p.slug', '=', project);
     const rows = await q.execute();
     const counts = await this.db
       .selectFrom('agent_sessions')
@@ -121,7 +137,7 @@ export class AgentsService {
       .execute();
     const last = await this.db.selectFrom('agent_events').select(sql<Date | null>`max(received_at)`.as('at')).executeTakeFirst();
     return {
-      sessions: rows.map(r => this.toDto(r, r.agent_kind, r.agent_host)),
+      sessions: rows.map(r => this.toDto(r, r.agent_kind, r.agent_host, r.project_slug, r.project_color)),
       counts: Object.fromEntries(counts.map(c => [c.status, c.n])),
       lastEventAt: last?.at ? new Date(last.at).toISOString() : null,
     };
@@ -144,7 +160,7 @@ export class AgentsService {
     }));
   }
 
-  toDto(r: AgentSession, kind: string, host: string): AgentSessionDto {
+  toDto(r: AgentSession, kind: string, host: string, projectSlug: string | null = null, projectColor: string | null = null): AgentSessionDto {
     const lastEventAt = new Date(r.last_event_at);
     return {
       id: r.id,
@@ -153,6 +169,8 @@ export class AgentsService {
       sessionId: r.session_id,
       cwd: r.cwd,
       project: r.cwd ? basename(r.cwd) : null,
+      projectSlug,
+      projectColor,
       branch: r.branch,
       model: r.model,
       permissionMode: r.permission_mode,

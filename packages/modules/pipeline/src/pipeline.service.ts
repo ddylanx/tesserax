@@ -305,14 +305,14 @@ export class PipelineService {
     return this.db
       .selectFrom('pipeline_runs as r')
       .innerJoin('tasks as t', 't.id', 'r.task_id')
-      .innerJoin('workspaces as w', 'w.id', 't.workspace_id')
+      .innerJoin('projects as w', 'w.id', 't.project_id')
       .innerJoin('sources as s', 's.id', 't.source_id')
       .selectAll('r')
       .select([
         't.id as t_id', 't.key as t_key', 't.title as t_title', 't.status as t_status', 't.status_category as t_status_category',
         't.priority as t_priority', 't.assignee as t_assignee', 't.project as t_project', 't.type as t_type', 't.labels as t_labels',
         't.url as t_url', 't.due_at as t_due_at', 't.updated_at_source as t_updated', 't.archived_at as t_archived_at',
-        'w.slug as t_workspace', 's.kind as t_source',
+        'w.slug as t_project_slug', 's.kind as t_source',
       ]);
   }
 
@@ -323,7 +323,7 @@ export class PipelineService {
       trigger: r.trigger,
       attempt: r.attempt,
       task: {
-        id: r.t_id, workspace: r.t_workspace, source: r.t_source, key: r.t_key, title: r.t_title, status: r.t_status,
+        id: r.t_id, projectSlug: r.t_project_slug, source: r.t_source, key: r.t_key, title: r.t_title, status: r.t_status,
         statusCategory: r.t_status_category, priority: r.t_priority, assignee: r.t_assignee, project: r.t_project, type: r.t_type,
         labels: r.t_labels ?? [], url: r.t_url, dueAt: r.t_due_at ? new Date(r.t_due_at).toISOString().slice(0, 10) : null,
         updatedAt: iso(r.t_updated), archived: r.t_archived_at != null,

@@ -16,8 +16,8 @@ export class AgentsController {
   }
 
   @Get('sessions')
-  sessions(@Query('scope') scope?: string): Promise<AgentSessionList> {
-    return this.agents.listSessions(scope === 'all' ? 'all' : 'active');
+  sessions(@Query('scope') scope?: string, @Query('project') project?: string): Promise<AgentSessionList> {
+    return this.agents.listSessions(scope === 'all' ? 'all' : 'active', project || undefined);
   }
 
   @Get('sessions/:id/events')

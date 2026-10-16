@@ -10,6 +10,7 @@ import { EXECUTORS } from './executors';
 import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
+import { projectSkills } from './project-skills';
 import type { SkillCatalog } from '@tesserax/mod-skills';
 
 const log = createLogger('workflow.jobs');
@@ -81,9 +82,20 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     // the agent picked on the run page for this run only wins over the workflow's engine
     const engineOverride = ((run.vars ?? {}) as { engine?: Record<string, string> }).engine?.[node.id];
     if (engineOverride && 'engine' in config) Object.assign(config, { engine: engineOverride });
+    const project = run.project_id ? await d.engine.projects.get(run.project_id) : null;
+    if (project && 'engine' in config) {
+      const allowed = project.settings.engines.allowed;
+      const current = String((config as { engine?: string }).engine ?? '');
+      if (allowed && current && !allowed.includes(current)) {
+        const fallback = project.settings.engines.default;
+        if (!fallback || !allowed.includes(fallback)) throw new FatalNodeError(`Engine "${current}" is not allowed in project "${project.name}" (allowed: ${allowed.join(', ') || 'none'}).`);
+        Object.assign(config, { engine: fallback });
+      }
+    }
     const input = (nr.input ?? {}) as { feedback?: string };
+    const projectVars = ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {};
     const result = await executor({
-      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: d.skills, appConfig: d.config, run, nodeRun: nr, node, config, task,
+      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr, node, config, task,
       artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null,
     });
     if ('async' in result) return; // finishes later (agent runs)

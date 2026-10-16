@@ -1,6 +1,6 @@
 # Spec 0002: Projects
 
-Status: draft for review (2026-10-16)
+Status: implemented (2026-10-16)
 
 ## Goal
 
@@ -40,7 +40,7 @@ Table `projects` (renamed from `workspaces`):
 | `color` | text | hex, for the dot shown next to rows in "All" |
 | `kind` | `personal` \| `company` | kept from `workspaces.kind` |
 | `position` | int | order in which rules are tried and projects are listed |
-| `is_default` | bool | exactly one row; receives tasks no rule matches ("Unsorted") |
+| `is_default` | bool | exactly one row; receives tasks no rule matches. The migration picks `company` when it exists, else the oldest row. |
 | `settings` | jsonb | validated by `projectSettingsSchema` in `@tesserax/contracts` |
 | `created_at` | timestamptz | |
 
@@ -53,11 +53,11 @@ Table `projects` (renamed from `workspaces`):
     sourceIds: string[];         // every task of these sources
     repositories: string[];      // repository ids from the Repos module (GitHub source tasks)
   };
-  workplaceIds: string[];        // workplaces runs of this project may use; the first is the default
-  workflows: string[];           // enabled workflow ids
-  skills: string[];              // enabled skill names
+  workplaceIds: string[];        // workplaces runs of this project may use; the first is the default; empty = every workplace
+  workflows: string[] | null;    // enabled workflow ids; null = all
+  skills: string[] | null;       // enabled skill paths; null = all
   routing: Routing;              // same shape as workflows/routing.json today
-  engines: { default: string; allowed: string[] };
+  engines: { default: string | null; allowed: string[] | null };  // default = fallback for a step whose engine is not allowed
   vars: Record<string, string>;  // e.g. { "test_command": "pnpm typecheck && pnpm test" }
 }
 ```
@@ -126,6 +126,7 @@ project. Otherwise the session stays in "Not in a project".
 - **Top bar:** a project picker (All / each project). The choice is kept in local storage and sent with every API call
   as `?project=<slug>`. Tasks, Runs and Agents filter by it. Workflows and Skills mark which items the project
   enables. In "All", every row shows the project's color dot.
+- **API names:** a task's project is `projectSlug`/`projectId`; the list filter for the Jira key is `board` (the old `project`), and `project=<slug>` filters tasks, runs and agent sessions. `GET/PUT /workflow-routing?project=<slug>` reads and saves a project's routing (the default project when omitted).
 - **`/projects`:** one card per project with tasks in progress, tasks waiting for you, and recent failed runs.
 - **`/projects/:slug`:** an Overview tab (the counts above and the list of gates waiting for you) and a Settings tab
   (rules, workplaces, enabled workflows and skills, routing, engines, variables).
@@ -138,9 +139,9 @@ One migration, safe to run twice:
 
 1. rename `workspaces` → `projects` and the `workspace_id` columns → `project_id`; add the new columns;
 2. give every existing row a slug, a color and empty settings; mark the oldest row as the default project;
-3. fill the default project's `routing` from `workflows/routing.json`, its `workflows` and `skills` with everything
-   that exists, its `workplaceIds` with every workplace, and its `rules.jiraKeys` with the Jira keys listed on
-   workplaces.
+3. at the first start after the migration, fill the default project's `routing` from `workflows/routing.json` and its
+   `rules.jiraKeys` with the Jira keys listed on workplaces (its workflows, skills and workplaces stay "all"). Tasks that
+   were already in a non-default project, and local tasks, are pinned where they are.
 
 On the first start after the migration, every unpinned task is resolved again against the rules.
 

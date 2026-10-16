@@ -7,6 +7,7 @@ import { TasksService } from '@tesserax/mod-tasks';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';
 import { prepareAgent } from './executors';
+import { projectSkills } from './project-skills';
 import type { NodeContext } from './executors/types';
 import { SkillCatalog } from '@tesserax/mod-skills';
 
@@ -51,7 +52,8 @@ export class HandoffService {
       const task = await this.tasks.getTask(run.task_id);
       if (!task) throw new Error('Task not found');
       const ctx: NodeContext = {
-        engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: this.skills, appConfig: this.config,
+        engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: projectSkills(this.skills, run.project_id ? await this.engine.projects.get(run.project_id) : null), appConfig: this.config,
+        projectVars: ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {},
         run, nodeRun: nr, node, config: nodeConfigSchemas['agent.run'].parse(node.config), task,
         artifacts: await this.engine.latestArtifacts(runId), feedback: ((nr.input ?? {}) as { feedback?: string }).feedback ?? null,
       };

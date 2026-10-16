@@ -15,7 +15,7 @@ async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?
   return {
     task: ctx.task, artifacts: ctx.artifacts, feedback: ctx.feedback,
     branch: extra.branch ?? ctx.run.branch, baseRef: extra.baseRef ?? ctx.run.base_ref, worktreePath: extra.worktree ?? ctx.run.worktree_path,
-    repoPath: extra.repoPath ?? ctx.run.repo_path, diff: extra.diff,
+    repoPath: extra.repoPath ?? ctx.run.repo_path, diff: extra.diff, projectVars: ctx.projectVars,
   };
 }
 

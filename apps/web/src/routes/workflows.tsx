@@ -10,8 +10,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { useProjectScope } from '@/lib/project-context';
 
 export function WorkflowsPage() {
+  const scope = useProjectScope();
   const q = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string; hash: string; problems: string[] }[]>('/api/workflows') });
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -44,20 +46,21 @@ export function WorkflowsPage() {
           {create.error && <span className="text-red-600">{(create.error as Error).message}</span>}
         </CardContent>
       </Card>
-      {q.data && <RoutingEditor workflows={q.data.map(w => ({ id: w.id, name: w.name }))} />}
+      {q.data && <RoutingEditor key={scope.selected} project={scope.selected} workflows={q.data.map(w => ({ id: w.id, name: w.name }))} />}
     </Page>
   );
 }
 
-/** workflows/routing.json: which workflow a ticket starts; first matching rule wins (Jira fields only). */
-function RoutingEditor({ workflows }: { workflows: { id: string; name: string }[] }) {
+/** Routing of the project picked in the top bar (the default project in All): which workflow a ticket starts; first matching rule wins. */
+function RoutingEditor({ workflows, project }: { workflows: { id: string; name: string }[]; project: string }) {
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['wf', 'routing'], queryFn: () => api<WorkflowRouting>('/api/workflow-routing') });
+  const suffix = project ? `?project=${encodeURIComponent(project)}` : '';
+  const q = useQuery({ queryKey: ['wf', 'routing', project], queryFn: () => api<WorkflowRouting>(`/api/workflow-routing${suffix}`) });
   const [draft, setDraft] = useState<WorkflowRouting | null>(null);
   const r = draft ?? q.data;
   const save = useMutation({
-    mutationFn: () => api('/api/workflow-routing', { method: 'PUT', body: JSON.stringify(r) }),
-    onSuccess: () => { setDraft(null); qc.invalidateQueries({ queryKey: ['wf', 'routing'] }); },
+    mutationFn: () => api(`/api/workflow-routing${suffix}`, { method: 'PUT', body: JSON.stringify(r) }),
+    onSuccess: () => { setDraft(null); qc.invalidateQueries({ queryKey: ['wf', 'routing'] }); qc.invalidateQueries({ queryKey: ['projects'] }); },
   });
   if (!r) return null;
   const set = (next: WorkflowRouting) => setDraft(next);

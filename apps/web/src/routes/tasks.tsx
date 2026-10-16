@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertCircle,
   Bookmark,
-  Briefcase,
   Bug,
   Building2,
   CheckSquare,
@@ -18,7 +17,7 @@ import {
   RefreshCw,
   RotateCcw,
   Search,
-  User,
+  Pin,
   X,
 } from 'lucide-react';
 import { TaskDialog } from '@/components/task-dialog';
@@ -33,9 +32,10 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { ProjectDot, useProjectScope } from '@/lib/project-context';
 import { cn, timeAgo } from '@/lib/utils';
 
-const STORAGE_KEY = 'tesserax:tasks-filter';
+const STORAGE_KEY = 'tesserax:tasks-filter-v2';
 
 const CAT = {
   in_progress: { label: 'In progress', variant: 'blue' as const },
@@ -52,9 +52,8 @@ function loadCachedFilters(): TaskQuery {
     if (parsed && typeof parsed === 'object') {
       return {
         q: typeof parsed.q === 'string' && parsed.q ? parsed.q : undefined,
-        project: typeof parsed.project === 'string' && parsed.project ? parsed.project : undefined,
+        board: typeof parsed.board === 'string' && parsed.board ? parsed.board : undefined,
         source: typeof parsed.source === 'string' && parsed.source ? parsed.source : undefined,
-        workspace: typeof parsed.workspace === 'string' && parsed.workspace ? parsed.workspace : undefined,
         statusCategory: ['todo', 'in_progress', 'done'].includes(parsed.statusCategory) ? parsed.statusCategory : undefined,
         includeArchived: parsed.includeArchived === '1' ? '1' : undefined,
         includeDone: parsed.includeDone === '1' ? '1' : undefined,
@@ -173,12 +172,20 @@ export function TasksPage() {
     } catch {}
   };
 
-  const params = new URLSearchParams(Object.entries(f).filter(([, v]) => v) as [string, string][]);
+  const { selected: project, projects } = useProjectScope();
+  const params = new URLSearchParams(Object.entries({ ...f, project }).filter(([, v]) => v) as [string, string][]);
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['tasks', f], queryFn: () => api<TaskList>(`/api/tasks?${params}`), refetchInterval: 30_000 });
+  const q = useQuery({ queryKey: ['tasks', f, project], queryFn: () => api<TaskList>(`/api/tasks?${params}`), refetchInterval: 30_000 });
   const sync = useMutation({
     mutationFn: () => api<{ queued: boolean }>('/api/tasks/sync', { method: 'POST' }),
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
+  });
+  const move = useMutation({
+    mutationFn: ({ id, projectId }: { id: string; projectId: string | null }) => api(`/api/tasks/${id}/project`, { method: 'PATCH', body: JSON.stringify({ projectId }) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+      qc.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
   const [starting, setStarting] = useState<TaskDto | null>(null);
   const runsQ = useQuery({ queryKey: ['wf', 'runs', 'all'], queryFn: () => api<WorkflowRunList>('/api/workflow-runs?status=all'), refetchInterval: 15_000 });
@@ -191,9 +198,8 @@ export function TasksPage() {
   const activeFilterCount = [
     f.q,
     f.source,
-    f.project,
+    f.board,
     f.statusCategory,
-    f.workspace,
     f.includeArchived === '1' ? 'archived' : undefined,
   ].filter(Boolean).length;
 
@@ -204,7 +210,7 @@ export function TasksPage() {
         d?.sources.length
           ? d.sources.map(s => (
               <span key={s.id} className="mr-3">
-                {s.kind} · {s.name} ({s.workspace}): {s.taskCount} open, synced {timeAgo(s.lastSyncedAt)}
+                {s.kind} · {s.name} ({s.projectSlug}): {s.taskCount} open, synced {timeAgo(s.lastSyncedAt)}
                 {s.lastError && <span className="text-red-600"> · last error: {s.lastError}</span>}
               </span>
             ))
@@ -292,15 +298,16 @@ export function TasksPage() {
 
             {/* Project Filter */}
             <Select
-              value={f.project ?? ''}
-              onChange={e => set('project')(e.target.value)}
+              value={f.board ?? ''}
+              onChange={e => set('board')(e.target.value)}
+              title="Jira board (project key)"
               className={cn(
                 'h-8 text-xs font-medium cursor-pointer transition-colors',
-                f.project ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : ''
+                f.board ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : ''
               )}
             >
-              <option value="">📁 All projects ({d?.projects.length ?? 0})</option>
-              {d?.projects.map(p => (
+              <option value="">📁 All boards ({d?.boards.length ?? 0})</option>
+              {d?.boards.map(p => (
                 <option key={p} value={p}>
                   📁 {p}
                 </option>
@@ -320,20 +327,6 @@ export function TasksPage() {
               <option value="in_progress">🔵 In progress</option>
               <option value="todo">⚪ To do</option>
               <option value="done">✅ Done</option>
-            </Select>
-
-            {/* Workspace Filter */}
-            <Select
-              value={f.workspace ?? ''}
-              onChange={e => set('workspace')(e.target.value)}
-              className={cn(
-                'h-8 text-xs font-medium cursor-pointer transition-colors',
-                f.workspace ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : ''
-              )}
-            >
-              <option value="">All workspaces</option>
-              <option value="company">🏢 Company</option>
-              <option value="personal">👤 Personal</option>
             </Select>
 
             {/* Show archived Toggle */}
@@ -393,10 +386,10 @@ export function TasksPage() {
                 </button>
               </span>
             )}
-            {f.workspace && (
+            {f.board && (
               <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[11px] font-medium shadow-2xs">
-                Workspace: <span className="font-semibold text-foreground">{f.workspace}</span>
-                <button type="button" onClick={() => set('workspace')('')} className="ml-0.5 hover:text-destructive cursor-pointer">
+                Board: <span className="font-semibold text-foreground">{f.board}</span>
+                <button type="button" onClick={() => set('board')('')} className="ml-0.5 hover:text-destructive cursor-pointer">
                   <X className="size-3" />
                 </button>
               </span>
@@ -467,10 +460,11 @@ export function TasksPage() {
                             <Laptop className="size-2.5" /> Local
                           </Badge>
                         )}
-                        {t.workspace && (
+                        {!project && (
                           <Badge variant="outline" className="text-[10px] gap-1 px-1.5 py-0 text-muted-foreground">
-                            {t.workspace === 'company' ? <Briefcase className="size-2.5" /> : <User className="size-2.5" />}
-                            {t.workspace}
+                            <ProjectDot color={t.projectColor} name={t.projectSlug} />
+                            {t.projectSlug}
+                            {t.pinned && <Pin className="size-2.5" />}
                           </Badge>
                         )}
                       </div>
@@ -491,7 +485,7 @@ export function TasksPage() {
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       {renderTypeBadge(t.type)}
                       {t.project && (
-                        <Badge variant="slate" className="font-mono text-[10px] font-semibold tracking-wide gap-1 px-1.5 py-0">
+                        <Badge variant="slate" title="Board (Jira project key)" className="font-mono text-[10px] font-semibold tracking-wide gap-1 px-1.5 py-0">
                           <FolderGit2 className="size-2.5 text-muted-foreground" />
                           {t.project}
                         </Badge>
@@ -555,6 +549,15 @@ export function TasksPage() {
                           <Pencil className="size-3" />
                         </Button>
                       )}
+                      <Select
+                        className="h-7 w-24 text-[11px]"
+                        title="Move to project"
+                        value={projects.find(p => p.slug === t.projectSlug)?.id ?? ''}
+                        onChange={e => move.mutate({ id: t.id, projectId: e.target.value || null })}
+                      >
+                        {t.pinned && <option value="">↺ by rules</option>}
+                        {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </Select>
                       <Button size="sm" variant="outline" title="Choose a workflow and start it" onClick={() => setStarting(t)}>
                         <Play className="size-3" />Start
                       </Button>

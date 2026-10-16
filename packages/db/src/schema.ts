@@ -3,17 +3,21 @@ import type { ColumnType, Generated, Insertable, Selectable, Updateable } from '
 type Timestamp = ColumnType<Date, Date | string | undefined, Date | string>;
 type Json = ColumnType<unknown, unknown, unknown>;
 
-export interface WorkspacesTable {
+export interface ProjectsTable {
   id: Generated<string>;
   slug: string;
   name: string;
   kind: 'personal' | 'company';
+  color: Generated<string>;
+  position: Generated<number>;
+  is_default: Generated<boolean>;
+  settings: ColumnType<unknown, unknown | undefined, unknown>;
   created_at: Generated<Date>;
 }
 
 export interface SourcesTable {
   id: Generated<string>;
-  workspace_id: string;
+  project_id: string;
   kind: string; // jira | google_tasks | ...
   name: string;
   config: Json;
@@ -38,6 +42,8 @@ export type AgentSessionStatus = 'running' | 'waiting' | 'idle' | 'ended';
 export interface AgentSessionsTable {
   id: Generated<string>;
   agent_id: string;
+  /** Set from the session's folder (workplace or run worktree); null = not in a project. */
+  project_id: string | null;
   session_id: string;
   cwd: string | null;
   branch: string | null;
@@ -77,7 +83,9 @@ export type TaskStatusCategory = 'todo' | 'in_progress' | 'done';
 
 export interface TasksTable {
   id: Generated<string>;
-  workspace_id: string;
+  project_id: string;
+  /** Moved to this project by hand: sync never moves it. */
+  project_pinned: Generated<boolean>;
   source_id: string;
   external_id: string;
   key: string | null;
@@ -176,6 +184,7 @@ export type NodeRunStatus = 'queued' | 'running' | 'waiting' | 'done' | 'failed'
 export interface WorkflowRunsTable {
   id: Generated<string>;
   task_id: string;
+  project_id: string | null;
   workflow_id: string;
   workflow_hash: string;
   workflow_snapshot: Json;
@@ -257,15 +266,15 @@ export interface Database {
   pipeline_runs: PipelineRunsTable;
   pipeline_events: PipelineEventsTable;
   tasks: TasksTable;
-  workspaces: WorkspacesTable;
+  projects: ProjectsTable;
   sources: SourcesTable;
   agents: AgentsTable;
   agent_sessions: AgentSessionsTable;
   agent_events: AgentEventsTable;
 }
 
-export type Workspace = Selectable<WorkspacesTable>;
-export type NewWorkspace = Insertable<WorkspacesTable>;
+export type ProjectRow = Selectable<ProjectsTable>;
+export type NewProject = Insertable<ProjectsTable>;
 export type Source = Selectable<SourcesTable>;
 export type SourceUpdate = Updateable<SourcesTable>;
 export type AgentSession = Selectable<AgentSessionsTable>;

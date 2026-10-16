@@ -9,12 +9,12 @@ import { api } from '@/lib/api';
 import { WorkplaceInfo, WorkplaceSelect, resolveWorkplace, useRepoRegistry } from '@/components/workplace';
 
 type Issue = ConditionContext['issue'];
-type TaskRef = Issue & { id: string; key: string | null; title: string; source?: string; workplaceId?: string | null };
+type TaskRef = Issue & { projectSlug?: string; id: string; key: string | null; title: string; source?: string; workplaceId?: string | null };
 
-/** The workflows plus the routing rules (workflows/routing.json) that suggest one per task. */
-export function useWorkflowChoices() {
+/** The workflows plus the routing rules of a project that suggest one per task. */
+export function useWorkflowChoices(projectSlug?: string) {
   const workflows = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string }[]>('/api/workflows') });
-  const routing = useQuery({ queryKey: ['wf', 'routing'], queryFn: () => api<WorkflowRouting>('/api/workflow-routing') });
+  const routing = useQuery({ queryKey: ['wf', 'routing', projectSlug ?? ''], queryFn: () => api<WorkflowRouting>(`/api/workflow-routing${projectSlug ? `?project=${encodeURIComponent(projectSlug)}` : ''}`) });
   return { workflows: workflows.data ?? [], routing: routing.data, isLoading: workflows.isLoading || routing.isLoading };
 }
 
@@ -37,7 +37,7 @@ export function WorkflowSelect({ value, onChange, suggested, workflows, classNam
 
 /** "Start workflow" for one task: pick the workflow (the routing rules preselect one), then start. */
 export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose: () => void }) {
-  const { workflows, routing } = useWorkflowChoices();
+  const { workflows, routing } = useWorkflowChoices(task.projectSlug);
   const suggestion = suggestWorkflow(routing, task);
   const [picked, setPicked] = useState<string | null>(null);
   const value = picked ?? suggestion?.id ?? workflows[0]?.id ?? '';

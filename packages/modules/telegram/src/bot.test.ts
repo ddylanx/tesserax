@@ -7,7 +7,7 @@ const botInfo = { id: 1, is_bot: true as const, first_name: 'ot', username: 'ot_
 function setup(allowed: number[]) {
   const sent: { method: string; text?: string }[] = [];
   const bot = createBot('123:abc', allowed, {
-    tasks: async () => ({ jiraConfigured: true, projects: [], sources: [], tasks: [{ id: '1', workspace: 'company', source: 'jira', key: 'PAY-1', title: 'Fix <b>', status: 'In Progress', statusCategory: 'in_progress', priority: null, assignee: null, project: 'PAY', type: null, labels: [], url: 'https://x/browse/PAY-1', dueAt: null, updatedAt: null, archived: false }] }),
+    tasks: async () => ({ jiraConfigured: true, boards: [], sources: [], tasks: [{ id: '1', projectSlug: 'company', source: 'jira', key: 'PAY-1', title: 'Fix <b>', status: 'In Progress', statusCategory: 'in_progress', priority: null, assignee: null, project: 'PAY', type: null, labels: [], url: 'https://x/browse/PAY-1', dueAt: null, updatedAt: null, archived: false }] }),
     agents: async () => ({ sessions: [], counts: {}, lastEventAt: null }),
     mcp: async () => ({ provider: 't', generatedAt: '', servers: [{ id: 'a', name: 'github', client: 'Claude Code', scope: 'user', file: '', transport: 'http', target: '', enabled: true, envKeys: [] }] }),
   }, botInfo as never);
@@ -46,7 +46,7 @@ test('pipeline notices: decision, verify, failed; nothing for other states', asy
   const { formatPipelineNotice } = await import('./format');
   const run = {
     id: 'r1', state: 'awaiting_decision', trigger: 'manual', attempt: 1,
-    task: { id: 't', workspace: 'company', source: 'jira', key: 'DEMO-1', title: 'Login <broken>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
+    task: { id: 't', projectSlug: 'company', source: 'jira', key: 'DEMO-1', title: 'Login <broken>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
     classification: { type: 'bug', automation: 'assisted', playbook: 'investigate-bug', repo: null, confidence: 0.82, reasoning: '' },
     classificationEngine: 'claude-cli', decision: null, playbookId: 'fix-bug', repoPath: null, branch: 'tx/DEMO-1', worktreePath: null,
     agentSessionId: null, result: { exitCode: 0, isError: false, subtype: 'success', summary: '', durationMs: 1, costUsd: 0, numTurns: 1, diff: { files: 2, insertions: 3, deletions: 1, stat: '', untracked: [] }, commits: ['abc x'], signal: 'ok' },
@@ -65,7 +65,7 @@ test('workflow notices: waiting, failed, done link to the run page', async () =>
   const { formatWorkflowNotice } = await import('./format');
   const run = {
     id: 'w1', status: 'waiting', workflowId: 'fix-bug', workflowHash: 'h', trigger: 'manual',
-    task: { id: 't', workspace: 'company', source: 'jira', key: 'DEMO-2', title: 'Pay <fails>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
+    task: { id: 't', projectSlug: 'company', source: 'jira', key: 'DEMO-2', title: 'Pay <fails>', status: null, statusCategory: 'todo', priority: null, assignee: null, project: 'DEMO', type: 'Bug', labels: [], url: null, dueAt: null, updatedAt: null, archived: false },
     currentNodeId: 'review', currentNodeLabel: 'Review plan', repoPath: null, baseRef: null, branch: null, worktreePath: null,
     error: 'quota: limit', costUsd: 0, vars: {}, createdAt: '', updatedAt: '', finishedAt: null,
   } as never;

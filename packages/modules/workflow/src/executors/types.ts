@@ -20,6 +20,8 @@ export interface NodeContext {
   artifacts: Record<string, string>;
   /** Feedback from the gate that sent the work back here, if any. */
   feedback: string | null;
+  /** Variables of the run's project as they were when the run started. */
+  projectVars: Record<string, string>;
 }
 
 export type NodeResult =

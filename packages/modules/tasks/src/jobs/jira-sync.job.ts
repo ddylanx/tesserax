@@ -11,15 +11,15 @@ const log = createLogger('tasks.jira');
 export const jiraCredentials = (c: AppConfig): JiraCredentials | null =>
   c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN ? { site: c.JIRA_BASE_URL, email: c.JIRA_EMAIL, token: c.JIRA_API_TOKEN } : null;
 
-/** Ensures the sources row for this Jira site in the configured workspace. */
-export async function ensureJiraSource(db: Db, config: AppConfig, site: string): Promise<{ id: string; workspace_id: string; last_synced_at: Date | null }> {
-  const ws = await db.selectFrom('workspaces').select('id').where('slug', '=', config.JIRA_WORKSPACE).executeTakeFirstOrThrow();
+/** Ensures the sources row for this Jira site, owned by the configured project (JIRA_WORKSPACE); its tasks are then sorted by the project rules. */
+export async function ensureJiraSource(db: Db, config: AppConfig, site: string): Promise<{ id: string; project_id: string; last_synced_at: Date | null }> {
+  const ws = await db.selectFrom('projects').select('id').where('slug', '=', config.JIRA_WORKSPACE).executeTakeFirstOrThrow();
   return db
     .insertInto('sources')
-    .values({ workspace_id: ws.id, kind: 'jira', name: site, config: JSON.stringify({ site, jql: config.JIRA_JQL ?? null }) })
-    .onConflict(oc => oc.columns(['workspace_id', 'kind', 'name']).doUpdateSet({ config: sql`excluded.config` }))
-    .returning(['id', 'workspace_id', 'last_synced_at'])
-    .executeTakeFirstOrThrow() as Promise<{ id: string; workspace_id: string; last_synced_at: Date | null }>;
+    .values({ project_id: ws.id, kind: 'jira', name: site, config: JSON.stringify({ site, jql: config.JIRA_JQL ?? null }) })
+    .onConflict(oc => oc.columns(['project_id', 'kind', 'name']).doUpdateSet({ config: sql`excluded.config` }))
+    .returning(['id', 'project_id', 'last_synced_at'])
+    .executeTakeFirstOrThrow() as Promise<{ id: string; project_id: string; last_synced_at: Date | null }>;
 }
 
 export interface SyncResult {
@@ -59,7 +59,7 @@ export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fet
     for (let i = 0; i < issues.length; i += 200) {
       const rows = issues.slice(i, i + 200).map(issue => {
         const m = mapIssue(issue, sprintField);
-        return { ...m, workspace_id: source.workspace_id, source_id: source.id, url: client.browseUrl(m.key), synced_at: startedAt, archived_at: null };
+        return { ...m, project_id: source.project_id, source_id: source.id, url: client.browseUrl(m.key), synced_at: startedAt, archived_at: null };
       });
       const cols = ['key', 'title', 'status', 'status_category', 'priority', 'assignee', 'reporter', 'project', 'type', 'labels', 'components',
         'description', 'parent', 'sprint', 'url', 'due_at', 'created_at_source', 'updated_at_source', 'raw', 'synced_at'] as const;

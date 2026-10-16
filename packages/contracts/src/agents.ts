@@ -26,7 +26,11 @@ export const agentSessionSchema = z.object({
   host: z.string(),
   sessionId: z.string(),
   cwd: z.string().nullable(),
+  /** Folder name of the cwd. */
   project: z.string().nullable(),
+  /** The Tesserax project the folder belongs to (workplace or run worktree); null = not in a project. */
+  projectSlug: z.string().nullable().optional(),
+  projectColor: z.string().nullable().optional(),
   branch: z.string().nullable(),
   model: z.string().nullable(),
   permissionMode: z.string().nullable(),

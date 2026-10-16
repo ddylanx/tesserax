@@ -3,13 +3,14 @@ import { sql } from 'kysely';
 import type { AppConfig } from '@tesserax/config';
 import {
   AGENT_EXECUTORS, AI_ENGINES, ENGINE_NODE_TYPES, CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
-  type ConfirmAction, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
+  type ConfirmAction, type ProjectDirectory, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@tesserax/contracts';
-import { CONFIG, DB, QUEUE, WorkContext, createLogger, type Queue } from '@tesserax/core';
+import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, WorkContext, createLogger, type Queue } from '@tesserax/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@tesserax/db';
 import { isAlive, stopProcess } from '@tesserax/agent-runtime';
 import { TasksService } from '@tesserax/mod-tasks';
+import { repoRegistry } from '@tesserax/mod-repos';
 import { RoutingStore, WorkflowStore } from './stores';
 import { ArtifactService } from './artifact.service';
 import { WorkflowQueryService } from './query.service';
@@ -40,6 +41,7 @@ export class WorkflowEngine {
     readonly artifacts: ArtifactService,
     readonly queries: WorkflowQueryService,
     readonly vcs: WorkflowVcsService,
+    @Inject(PROJECT_DIRECTORY) readonly projects: ProjectDirectory,
   ) {}
 
   onRunEvent(fn: RunListener) {
@@ -79,18 +81,25 @@ export class WorkflowEngine {
 
   // ---------- lifecycle ----------
 
-  /** Starts a run; without a workflow id the routing rules (workflows/routing.json) pick one. */
+  /** Starts a run; without a workflow id the routing of the task's project picks one. The project must enable the workflow. */
   async startRun(taskId: string, trigger: 'new_issue' | 'manual', requested?: string): Promise<{ runId: string; created: boolean; workflowId: string }> {
     const task = await this.tasks.getTask(taskId);
     if (!task) throw new Error('Task not found');
-    const workflowId = requested || routeWorkflow(this.routing.read(), task);
+    const project = await this.projects.get(task.projectSlug);
+    if (!project) throw new Error(`Project "${task.projectSlug}" not found`);
+    const workflowId = requested || routeWorkflow(project.settings.routing, task);
+    if (project.settings.workflows && !project.settings.workflows.includes(workflowId)) {
+      throw new Error(`Workflow "${workflowId}" is not enabled in project "${project.name}".`);
+    }
+    await this.assertWorkplace(task, project);
     const { def, hash, problems } = this.workflows.load(workflowId);
     if (problems.length) throw new Error(`Workflow ${workflowId} is invalid: ${problems.join('; ')}`);
     const triggerNode = def.nodes.find(n => n.type === 'trigger.jira')!;
     const inserted = await this.db
       .insertInto('workflow_runs')
       .values({
-        task_id: taskId, workflow_id: def.id, workflow_hash: hash, workflow_snapshot: JSON.stringify(def), trigger,
+        task_id: taskId, project_id: project.id, workflow_id: def.id, workflow_hash: hash, workflow_snapshot: JSON.stringify(def), trigger,
+        vars: JSON.stringify({ project: { slug: project.slug, name: project.name, vars: project.settings.vars } }),
         branch: `tx/${(task.key ?? taskId.slice(0, 8)).replace(/[^A-Za-z0-9._-]+/g, '-')}`,
       })
       .returning('id')
@@ -106,6 +115,18 @@ export class WorkflowEngine {
     await this.event(inserted.id, trigger === 'manual' ? 'user' : 'system', 'run_started', { workflow: def.id, hash });
     await this.enqueue(inserted.id, triggerNode.id, null, {});
     return { runId: inserted.id, created: true, workflowId };
+  }
+
+  /**
+   * A project that lists workplaces only works in those: a workplace picked on the task must be one of them, and a task
+   * that would resolve to another one is pointed at the project's first workplace.
+   */
+  private async assertWorkplace(task: { id: string; project: string | null; workplaceId?: string | null }, project: { name: string; settings: { workplaceIds: string[] } }) {
+    const allowed = project.settings.workplaceIds;
+    if (!allowed.length) return;
+    if (task.workplaceId && !allowed.includes(task.workplaceId)) throw new Error(`Workplace "${task.workplaceId}" is not one of the workplaces of project "${project.name}".`);
+    const resolved = repoRegistry.resolve(task);
+    if (!task.workplaceId && !(resolved?.workplaceId && allowed.includes(resolved.workplaceId))) await this.tasks.setWorkplace(task.id, allowed[0]!);
   }
 
   /**
@@ -370,6 +391,10 @@ export class WorkflowEngine {
     if (!key) throw new RunConflict(`“${node.label}” has no agent to choose.`);
     const allowed: readonly string[] = key === 'engine' ? AI_ENGINES : AGENT_EXECUTORS;
     if (agent !== null && !allowed.includes(agent)) throw new RunConflict(`Pick one of: ${allowed.join(', ')}.`);
+    const project = run.project_id ? await this.projects.get(run.project_id) : null;
+    if (key === 'engine' && agent !== null && project?.settings.engines.allowed && !project.settings.engines.allowed.includes(agent)) {
+      throw new RunConflict(`Project "${project.name}" allows only: ${project.settings.engines.allowed.join(', ')}.`);
+    }
     const live = await this.db.selectFrom('node_runs').select('id').where('run_id', '=', runId).where('node_id', '=', nodeId).where('status', '=', 'running').executeTakeFirst();
     if (live) throw new RunConflict(`“${node.label}” is running now; change the agent after it ends (e.g. before a retry).`);
     const vars = (run.vars ?? {}) as Record<string, unknown>;
@@ -466,8 +491,8 @@ export class WorkflowEngine {
 
   // ---------- reads (delegated) ----------
 
-  listRuns(status?: string): Promise<WorkflowRunList> {
-    return this.queries.listRuns(status);
+  listRuns(status?: string, project?: string): Promise<WorkflowRunList> {
+    return this.queries.listRuns(status, project);
   }
 
   getRun(id: string): Promise<WorkflowRunDto | null> {

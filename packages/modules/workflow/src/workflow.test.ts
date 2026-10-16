@@ -86,7 +86,7 @@ test('skip ports are validated', () => {
 
 test('WorkflowEngine resolves graph and nodes correctly', async () => {
   const { WorkflowEngine } = await import('./engine.service');
-  const engine = new WorkflowEngine({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
+  const engine = new WorkflowEngine({} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any, {} as any);
   const run = { workflow_snapshot: base() };
   assert.equal(engine.graph(run).id, 'x');
   assert.equal(engine.node(run, 't').type, 'trigger.jira');

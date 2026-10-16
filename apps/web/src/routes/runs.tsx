@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { ProjectDot, useProjectScope } from '@/lib/project-context';
 import { timeAgo } from '@/lib/utils';
 
 export const RUN_STATUS: Record<string, { label: string; variant: 'green' | 'amber' | 'blue' | 'red' | 'outline' }> = {
@@ -23,7 +24,8 @@ export function RunsPage() {
   const search = useSearch({ strict: false }) as { status?: string };
   const status = search.status ?? 'waiting';
   const navigate = useNavigate();
-  const q = useQuery({ queryKey: ['wf', 'runs', status], queryFn: () => api<WorkflowRunList>(`/api/workflow-runs?status=${status}`), refetchInterval: 4000 });
+  const { scopeParam, selected: scopeSelected } = useProjectScope();
+  const q = useQuery({ queryKey: ['wf', 'runs', status, scopeParam], queryFn: () => api<WorkflowRunList>(`/api/workflow-runs?status=${status}&${scopeParam}`), refetchInterval: 4000 });
   const counts = q.data?.counts ?? {};
   const runs = q.data?.runs ?? [];
   return (
@@ -46,7 +48,7 @@ export function RunsPage() {
               {runs.map(r => (
                 <Tr key={r.id}>
                   <Td>
-                    <Link to="/runs/$runId" params={{ runId: r.id }} className="font-medium hover:underline">{r.task.key}</Link>
+                    <span className="inline-flex items-center gap-1.5">{!scopeSelected && <ProjectDot color={r.task.projectColor} name={r.task.projectSlug} />}<Link to="/runs/$runId" params={{ runId: r.id }} className="font-medium hover:underline">{r.task.key}</Link></span>
                     <div className="max-w-md truncate text-xs text-muted-foreground">{r.task.title}</div>
                   </Td>
                   <Td className="text-xs">{r.workflowId}</Td>
