@@ -38,6 +38,12 @@ export const taskQuerySchema = z.object({
   q: z.string().optional(),
   includeDone: z.enum(['0', '1']).optional(),
   includeArchived: z.enum(['0', '1']).optional(),
+  /** ISO date-time: only tasks with updated_at_source >= it. */
+  updatedSince: z.iso.datetime({ offset: true }).optional(),
+  /** Page size; when set, the list is paged by updatedAt (newest first). 1–500. */
+  limit: z.coerce.number().int().min(1).max(500).optional(),
+  /** Opaque cursor: nextCursor of the previous page. */
+  cursor: z.string().max(300).optional(),
 });
 export type TaskQuery = z.infer<typeof taskQuerySchema>;
 
@@ -57,6 +63,8 @@ export const taskListSchema = z.object({
   boards: z.array(z.string()),
   sources: z.array(taskSourceSchema),
   jiraConfigured: z.boolean(),
+  /** Next page; null on the last page or when not paged. */
+  nextCursor: z.string().nullable(),
 });
 export type TaskList = z.infer<typeof taskListSchema>;
 

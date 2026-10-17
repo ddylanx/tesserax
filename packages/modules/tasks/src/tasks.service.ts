@@ -7,6 +7,7 @@ import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, type Queue } from '@tesserax/core
 import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
 import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
+import { decodeCursor, encodeCursor, type TaskCursor } from './cursor';
 
 export type NewTasksListener = (taskIds: string[]) => Promise<void>;
 
@@ -23,27 +24,77 @@ export class TasksService {
     @Inject(PROJECT_DIRECTORY) private readonly projects: ProjectDirectory,
   ) {}
 
-  async list(f: TaskQuery, limit = 500): Promise<TaskList> {
+  async list(f: TaskQuery, cursor?: TaskCursor | null): Promise<TaskList> {
+    const isPaged = f.limit !== undefined || f.cursor !== undefined;
     let q = this.db
       .selectFrom('tasks as t')
       .innerJoin('projects as w', 'w.id', 't.project_id')
       .innerJoin('sources as s', 's.id', 't.source_id')
       .selectAll('t')
-      .select(['w.slug as project_slug', 'w.color as project_color', 's.kind as source'])
-      .orderBy(sql`case t.status_category when 'in_progress' then 0 when 'todo' then 1 else 2 end`)
-      .orderBy('t.updated_at_source', sql`desc nulls last` as never)
-      .limit(limit);
+      .select(['w.slug as project_slug', 'w.color as project_color', 's.kind as source']);
+
+    const pageSize = f.limit ?? 50;
+    if (isPaged) {
+      q = q
+        .orderBy('t.updated_at_source', sql`desc nulls last` as never)
+        .orderBy('t.id', 'desc')
+        .limit(pageSize + 1);
+    } else {
+      q = q
+        .orderBy(sql`case t.status_category when 'in_progress' then 0 when 'todo' then 1 else 2 end`)
+        .orderBy('t.updated_at_source', sql`desc nulls last` as never)
+        .limit(500);
+    }
+
     if (f.project) q = q.where('w.slug', '=', f.project);
     if (f.source) q = q.where('s.kind', '=', f.source);
     if (f.statusCategory) q = q.where('t.status_category', '=', f.statusCategory);
     else if (f.includeDone !== '1') q = q.where('t.status_category', '!=', 'done');
     if (f.board) q = q.where('t.project', '=', f.board);
     if (f.includeArchived !== '1') q = q.where('t.archived_at', 'is', null);
+    if (f.updatedSince) q = q.where('t.updated_at_source', '>=', new Date(f.updatedSince));
     if (f.q) {
       const like = `%${f.q.replace(/[%_\\]/g, '\\$&')}%`;
       q = q.where(eb => eb.or([eb('t.title', 'ilike', like), eb('t.key', 'ilike', like), eb('t.assignee', 'ilike', like)]));
     }
-    const rows = await q.execute();
+
+    const c = cursor !== undefined ? cursor : (f.cursor ? decodeCursor(f.cursor) : null);
+    if (c) {
+      if (c.u !== null) {
+        const uDate = new Date(c.u);
+        q = q.where(eb =>
+          eb.or([
+            eb('t.updated_at_source', '<', uDate),
+            eb.and([
+              eb('t.updated_at_source', '=', uDate),
+              eb('t.id', '<', c.id),
+            ]),
+            eb('t.updated_at_source', 'is', null),
+          ]),
+        );
+      } else {
+        q = q.where(eb =>
+          eb.and([
+            eb('t.updated_at_source', 'is', null),
+            eb('t.id', '<', c.id),
+          ]),
+        );
+      }
+    }
+
+    const rawRows = await q.execute();
+    let rows = rawRows;
+    let nextCursor: string | null = null;
+    if (isPaged && rawRows.length > pageSize) {
+      rows = rawRows.slice(0, pageSize);
+      const last = rows[rows.length - 1];
+      if (last) {
+        nextCursor = encodeCursor({
+          u: iso(last.updated_at_source),
+          id: last.id,
+        });
+      }
+    }
 
     const boards = await this.db.selectFrom('tasks').select('project').distinct().where('project', 'is not', null).orderBy('project').execute();
     const sources = await this.db
@@ -62,6 +113,7 @@ export class TasksService {
         lastSyncedAt: iso(s.last_synced_at), lastError: s.last_error, taskCount: s.n,
       })),
       tasks: rows.map(r => this.toDto(r)),
+      nextCursor,
     };
   }
 

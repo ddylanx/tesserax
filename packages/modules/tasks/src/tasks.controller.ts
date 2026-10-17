@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, updateTaskStatusSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { TasksService } from './tasks.service';
+import { decodeCursor, type TaskCursor } from './cursor';
 
 @Controller('tasks')
 export class TasksController {
@@ -10,7 +11,12 @@ export class TasksController {
   list(@Query() query: Record<string, string>): Promise<TaskList> {
     const parsed = taskQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues);
-    return this.tasks.list(parsed.data);
+    let cursor: TaskCursor | null = null;
+    if (parsed.data.cursor) {
+      cursor = decodeCursor(parsed.data.cursor);
+      if (!cursor) throw new BadRequestException('Invalid cursor');
+    }
+    return this.tasks.list(parsed.data, cursor);
   }
 
   @Get(':id')
