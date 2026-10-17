@@ -9,10 +9,12 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@tesserax/contracts": "workspace:*",
-    "@tesserax/mod-skills": "workspace:*",
+    "@atlaskit/pragmatic-drag-and-drop": "^4.0.0",
+    "@atlaskit/pragmatic-drag-and-drop-auto-scroll": "^3.2.1",
     "@tanstack/react-query": "^5.85.0",
     "@tanstack/react-router": "^1.131.0",
+    "@tesserax/contracts": "workspace:*",
+    "@tesserax/mod-skills": "workspace:*",
     "@xyflow/react": "^12.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
