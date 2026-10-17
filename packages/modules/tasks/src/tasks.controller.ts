@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
+import { createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, updateTaskStatusSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -33,6 +33,16 @@ export class TasksController {
     const parsed = updateLocalTaskSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
     return this.tasks.updateLocal(id, parsed.data).catch(e => {
+      throw new BadRequestException((e as Error).message);
+    });
+  }
+
+  /** Update task status (To Do, In Progress, Done). Local tasks only; Jira tasks are read-only. */
+  @Patch(':id/status')
+  async setStatus(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown): Promise<TaskDetailDto> {
+    const parsed = updateTaskStatusSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    return this.tasks.updateStatus(id, parsed.data).catch(e => {
       throw new BadRequestException((e as Error).message);
     });
   }

@@ -5,12 +5,14 @@ import {
   Bug,
   Building2,
   CheckSquare,
+  ChevronDown,
   ExternalLink,
   Filter,
   Flame,
   FolderGit2,
   GitPullRequest,
   Laptop,
+  Lock,
   Pencil,
   Play,
   Plus,
@@ -185,6 +187,35 @@ export function TasksPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['tasks'] });
       qc.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+  const updateStatus = useMutation({
+    mutationFn: ({ id, statusCategory }: { id: string; statusCategory: 'todo' | 'in_progress' | 'done' }) =>
+      api<TaskDetailDto>(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ statusCategory }),
+      }),
+    onMutate: async ({ id, statusCategory }) => {
+      await qc.cancelQueries({ queryKey: ['tasks'] });
+      const prev = qc.getQueryData<TaskList>(['tasks', f, project]);
+      if (prev) {
+        const statusNames = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' } as const;
+        qc.setQueryData<TaskList>(['tasks', f, project], {
+          ...prev,
+          tasks: prev.tasks.map(task =>
+            task.id === id ? { ...task, statusCategory, status: statusNames[statusCategory] } : task
+          ),
+        });
+      }
+      return { prev };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.prev) {
+        qc.setQueryData(['tasks', f, project], context.prev);
+      }
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
     },
   });
   const [starting, setStarting] = useState<TaskDto | null>(null);
@@ -423,7 +454,7 @@ export function TasksPage() {
               <Tr>
                 <Th className="w-[140px]">Key & Source</Th>
                 <Th>Task</Th>
-                <Th className="w-[140px]">Status</Th>
+                <Th className="w-[150px]">Status</Th>
                 <Th className="w-[100px]">Priority</Th>
                 <Th className="w-[130px]">Assignee</Th>
                 <Th className="w-[110px]">Due</Th>
@@ -512,9 +543,50 @@ export function TasksPage() {
                     )}
                   </Td>
 
-                  {/* Status Badge Column */}
+                  {/* Status Column */}
                   <Td className="align-top whitespace-nowrap">
-                    {renderStatusBadge(t.statusCategory, t.status)}
+                    {t.source === 'local' ? (
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="relative inline-flex items-center">
+                          <select
+                            value={t.statusCategory}
+                            disabled={updateStatus.isPending && updateStatus.variables?.id === t.id}
+                            onChange={e => updateStatus.mutate({ id: t.id, statusCategory: e.target.value as 'todo' | 'in_progress' | 'done' })}
+                            className={cn(
+                              'appearance-none cursor-pointer rounded-md border text-xs font-semibold py-0.5 pl-5 pr-5 outline-none transition-colors shadow-2xs',
+                              t.statusCategory === 'in_progress' && 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400 hover:bg-sky-500/20',
+                              t.statusCategory === 'done' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20',
+                              t.statusCategory === 'todo' && 'border-border bg-muted/70 text-foreground hover:bg-muted'
+                            )}
+                            title="Click to update local task status"
+                          >
+                            <option value="todo">To Do</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="done">Done</option>
+                          </select>
+                          <span
+                            className={cn(
+                              'pointer-events-none absolute left-2 size-1.5 rounded-full',
+                              t.statusCategory === 'in_progress' && 'bg-sky-500 animate-pulse',
+                              t.statusCategory === 'done' && 'bg-emerald-500',
+                              t.statusCategory === 'todo' && 'bg-muted-foreground/60'
+                            )}
+                          />
+                          <ChevronDown className="pointer-events-none absolute right-1.5 size-3 opacity-60" />
+                        </div>
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-medium">Local status</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-start gap-1">
+                        <div className="inline-flex items-center gap-1.5" title="Synced from Jira Cloud (Read-only)">
+                          {renderStatusBadge(t.statusCategory, t.status)}
+                          <span className="text-muted-foreground/60" title="Synced from Jira (Read-only)">
+                            <Lock className="size-2.5" />
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground/70 font-mono tracking-tight">Jira status</span>
+                      </div>
+                    )}
                   </Td>
 
                   {/* Priority Badge Column */}

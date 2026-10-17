@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { jiraConfigured, type AppConfig } from '@tesserax/config';
 import { randomUUID } from 'node:crypto';
-import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
+import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask, type UpdateTaskStatus } from '@tesserax/contracts';
 import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
@@ -223,6 +223,31 @@ export class TasksService {
         ...(input.review !== undefined ? { review: input.review ? JSON.stringify(input.review) : null } : {}),
         ...(input.workplaceId !== undefined ? { workplace_id: input.workplaceId } : {}),
         ...(input.statusCategory ? { status_category: input.statusCategory, status: statusName[input.statusCategory] } : {}),
+        updated_at_source: new Date(),
+      })
+      .where('id', '=', id)
+      .execute();
+    return (await this.getTask(id))!;
+  }
+
+  async updateStatus(id: string, input: UpdateTaskStatus): Promise<TaskDetailDto> {
+    const t = await this.db
+      .selectFrom('tasks as t')
+      .innerJoin('sources as s', 's.id', 't.source_id')
+      .select(['t.id', 's.kind'])
+      .where('t.id', '=', id)
+      .executeTakeFirst();
+    if (!t) throw new Error('Task not found');
+    if (t.kind !== 'local') {
+      throw new Error('Jira task status is synchronized from Jira Cloud and cannot be updated locally.');
+    }
+    const statusName = { todo: 'To Do', in_progress: 'In Progress', done: 'Done' } as const;
+    const status = input.status?.trim() || statusName[input.statusCategory];
+    await this.db
+      .updateTable('tasks')
+      .set({
+        status_category: input.statusCategory,
+        status,
         updated_at_source: new Date(),
       })
       .where('id', '=', id)

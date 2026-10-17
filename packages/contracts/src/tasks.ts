@@ -93,6 +93,12 @@ export const updateLocalTaskSchema = createLocalTaskSchema
   .extend({ statusCategory: z.enum(['todo', 'in_progress', 'done']).optional(), review: reviewTargetSchema.nullable().optional() });
 export type UpdateLocalTask = z.infer<typeof updateLocalTaskSchema>;
 
+export const updateTaskStatusSchema = z.object({
+  statusCategory: taskStatusCategorySchema,
+  status: z.string().min(1).max(100).optional(),
+});
+export type UpdateTaskStatus = z.infer<typeof updateTaskStatusSchema>;
+
 export const taskDetailSchema = taskSchema.extend({
   description: z.string().nullable(),
   reporter: z.string().nullable(),
