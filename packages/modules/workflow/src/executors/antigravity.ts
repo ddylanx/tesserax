@@ -137,7 +137,13 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
 export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir: string; prompt: string; model?: string }): number {
   mkdirSync(o.runDir, { recursive: true });
   writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt, 'accept-edits'), { mode: 0o600 });
-  const args = ['--mode', 'accept-edits', '--output-format', 'stream-json', ...(o.model ? ['--model', o.model] : [])];
+  const git = gitCommonDir(o.cwd);
+  const args = [
+    '--mode', 'accept-edits',
+    '--output-format', 'stream-json',
+    ...(o.model ? ['--model', o.model] : []),
+    ...(git ? ['--add-dir', git] : []),
+  ];
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
   const script = '"$TESSERAX_BIN" "$@" "--print=$(cat "$TESSERAX_RUN_DIR/prompt.md")" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';
   const child = spawn('/bin/sh', ['-c', script, 'ot-run', ...args], {

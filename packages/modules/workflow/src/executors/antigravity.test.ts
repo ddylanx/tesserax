@@ -1,7 +1,8 @@
 import { strict as assert } from 'node:assert';
+import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { allowedCommands, antigravityArgs, antigravitySignal, parseAntigravity, runAntigravity, withToolHint } from './antigravity';
+import { allowedCommands, antigravityArgs, antigravitySignal, launchAntigravityDetached, parseAntigravity, runAntigravity, withToolHint } from './antigravity';
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readLiveLog, renderLiveLog } from './livelog';
@@ -68,3 +69,15 @@ test('antigravity: the prompt lists the shell commands its settings allow', () =
   assert.match(hint, /edit files inside the working folder/);
   assert.match(withToolHint('x', 'plan', []), /Shell commands are not available/);
 });
+
+test('launchAntigravityDetached includes gitCommonDir in args when run in git repo/worktree', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'agy-detached-'));
+  const workDir = mkdtempSync(join(tmpdir(), 'agy-work-'));
+  execFileSync('git', ['init'], { cwd: workDir, stdio: 'ignore' });
+  const pid = launchAntigravityDetached({ bin: FAKE, cwd: workDir, runDir: dir, prompt: 'hello' });
+  assert.ok(pid > 0);
+  const cmd = JSON.parse(readFileSync(join(dir, 'command.json'), 'utf8'));
+  assert.equal(cmd.engine, 'antigravity');
+  assert.ok(cmd.args.includes('--add-dir'));
+});
+
