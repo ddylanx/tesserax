@@ -19,7 +19,7 @@ ordering inside a column, swimlanes, WIP limits, live updates over SSE, starting
 | 2 | Which drag-and-drop library? | `@atlaskit/pragmatic-drag-and-drop` (Apache-2.0, actively maintained, small core), with its `auto-scroll` and `hitbox` add-ons (Apache-2.0). `@dnd-kit/core` has had no release since 12/2024 and its successor `@dnd-kit/react` is still 0.x. |
 | 3 | Which columns? | To do / In progress / In review / Done. |
 | 4 | Where does a card's column come from? | An active run decides first (see the table below), else the task's `status_category`. |
-| 5 | Which cards can be dragged? | Local tasks with no active run. Jira tasks are read-only (their status comes from Jira sync) and show a lock. |
+| 5 | Which cards can be dragged? | Local tasks whose latest run is not running or waiting (a failed run does not block, so the task can still be closed). Jira tasks are read-only (their status comes from Jira sync) and show a lock. |
 | 6 | Order inside a column | Priority (highest first), then `updated_at_source` (newest first). No manual ordering yet, so no new column. |
 | 7 | How much "Done" to load? | Done tasks updated in the last 14 days, 50 at a time with "Load more". To do and In progress load in full, as the list does today. |
 | 8 | Refresh | Polling as on the Tasks page today (tasks 30 s, runs 15 s) plus a refetch after every drop. |
@@ -30,8 +30,8 @@ FSL-1.1-ALv2, not open source, so none of its code is copied here.
 ### Column of a card
 
 Computed by one pure function, `boardColumn(task, activeRun)`, in `@tesserax/contracts` so the web app and tests share
-it. `activeRun` is the task's latest run when its status is `running`, `waiting` or `failed` (the same set the Tasks
-page already uses).
+it. `activeRun` is the task's latest run (by `createdAt`) when its status is `running`, `waiting` or `failed`; a task whose
+latest run is done or cancelled has no active run.
 
 | Active run | Column | Card badge |
 |---|---|---|
@@ -74,7 +74,7 @@ A drop calls the existing `PATCH /api/tasks/:id/status` with the target column's
 **Open the board.** On the Tasks page a "List / Board" switch picks the view; the choice is kept in local storage with
 the other filters. Filters, search and the project picker apply to both views.
 
-**Drag a card.** Only a local task with no active run can be picked up. Valid drop targets are To do, In progress and
+**Drag a card.** Only a local task whose latest run is not running or waiting can be picked up. Valid drop targets are To do, In progress and
 Done; In review and the card's own column are not highlighted. On drop the card moves at once (optimistic update),
 the status request is sent, and the task list is refetched. If the request fails, the card goes back and a toast shows
 the error.
@@ -88,8 +88,8 @@ progress / Done) that calls the same endpoint, so the board works by keyboard an
 ## UI
 
 - **Card:** Jira key or "Local", title (two lines max), type and priority badges (the ones the list already uses),
-  assignee, project color dot in "All", run badge, lock icon on Jira tasks. Clicking the card opens the existing task
-  dialog.
+  assignee, project color dot in "All", run badge, lock icon on Jira tasks. Clicking a local card opens the existing task
+  dialog; clicking a Jira card opens the issue in Jira in a new tab.
 - **Column header:** name and count; Done shows "last 14 days" and a "Load more" button at the bottom.
 - **Layout:** four equal columns that scroll vertically on their own; the page scrolls horizontally on narrow screens.
   Auto-scroll while dragging near a column edge.
