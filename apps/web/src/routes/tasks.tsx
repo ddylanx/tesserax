@@ -38,7 +38,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { ProjectDot, useProjectScope } from '@/lib/project-context';
 import { cn, timeAgo } from '@/lib/utils';
 import { TaskBoard } from '@/components/task-board';
@@ -253,11 +253,22 @@ export function TasksPage() {
 
   const [boardError, setBoardError] = useState<string | null>(null);
   const moveBoardTask = useMutation({
-    mutationFn: ({ id, statusCategory }: { id: string; statusCategory: DroppableColumn; task?: TaskDto }) =>
-      api<TaskDetailDto>(`/api/tasks/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ statusCategory }),
-      }),
+    mutationFn: async ({ id, statusCategory }: { id: string; statusCategory: DroppableColumn; task?: TaskDto }) => {
+      try {
+        return await api<TaskDetailDto>(`/api/tasks/${id}/status`, {
+          method: 'PATCH',
+          body: JSON.stringify({ statusCategory }),
+        });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 404) {
+          return await api<TaskDetailDto>(`/api/tasks/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify({ statusCategory }),
+          });
+        }
+        throw err;
+      }
+    },
     onMutate: async ({ id, statusCategory, task }) => {
       setBoardError(null);
       await qc.cancelQueries({ queryKey: ['tasks'] });
