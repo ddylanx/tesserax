@@ -1,17 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type InfiniteData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  AlertCircle,
-  Bookmark,
-  Bug,
   Building2,
-  CheckSquare,
   ChevronDown,
+  Columns3,
   ExternalLink,
   Filter,
-  Flame,
   FolderGit2,
-  GitPullRequest,
   Laptop,
+  List,
   Lock,
   Pencil,
   Play,
@@ -25,8 +21,17 @@ import {
 import { TaskDialog } from '@/components/task-dialog';
 import { StartWorkflowDialog } from '@/components/workflow-picker';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
-import type { TaskDetailDto, TaskDto, TaskList, TaskQuery, WorkflowRunList } from '@tesserax/contracts';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  activeRun,
+  latestRunByTask,
+  type DroppableColumn,
+  type TaskDetailDto,
+  type TaskDto,
+  type TaskList,
+  type TaskQuery,
+  type WorkflowRunList,
+} from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -36,8 +41,22 @@ import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { ProjectDot, useProjectScope } from '@/lib/project-context';
 import { cn, timeAgo } from '@/lib/utils';
+import { TaskBoard } from '@/components/task-board';
+import { renderPriorityBadge, renderTypeBadge } from '@/components/task-badges';
 
 const STORAGE_KEY = 'tesserax:tasks-filter-v2';
+const VIEW_STORAGE_KEY = 'tesserax:tasks-view';
+
+function loadCachedView(): 'list' | 'board' {
+  if (typeof window === 'undefined') return 'list';
+  try {
+    const raw = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (raw === 'board' || raw === 'list') return raw;
+  } catch {
+    /* ignore storage issues */
+  }
+  return 'list';
+}
 
 const CAT = {
   in_progress: { label: 'In progress', variant: 'blue' as const },
@@ -67,63 +86,6 @@ function loadCachedFilters(): TaskQuery {
   return {};
 }
 
-function renderTypeBadge(type: string | null) {
-  if (!type) return null;
-  const t = type.toLowerCase();
-  if (t === 'bug') {
-    return (
-      <Badge variant="red" className="text-[10px] font-medium gap-1 px-1.5 py-0">
-        <Bug className="size-2.5" /> Bug
-      </Badge>
-    );
-  }
-  if (t === 'story') {
-    return (
-      <Badge variant="green" className="text-[10px] font-medium gap-1 px-1.5 py-0">
-        <Bookmark className="size-2.5" /> Story
-      </Badge>
-    );
-  }
-  if (t === 'code review') {
-    return (
-      <Badge variant="purple" className="text-[10px] font-medium gap-1 px-1.5 py-0">
-        <GitPullRequest className="size-2.5" /> Review
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="slate" className="text-[10px] font-medium gap-1 px-1.5 py-0">
-      <CheckSquare className="size-2.5" /> {type}
-    </Badge>
-  );
-}
-
-function renderPriorityBadge(priority: string | null) {
-  if (!priority) return <span className="text-xs text-muted-foreground">–</span>;
-  const p = priority.toLowerCase();
-  if (p.includes('high') || p.includes('crit') || p.includes('block')) {
-    return (
-      <Badge variant="red" className="text-[11px] font-semibold gap-1 px-1.5 py-0.5">
-        <Flame className="size-3 text-rose-500" />
-        {priority}
-      </Badge>
-    );
-  }
-  if (p.includes('med')) {
-    return (
-      <Badge variant="amber" className="text-[11px] font-medium gap-1 px-1.5 py-0.5">
-        <AlertCircle className="size-3 text-amber-500" />
-        {priority}
-      </Badge>
-    );
-  }
-  return (
-    <Badge variant="outline" className="text-[11px] text-muted-foreground px-1.5 py-0.5">
-      {priority}
-    </Badge>
-  );
-}
-
 function renderStatusBadge(statusCategory: 'todo' | 'in_progress' | 'done', statusName: string | null) {
   if (statusCategory === 'in_progress') {
     return (
@@ -150,6 +112,14 @@ function renderStatusBadge(statusCategory: 'todo' | 'in_progress' | 'done', stat
 }
 
 export function TasksPage() {
+  const [view, setView] = useState<'list' | 'board'>(loadCachedView);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, view);
+    } catch {}
+  }, [view]);
+
   const [f, setF] = useState<TaskQuery>(loadCachedFilters);
   const set = (k: keyof TaskQuery) => (v: string) => setF(prev => ({ ...prev, [k]: v || undefined }));
 
@@ -175,9 +145,71 @@ export function TasksPage() {
   };
 
   const { selected: project, projects } = useProjectScope();
-  const params = new URLSearchParams(Object.entries({ ...f, project }).filter(([, v]) => v) as [string, string][]);
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ['tasks', f, project], queryFn: () => api<TaskList>(`/api/tasks?${params}`), refetchInterval: 30_000 });
+
+  // List view query
+  const params = new URLSearchParams(Object.entries({ ...f, project }).filter(([, v]) => v) as [string, string][]);
+  const q = useQuery({
+    queryKey: ['tasks', f, project],
+    queryFn: () => api<TaskList>(`/api/tasks?${params}`),
+    refetchInterval: 30_000,
+    enabled: view === 'list',
+  });
+
+  // Board view queries
+  const { statusCategory: _sc, includeDone: _id, ...boardFilters } = f;
+  const boardOpenParams = new URLSearchParams(
+    Object.entries({ ...boardFilters, project }).filter(([, v]) => v) as [string, string][],
+  );
+  const boardOpenQ = useQuery({
+    queryKey: ['tasks', 'board-open', boardFilters, project],
+    queryFn: () => api<TaskList>(`/api/tasks?${boardOpenParams}`),
+    refetchInterval: 30_000,
+    enabled: view === 'board',
+  });
+
+  const [doneUpdatedSince] = useState(() => new Date(Date.now() - 14 * 864e5).toISOString());
+  const boardDoneQ = useInfiniteQuery({
+    queryKey: ['tasks', 'board-done', boardFilters, project],
+    queryFn: ({ pageParam }) => {
+      const p = new URLSearchParams(
+        Object.entries({
+          ...boardFilters,
+          project,
+          statusCategory: 'done',
+          updatedSince: doneUpdatedSince,
+          limit: '50',
+          cursor: pageParam ?? undefined,
+        }).filter(([, v]) => v) as [string, string][],
+      );
+      return api<TaskList>(`/api/tasks?${p}`);
+    },
+    initialPageParam: null as string | null,
+    getNextPageParam: last => last.nextCursor ?? undefined,
+    refetchInterval: 30_000,
+    enabled: view === 'board',
+  });
+
+  const boardTasks = useMemo(() => {
+    const openTasks = boardOpenQ.data?.tasks ?? [];
+    const doneTasks = boardDoneQ.data?.pages.flatMap(p => p.tasks) ?? [];
+    const seen = new Set<string>();
+    const combined: TaskDto[] = [];
+    for (const t of openTasks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        combined.push(t);
+      }
+    }
+    for (const t of doneTasks) {
+      if (!seen.has(t.id)) {
+        seen.add(t.id);
+        combined.push(t);
+      }
+    }
+    return combined;
+  }, [boardOpenQ.data?.tasks, boardDoneQ.data?.pages]);
+
   const sync = useMutation({
     mutationFn: () => api<{ queued: boolean }>('/api/tasks/sync', { method: 'POST' }),
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
@@ -218,19 +250,134 @@ export function TasksPage() {
       qc.invalidateQueries({ queryKey: ['tasks'] });
     },
   });
+
+  const [boardError, setBoardError] = useState<string | null>(null);
+  const moveBoardTask = useMutation({
+    mutationFn: ({ id, statusCategory }: { id: string; statusCategory: DroppableColumn; task?: TaskDto }) =>
+      api<TaskDetailDto>(`/api/tasks/${id}/status`, {
+        method: 'PATCH',
+        body: JSON.stringify({ statusCategory }),
+      }),
+    onMutate: async ({ id, statusCategory, task }) => {
+      setBoardError(null);
+      await qc.cancelQueries({ queryKey: ['tasks'] });
+
+      const openKey = ['tasks', 'board-open', boardFilters, project];
+      const doneKey = ['tasks', 'board-done', boardFilters, project];
+
+      const prevOpen = qc.getQueryData<TaskList>(openKey);
+      const prevDone = qc.getQueryData<InfiniteData<TaskList, string | null>>(doneKey);
+
+      let foundTask = task ?? prevOpen?.tasks.find(t => t.id === id);
+      if (!foundTask && prevDone) {
+        for (const page of prevDone.pages) {
+          const t = page.tasks.find(x => x.id === id);
+          if (t) {
+            foundTask = t;
+            break;
+          }
+        }
+      }
+
+      if (foundTask) {
+        const statusLabels: Record<DroppableColumn, string> = {
+          todo: 'To Do',
+          in_progress: 'In Progress',
+          done: 'Done',
+        };
+        const nowIso = new Date().toISOString();
+
+        if (statusCategory === 'todo' || statusCategory === 'in_progress') {
+          const updatedTask: TaskDto = {
+            ...foundTask,
+            statusCategory,
+            status: statusLabels[statusCategory],
+            updatedAt: nowIso,
+          };
+
+          if (prevDone) {
+            qc.setQueryData<InfiniteData<TaskList, string | null>>(doneKey, {
+              ...prevDone,
+              pages: prevDone.pages.map(p => ({
+                ...p,
+                tasks: p.tasks.filter(t => t.id !== id),
+              })),
+            });
+          }
+
+          if (prevOpen) {
+            const exists = prevOpen.tasks.some(t => t.id === id);
+            qc.setQueryData<TaskList>(openKey, {
+              ...prevOpen,
+              tasks: exists
+                ? prevOpen.tasks.map(t => (t.id === id ? updatedTask : t))
+                : [updatedTask, ...prevOpen.tasks],
+            });
+          }
+        } else if (statusCategory === 'done') {
+          const updatedTask: TaskDto = {
+            ...foundTask,
+            statusCategory: 'done',
+            status: 'Done',
+            updatedAt: nowIso,
+          };
+
+          if (prevOpen) {
+            qc.setQueryData<TaskList>(openKey, {
+              ...prevOpen,
+              tasks: prevOpen.tasks.filter(t => t.id !== id),
+            });
+          }
+
+          if (prevDone && prevDone.pages.length > 0) {
+            qc.setQueryData<InfiniteData<TaskList, string | null>>(doneKey, {
+              ...prevDone,
+              pages: prevDone.pages.map((p, idx) =>
+                idx === 0
+                  ? { ...p, tasks: [updatedTask, ...p.tasks.filter(t => t.id !== id)] }
+                  : { ...p, tasks: p.tasks.filter(t => t.id !== id) },
+              ),
+            });
+          }
+        }
+      }
+
+      return { prevOpen, prevDone, openKey, doneKey };
+    },
+    onError: (err, _vars, context) => {
+      if (context) {
+        if (context.prevOpen) qc.setQueryData(context.openKey, context.prevOpen);
+        if (context.prevDone) qc.setQueryData(context.doneKey, context.prevDone);
+      }
+      setBoardError((err as Error).message);
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
+
   const [starting, setStarting] = useState<TaskDto | null>(null);
   const runsQ = useQuery({ queryKey: ['wf', 'runs', 'all'], queryFn: () => api<WorkflowRunList>('/api/workflow-runs?status=all'), refetchInterval: 15_000 });
-  const activeRun = new Map((runsQ.data?.runs ?? []).filter(r => ['running', 'waiting', 'failed'].includes(r.status)).map(r => [r.task.id, r]));
+  const latestRuns = useMemo(() => latestRunByTask(runsQ.data?.runs ?? []), [runsQ.data]);
   const [dialog, setDialog] = useState<{ task?: TaskDetailDto } | null>(null);
   const openEdit = (id: string) => api<TaskDetailDto>(`/api/tasks/${id}`).then(task => setDialog({ task }));
-  const d = q.data;
+
+  const handleOpenTask = (task: TaskDto) => {
+    if (task.source === 'local') {
+      openEdit(task.id);
+    } else if (task.url) {
+      window.open(task.url, '_blank', 'noopener');
+    }
+  };
+
+  const d = view === 'list' ? q.data : boardOpenQ.data;
   const tasks = d?.tasks ?? [];
 
   const activeFilterCount = [
     f.q,
     f.source,
     f.board,
-    f.statusCategory,
+    view === 'list' ? f.statusCategory : undefined,
     f.includeArchived === '1' ? 'archived' : undefined,
   ].filter(Boolean).length;
 
@@ -249,6 +396,24 @@ export function TasksPage() {
       }
       actions={
         <div className="flex gap-2">
+          <div className="flex items-center gap-1 border-r border-border pr-2">
+            <Button
+              size="sm"
+              variant={view === 'list' ? 'default' : 'outline'}
+              onClick={() => setView('list')}
+              title="List view"
+            >
+              <List className="size-3.5" />List
+            </Button>
+            <Button
+              size="sm"
+              variant={view === 'board' ? 'default' : 'outline'}
+              onClick={() => setView('board')}
+              title="Board view"
+            >
+              <Columns3 className="size-3.5" />Board
+            </Button>
+          </div>
           <Button size="sm" onClick={() => setDialog({})}>
             <Plus className="size-3.5" />New task
           </Button>
@@ -345,20 +510,22 @@ export function TasksPage() {
               ))}
             </Select>
 
-            {/* Status Category Filter */}
-            <Select
-              value={f.statusCategory ?? ''}
-              onChange={e => set('statusCategory')(e.target.value)}
-              className={cn(
-                'h-8 text-xs font-medium cursor-pointer transition-colors',
-                f.statusCategory ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : ''
-              )}
-            >
-              <option value="">Status: Open (To do + In progress)</option>
-              <option value="in_progress">🔵 In progress</option>
-              <option value="todo">⚪ To do</option>
-              <option value="done">✅ Done</option>
-            </Select>
+            {/* Status Category Filter - List view only */}
+            {view === 'list' && (
+              <Select
+                value={f.statusCategory ?? ''}
+                onChange={e => set('statusCategory')(e.target.value)}
+                className={cn(
+                  'h-8 text-xs font-medium cursor-pointer transition-colors',
+                  f.statusCategory ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : ''
+                )}
+              >
+                <option value="">Status: Open (To do + In progress)</option>
+                <option value="in_progress">🔵 In progress</option>
+                <option value="todo">⚪ To do</option>
+                <option value="done">✅ Done</option>
+              </Select>
+            )}
 
             {/* Show archived Toggle */}
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer select-none px-1">
@@ -409,7 +576,7 @@ export function TasksPage() {
                 </button>
               </span>
             )}
-            {f.statusCategory && (
+            {view === 'list' && f.statusCategory && (
               <span className="inline-flex items-center gap-1 rounded-full border bg-background px-2.5 py-0.5 text-[11px] font-medium shadow-2xs">
                 Status: <span className="font-semibold text-foreground">{CAT[f.statusCategory]?.label ?? f.statusCategory}</span>
                 <button type="button" onClick={() => set('statusCategory')('')} className="ml-0.5 hover:text-destructive cursor-pointer">
@@ -445,11 +612,30 @@ export function TasksPage() {
         )}
       </div>
 
-      {/* Task table card */}
-      <Card>
-        <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && tasks.length === 0} emptyText={activeFilterCount > 0 ? 'No tasks match current filters.' : 'No tasks found.'} />
-        {tasks.length > 0 && (
-          <Table>
+      {/* Board or List view */}
+      {view === 'board' ? (
+        <>
+          <QueryState isLoading={boardOpenQ.isLoading} error={boardOpenQ.error} />
+          {!boardOpenQ.isLoading && !boardOpenQ.error && (
+            <TaskBoard
+              tasks={boardTasks}
+              runs={latestRuns}
+              showProjectDot={!project}
+              doneHasMore={Boolean(boardDoneQ.hasNextPage)}
+              doneLoadingMore={boardDoneQ.isFetchingNextPage}
+              onLoadMoreDone={() => boardDoneQ.fetchNextPage()}
+              onMove={(task, to) => moveBoardTask.mutate({ id: task.id, statusCategory: to, task })}
+              onOpen={handleOpenTask}
+              error={boardError}
+              onDismissError={() => setBoardError(null)}
+            />
+          )}
+        </>
+      ) : (
+        <Card>
+          <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && tasks.length === 0} emptyText={activeFilterCount > 0 ? 'No tasks match current filters.' : 'No tasks found.'} />
+          {tasks.length > 0 && (
+            <Table>
             <THead>
               <Tr>
                 <Th className="w-[140px]">Key & Source</Th>
@@ -530,17 +716,21 @@ export function TasksPage() {
                         </span>
                       ))}
                     </div>
-                    {activeRun.get(t.id) && (
-                      <Link
-                        to="/runs/$runId"
-                        params={{ runId: activeRun.get(t.id)!.id }}
-                        className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 transition-colors"
-                      >
-                        <span className="size-1.5 rounded-full bg-sky-500 animate-ping" />
-                        run: <span className="font-semibold">{activeRun.get(t.id)!.workflowId}</span> · {activeRun.get(t.id)!.status}
-                        {activeRun.get(t.id)!.currentNodeLabel ? ` · ${activeRun.get(t.id)!.currentNodeLabel}` : ''} →
-                      </Link>
-                    )}
+                    {(() => {
+                      const r = activeRun(latestRuns.get(t.id));
+                      if (!r) return null;
+                      return (
+                        <Link
+                          to="/runs/$runId"
+                          params={{ runId: r.id }}
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 transition-colors"
+                        >
+                          <span className="size-1.5 rounded-full bg-sky-500 animate-ping" />
+                          run: <span className="font-semibold">{r.workflowId}</span> · {r.status}
+                          {r.currentNodeLabel ? ` · ${r.currentNodeLabel}` : ''} →
+                        </Link>
+                      );
+                    })()}
                   </Td>
 
                   {/* Status Column */}
@@ -641,6 +831,7 @@ export function TasksPage() {
           </Table>
         )}
       </Card>
+      )}
 
       {dialog && <TaskDialog task={dialog.task} onClose={() => setDialog(null)} />}
       {starting && <StartWorkflowDialog task={starting} onClose={() => setStarting(null)} />}
