@@ -1,6 +1,6 @@
 # Spec 0003: Task board (Kanban)
 
-Status: proposed (2026-10-17)
+Status: implemented (2026-10-17)
 
 ## Goal
 
