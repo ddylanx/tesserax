@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "cursor-mock": {
+      "command": "node",
+      "args": ["mock-cursor.js"],
+      "env": {
+        "CURSOR_API_KEY": "secret_cursor_val"
+      }
+    },
+    "cursor-disabled": {
+      "command": "node",
+      "args": ["mock-disabled.js"],
+      "disabled": true
+    }
+  }
+}
