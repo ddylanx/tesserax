@@ -2,8 +2,8 @@ import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { allowedCommands, antigravityArgs, antigravitySignal, launchAntigravityDetached, parseAntigravity, runAntigravity, withToolHint } from './antigravity';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { allowedCommands, antigravityArgs, antigravitySignal, deniedConversation, launchAntigravityDetached, parseAntigravity, readAntigravityOutcome, runAntigravity, withToolHint } from './antigravity';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readLiveLog, renderLiveLog } from './livelog';
 import { askAgent } from './claude';
@@ -81,3 +81,25 @@ test('launchAntigravityDetached includes gitCommonDir in args when run in git re
   assert.ok(cmd.args.includes('--add-dir'));
 });
 
+
+test('antigravity: a turn stopped by a refused tool is continued in the same conversation', async () => {
+  assert.equal(deniedConversation({ conversation_id: 'c', response: '', denied_actions: [{ action: 'read_file' }] }), 'c');
+  assert.equal(deniedConversation({ conversation_id: 'c', response: 'answer', denied_actions: [{ action: 'read_file' }] }), null);
+  assert.equal(deniedConversation({ conversation_id: 'c', response: '' }), null);
+  process.env.FAKE_AGY_MODE = 'denied-once';
+  try {
+    const r = await runAntigravity({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000 });
+    assert.equal(r.signal, 'ok');
+    const dir = mkdtempSync(join(tmpdir(), 'agy-denied-'));
+    const workDir = mkdtempSync(join(tmpdir(), 'agy-denied-work-'));
+    writeFileSync(join(workDir, 'README.md'), '# x\n');
+    const pid = launchAntigravityDetached({ bin: FAKE, cwd: workDir, runDir: dir, prompt: 'hello' });
+    for (let i = 0; i < 100 && !existsSync(join(dir, 'exit_code')); i++) await new Promise(res => setTimeout(res, 100));
+    const outcome = readAntigravityOutcome(dir, pid, false);
+    assert.equal(outcome.finished, true);
+    assert.equal(outcome.signal, 'ok');
+    assert.equal(readFileSync(join(dir, 'stdout.json'), 'utf8').match(/"event":"result"/g)?.length, 2);
+  } finally {
+    delete process.env.FAKE_AGY_MODE;
+  }
+});

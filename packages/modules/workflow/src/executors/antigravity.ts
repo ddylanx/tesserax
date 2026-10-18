@@ -100,14 +100,40 @@ export const withToolHint = (prompt: string, mode: 'plan' | 'accept-edits' = 'pl
   return `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. ${files} ${shell} Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused anyway, do not stop: answer from what you have.)`;
 };
 
-/** One headless call, read-only (`--mode plan`). */
-export function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
+/**
+ * One refused tool (e.g. read_file on a path outside the workspace) ends agy's whole turn with an empty answer, even when
+ * the prompt says to carry on. Continuing the same conversation (`--conversation <id>`) with a short note lets it finish
+ * without that tool, so a denied turn is continued up to this many times before the step fails.
+ */
+export const DENIED_RETRIES = 2;
+export const DENIED_FOLLOW_UP =
+  'The tool you just tried was refused: this run cannot ask anyone for permission, and only the working folder is readable. Do not try it again or work around it. Carry on with the rest of the task without it and finish with your answer.';
+
+/** The conversation to continue when the turn ended only because a tool was refused (no answer). */
+export function deniedConversation(out: AntigravityOutput | null): string | null {
+  return out?.conversation_id && !out.response?.trim() && out.denied_actions?.length ? out.conversation_id : null;
+}
+
+/** One headless call, read-only (`--mode plan`); a turn stopped by a refused tool is continued (DENIED_RETRIES). */
+export async function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
+  const git = gitCommonDir(o.cwd);
+  const deadline = Date.now() + o.timeoutMs;
+  if (o.logFile) mkdirSync(dirname(o.logFile), { recursive: true });
+  let args = antigravityArgs('plan', withToolHint(o.prompt), o.model, git ? [git] : []);
+  for (let attempt = 0; ; attempt++) {
+    const r = await runAntigravityOnce({ ...o, args, timeoutMs: Math.max(1000, deadline - Date.now()) });
+    const conversation = attempt < DENIED_RETRIES && r.signal === 'denied' ? deniedConversation(r.out) : null;
+    if (!conversation) return { text: r.out?.response?.trim() || null, signal: r.signal, message: r.message };
+    args = [...antigravityArgs('plan', DENIED_FOLLOW_UP, o.model, git ? [git] : []).slice(0, -1), '--conversation', conversation, `--print=${DENIED_FOLLOW_UP}`];
+  }
+}
+
+function runAntigravityOnce(o: { bin: string; cwd: string; args: string[]; timeoutMs: number; logFile?: string }): Promise<{ out: AntigravityOutput | null; signal: AntigravitySignal; message: string | null }> {
   return new Promise(resolve => {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
-    const git = gitCommonDir(o.cwd);
-    const child = spawn(o.bin, antigravityArgs('plan', withToolHint(o.prompt), o.model, git ? [git] : []), { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(o.bin, o.args, { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
@@ -119,10 +145,8 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
       done = true;
       clearTimeout(timer);
       const out = parseAntigravity(stdout);
-      const { signal, message } = antigravitySignal({ out, stderr, exitCode: code, timedOut: timedOut && !out?.response, spawnError });
-      resolve({ text: out?.response?.trim() || null, signal, message });
+      resolve({ out, ...antigravitySignal({ out, stderr, exitCode: code, timedOut: timedOut && !out?.response, spawnError }) });
     };
-    if (o.logFile) mkdirSync(dirname(o.logFile), { recursive: true });
     child.stdout.on('data', d => {
       stdout += d;
       if (o.logFile) appendFileSync(o.logFile, d);
@@ -132,6 +156,31 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
     child.on('close', code => finish(code));
   });
 }
+
+/**
+ * Runs inside the detached process (plain Node, no TS): calls agy, continues the conversation when a refused tool ended
+ * the turn with no answer (same rule as deniedConversation), appends every turn to stdout.json, then writes exit_code.
+ */
+const DETACHED_RUNNER = `
+const { spawnSync } = require('node:child_process');
+const fs = require('node:fs');
+const e = process.env, dir = e.TESSERAX_RUN_DIR, args = JSON.parse(e.TESSERAX_ARGS);
+const file = n => dir + '/' + n;
+const out = fs.openSync(file('stdout.json'), 'a'), err = fs.openSync(file('stderr.log'), 'a');
+let prompt = fs.readFileSync(file('prompt.md'), 'utf8'), extra = [], code = 1;
+for (let i = 0; ; i++) {
+  const r = spawnSync(e.TESSERAX_BIN, [...args, ...extra, '--print=' + prompt], { stdio: ['ignore', out, err] });
+  code = r.status ?? 1;
+  if (i >= Number(e.TESSERAX_DENIED_RETRIES)) break;
+  const last = fs.readFileSync(file('stdout.json'), 'utf8').trim().split('\\n').reverse().find(l => l.startsWith('{"event":"result"'));
+  let res = null;
+  try { res = JSON.parse(last).result; } catch {}
+  if (!res || !res.conversation_id || (res.response || '').trim() || !(res.denied_actions || []).length) break;
+  extra = ['--conversation', res.conversation_id];
+  prompt = e.TESSERAX_FOLLOW_UP;
+}
+fs.writeFileSync(file('exit_code'), String(code) + '\\n');
+`;
 
 /** Detached agent run (`accept-edits`, no shell): prompt kept in runDir, output and exit code written there. */
 export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir: string; prompt: string; model?: string }): number {
@@ -144,10 +193,13 @@ export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir:
     ...(o.model ? ['--model', o.model] : []),
     ...(git ? ['--add-dir', git] : []),
   ];
-  writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
-  const script = '"$TESSERAX_BIN" "$@" "--print=$(cat "$TESSERAX_RUN_DIR/prompt.md")" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';
-  const child = spawn('/bin/sh', ['-c', script, 'ot-run', ...args], {
-    cwd: o.cwd, detached: true, stdio: 'ignore', env: cleanEnv(process.env, { TESSERAX_BIN: o.bin, TESSERAX_RUN_DIR: o.runDir }),
+  writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, deniedRetries: DENIED_RETRIES, startedAt: new Date().toISOString() }, null, 2));
+  const child = spawn(process.execPath, ['-e', DETACHED_RUNNER], {
+    cwd: o.cwd, detached: true, stdio: 'ignore',
+    env: cleanEnv(process.env, {
+      TESSERAX_BIN: o.bin, TESSERAX_RUN_DIR: o.runDir, TESSERAX_ARGS: JSON.stringify(args),
+      TESSERAX_DENIED_RETRIES: String(DENIED_RETRIES), TESSERAX_FOLLOW_UP: DENIED_FOLLOW_UP,
+    }),
   });
   child.unref();
   if (!child.pid) throw new Error('Could not start Antigravity CLI');

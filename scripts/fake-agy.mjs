@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Stand-in for the Antigravity CLI (agy) in tests: ANTIGRAVITY_BIN=<repo>/scripts/fake-agy.mjs
-// FAKE_AGY_MODE: ok (default) | auth | denied. Agent runs (--mode accept-edits) change a file in the folder.
+// FAKE_AGY_MODE: ok (default) | auth | denied | denied-once (refused until the conversation is continued with --conversation). Agent runs (--mode accept-edits) change a file in the folder.
 import { appendFileSync } from 'node:fs';
 const args = process.argv.slice(2);
 const mode = process.env.FAKE_AGY_MODE ?? 'ok';
@@ -21,7 +21,7 @@ if (mode === 'auth') {
   out({ status: 'ERROR', response: '', error: 'authentication required' });
   process.exit(1);
 }
-if (mode === 'denied') {
+if (mode === 'denied' || (mode === 'denied-once' && !args.includes('--conversation'))) {
   console.error('jetski: no output produced');
   out({ status: 'SUCCESS', response: '', denied_actions: [{ action: 'command', display_name: 'RunCommand' }] });
   process.exit(0);
