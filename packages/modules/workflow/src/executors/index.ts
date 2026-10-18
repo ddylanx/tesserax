@@ -9,6 +9,7 @@ import { askAgent } from './claude';
 import { liveLogFile } from './livelog';
 import { startAgent } from './agent';
 import { ensureReviewWorktree } from '../review';
+import { getProjectInfo } from '../worktree-links';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
 
 async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?: string; baseRef?: string; branch?: string; diff?: string } = {}) {
@@ -25,6 +26,7 @@ const worktree = async (ctx: NodeContext) => {
   try {
     return await ctx.engine.ensureRunWorktree(ctx.run.id);
   } catch (e) {
+    if (e instanceof FatalNodeError) throw e;
     throw new FatalNodeError((e as Error).message);
   }
 };
@@ -103,6 +105,15 @@ const checkCommand: NodeExecutor = async ctx => {
   const c = ctx.config;
   const wt = await worktree(ctx);
   const rc = await renderCtx(ctx, wt);
+  for (const raw of ((c.commands ?? []) as string[])) {
+    if (raw.includes('project.test_command') || raw.includes('TX_PROJECT_TEST_COMMAND')) {
+      const testCmd = rc.projectVars?.test_command?.trim();
+      if (!testCmd) {
+        const projectName = getProjectInfo(ctx.run.vars).name || ctx.task.project || 'unnamed';
+        throw new FatalNodeError(`Project ${projectName} has no test_command; set it on the project page`);
+      }
+    }
+  }
   const shellEnv = buildShellEnv(rc);
   const lines: string[] = [`# Checks in ${wt.worktree}`, ''];
   const results: { command: string; exitCode: number | null; seconds: number }[] = [];
@@ -110,7 +121,10 @@ const checkCommand: NodeExecutor = async ctx => {
   const deadline = Date.now() + c.timeoutSeconds * 1000;
   for (const raw of c.commands as string[]) {
     const cmd = renderShellTemplate(raw, rc);
-    const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
+    const execCmd = /^"?\$TX_PROJECT_[A-Z0-9_]+"?$/.test(cmd.trim())
+      ? `eval "$${cmd.trim().replace(/^"?\$|"$/g, '')}"`
+      : cmd;
+    const r = await sh(execCmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
     results.push({ command: cmd, exitCode: r.code, seconds: Math.round(r.ms / 100) / 10 });
     const passed = r.code === 0 && !r.timedOut;
     // PHP deprecation notices (hundreds of lines at boot) would push the actual failure out of the tail we keep

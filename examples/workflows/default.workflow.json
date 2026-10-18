@@ -129,9 +129,7 @@
       },
       "config": {
         "commands": [
-          "test -e vendor || ln -s \"{{repo_path}}/vendor\" vendor",
-          "composer test",
-          "vendor/bin/pint --test"
+          "{{project.test_command}}"
         ],
         "output": "checks"
       },

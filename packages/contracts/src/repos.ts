@@ -76,6 +76,8 @@ export interface RepoInspection {
   suggestedName: string;
   /** Registered repository with the same origin, if any. */
   repositoryId: string | null;
+  /** Stack-detected project variable suggestions (test_command, worktree_links). */
+  suggestedVars?: Record<string, string>;
 }
 
 /** The workplace a task resolves to (null fields when it came from the legacy config/repos.json). */

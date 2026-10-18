@@ -40,6 +40,111 @@ const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').re
 /** Legacy config/repos.json entry: project key -> path, or { path, base, remote, bitbucket }. */
 type LegacyEntry = string | { path: string; base?: string; remote?: string; bitbucket?: string };
 
+/** Detects project stack conventions (test_command, worktree_links) from checkout manifest files. */
+export function detectRepoStack(checkoutPath: string): Record<string, string> {
+  const pkgJsonPath = join(checkoutPath, 'package.json');
+  if (existsSync(pkgJsonPath)) {
+    let scripts: Record<string, unknown> = {};
+    try {
+      const parsed = JSON.parse(readFileSync(pkgJsonPath, 'utf8'));
+      if (parsed && typeof parsed.scripts === 'object' && parsed.scripts) {
+        scripts = parsed.scripts as Record<string, unknown>;
+      }
+    } catch {
+      // ignore parse error, fallback to default scripts
+    }
+
+    // Hybrid projects (e.g. Laravel with Vite, Python/Go with frontend):
+    // if package.json has no test script, but a backend manifest exists, prioritize the backend stack.
+    const hasNodeTest = 'test' in scripts;
+    if (!hasNodeTest) {
+      if (existsSync(join(checkoutPath, 'composer.json'))) {
+        return {
+          test_command: 'composer test',
+          worktree_links: 'vendor, .env',
+        };
+      }
+      if (existsSync(join(checkoutPath, 'pyproject.toml'))) {
+        return {
+          test_command: 'pytest',
+          worktree_links: '.venv, .env',
+        };
+      }
+      if (existsSync(join(checkoutPath, 'go.mod'))) {
+        return {
+          test_command: 'go test ./...',
+          worktree_links: '.env',
+        };
+      }
+    }
+
+    const hasPnpm = existsSync(join(checkoutPath, 'pnpm-lock.yaml'));
+    const hasYarn = existsSync(join(checkoutPath, 'yarn.lock'));
+    const hasBun = existsSync(join(checkoutPath, 'bun.lockb')) || existsSync(join(checkoutPath, 'bun.lock'));
+
+    const cmds: string[] = [];
+
+    if (hasPnpm) {
+      cmds.push('pnpm install --frozen-lockfile --prefer-offline');
+      if ('typecheck' in scripts) cmds.push('pnpm typecheck');
+      if ('lint' in scripts) cmds.push('pnpm lint');
+      if ('test' in scripts) cmds.push('pnpm test');
+      if (cmds.length === 1) cmds.push('pnpm test');
+      return {
+        test_command: cmds.join(' && '),
+        worktree_links: '.env',
+      };
+    }
+
+    const pm = hasYarn ? 'yarn' : hasBun ? 'bun' : 'npm';
+    if (pm === 'yarn') {
+      if ('typecheck' in scripts) cmds.push('yarn typecheck');
+      if ('lint' in scripts) cmds.push('yarn lint');
+      if ('test' in scripts) cmds.push('yarn test');
+      if (cmds.length === 0) cmds.push('yarn test');
+    } else if (pm === 'bun') {
+      if ('typecheck' in scripts) cmds.push('bun run typecheck');
+      if ('lint' in scripts) cmds.push('bun run lint');
+      if ('test' in scripts) cmds.push('bun test');
+      if (cmds.length === 0) cmds.push('bun test');
+    } else {
+      // npm
+      if ('typecheck' in scripts) cmds.push('npm run typecheck');
+      if ('lint' in scripts) cmds.push('npm run lint');
+      if ('test' in scripts) cmds.push('npm test');
+      if (cmds.length === 0) cmds.push('npm test');
+    }
+
+    return {
+      test_command: cmds.join(' && '),
+      worktree_links: 'node_modules, .env',
+    };
+  }
+
+  if (existsSync(join(checkoutPath, 'composer.json'))) {
+    return {
+      test_command: 'composer test',
+      worktree_links: 'vendor, .env',
+    };
+  }
+
+  if (existsSync(join(checkoutPath, 'pyproject.toml'))) {
+    return {
+      test_command: 'pytest',
+      worktree_links: '.venv, .env',
+    };
+  }
+
+  if (existsSync(join(checkoutPath, 'go.mod'))) {
+    return {
+      test_command: 'go test ./...',
+      worktree_links: '.env',
+    };
+  }
+
+  return {};
+}
+
 export class RepoRegistryStore {
   constructor(
     readonly file = process.env.OT_WORKPLACES_FILE || join(findRepoRoot(), 'config', 'workplaces.json'),
@@ -136,6 +241,10 @@ export class RepoRegistryStore {
     return { exists: true, isGit: true, origin, branch, originMatches: want && have ? want === have : null, error: null };
   }
 
+  detectRepoStack(checkoutPath: string): Record<string, string> {
+    return detectRepoStack(checkoutPath);
+  }
+
   /** What a folder is, to prefill "register" forms. */
   inspect(path: string): RepoInspection {
     const abs = checkCheckoutPath(path);
@@ -148,6 +257,7 @@ export class RepoRegistryStore {
       path: abs, isGit: true, origin, branch: tryGit(abs, ['symbolic-ref', '--quiet', '--short', 'HEAD']),
       defaultBranch: head ? head.replace(/^origin\//, '') : null,
       suggestedName: origin ? basename(origin.replace(/\.git$/, '')) : basename(top), repositoryId: match?.id ?? null,
+      suggestedVars: this.detectRepoStack(abs),
     };
   }
 
