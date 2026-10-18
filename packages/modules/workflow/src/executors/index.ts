@@ -110,7 +110,10 @@ const checkCommand: NodeExecutor = async ctx => {
   const deadline = Date.now() + c.timeoutSeconds * 1000;
   for (const raw of c.commands as string[]) {
     const cmd = renderShellTemplate(raw, rc);
-    const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
+    const execCmd = /^"?\$TX_PROJECT_[A-Z0-9_]+"?$/.test(cmd.trim())
+      ? `eval "$${cmd.trim().replace(/^"?\$|"$/g, '')}"`
+      : cmd;
+    const r = await sh(execCmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
     results.push({ command: cmd, exitCode: r.code, seconds: Math.round(r.ms / 100) / 10 });
     const passed = r.code === 0 && !r.timedOut;
     // PHP deprecation notices (hundreds of lines at boot) would push the actual failure out of the tail we keep
