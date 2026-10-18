@@ -1,5 +1,7 @@
 # Tesserax (local)
 
+[![CI](https://github.com/ddylanx/tesserax/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ddylanx/tesserax/actions/workflows/ci.yml)
+
 A personal backoffice for managing AI coding work, running on your own machine: tasks, agents (Claude Code sessions), MCP servers and system health on one page.
 
 Local mode: one backend process, bound to 127.0.0.1, no login.
