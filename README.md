@@ -27,8 +27,6 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 
 ## Pages
 
-- **Inbox**: the automation pipeline (below): issues waiting for your decision, running playbooks, results waiting for you to verify.
-
 - **MCP**: every MCP server configured on this machine (Claude Code user/local/project scopes, Cursor, Claude Desktop, Codex, Gemini, Antigravity), on/off, read-only. It reuses the reader in `../agent-cockpit/src/mcp.mjs` (`AGENT_COCKPIT_MCP_PATH` to point elsewhere); without it, a built-in Claude Code-only reader is used. Only names, transport and env key names are read, never values.
 - **Tasks**: your Jira Cloud issues, read-only, synced every ~2 minutes (pg-boss schedule with up to 30 s jitter) and on start; "Sync now" queues one right away. Filters: text, workspace, status, project, archived. Issues the query stops returning are archived, not deleted.
 - **Agents**: Claude Code sessions on this machine: running / needs you / idle / ended, folder, git branch, last activity, prompt and tool counts, token usage. Click a row for its recent events. Fed by Claude Code hooks (below).
@@ -43,7 +41,7 @@ Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you appr
   → Tests + lint (fail → implement, max 2) → AI review vs spec (fail → implement, max 2) → you review the result → Score
 ```
 
-- **Start**: "Start workflow" on the Tasks page, or automatically for new Jira issues (`AUTO_START=workflow`, the default; `pipeline` keeps the older Inbox flow, `off` disables).
+- **Start**: "Start workflow" on the Tasks page, or automatically for new Jira issues (`AUTO_START=workflow`, the default; `off` disables).
 - **Runs page** (`/runs`): runs waiting for you, running, failed, done. A run's page shows the graph with each node's state; click a node for its documents (every version, AI or yours), its attempts, cost and errors.
 - **Gates**: edit the document (your version is what later steps use), approve, send it back with feedback (the AI step re-runs with your feedback), or reject.
 - **Score**: rate the result per criterion (1–5) with a note; stored with the run's workflow and skill versions for later comparison.
@@ -71,28 +69,6 @@ Jira ticket → Analyze (AI) → you review → Options + spec (AI) → you appr
 - **Metrics** (`/metrics`): per workflow version (runs, done rate, your average score per criterion, cost, time), per skill version (how often its output was accepted as-is, edited, or sent back at the next review; cost per use; whether it is the current version), and per node (runs, skips, retries, failures, gate outcomes, your time at gates, pass/fail for checks and reviews), plus your evaluation notes. Use it to see whether a skill or workflow change helped.
 - Bitbucket setup (`.env`): `BITBUCKET_API_TOKEN` (an Atlassian API token with Bitbucket scopes `read:repository` and `write:pullrequest`, created at https://id.atlassian.com/manage-profile/security/api-tokens) and `BITBUCKET_EMAIL` if it differs from `JIRA_EMAIL`. The repo is read from the push remote's URL (`git@bitbucket.org:<workspace>/<repo>.git`); otherwise add `"bitbucket": "workspace/repo"` (and `"remote"` if it is not `origin`) to the project in `config/repos.json`.
 
-## Automation pipeline (Inbox, older flow)
-
-```
-Jira issue ─▶ AI classifies ─▶ YOU decide ─▶ AI runs a playbook ─▶ result ─▶ YOU verify (true / false)
-              claude -p           accept / change    git worktree +          summary, diff,   stored as labeled
-              (rules fallback)    / reject           claude -p headless      branch           feedback
-```
-
-1. **New issue**: a Jira issue seen for the first time (not the first import), or "Run pipeline" on the Tasks page, creates a run. One active run per issue.
-2. **Classify**: the local `claude -p` (your Claude Code login, no API key) returns type (bug/feature/chore/research/question), automation (auto/assisted/manual), playbook, confidence and reasoning, validated with Zod. Issue text is passed as delimited, untrusted data. If the CLI is missing, not logged in or answers badly, a rules classifier (issue type, labels, title) is used and the reason is shown in the run's history.
-3. **Decide** (you): accept or change type, automation and playbook, add a note for the agent, classify again, or reject. The issue's Jira project must map to a local repo in `config/repos.json` (copy `config/repos.example.json`): a path, or `{ "path": …, "base": "develop" }` to choose the branch new issue branches start from (default: the remote's default branch, `origin/HEAD`, never the branch your main checkout happens to be on). If a project is not mapped, the Inbox asks for the path and saves it.
-4. **Run**: a git worktree on branch `tx/<ISSUE-KEY>` is created under `.data/worktrees/`, and Claude Code runs the playbook there headless (`claude -p`, prompt from a file, permission mode and allowed tools from the playbook, a budget cap). Push, merge, rebase, remote changes, `gh`, `curl` and `rm -rf` are always denied. Nothing is pushed or merged. The run survives an API restart; Cancel stops it.
-5. **Verify** (you): the Inbox shows the agent's summary, diff stats and full diff, branch and worktree path. Mark it correct (true) or not (false) with a note; this is stored with the classification and playbook as labeled feedback (System page shows the totals). Optionally **Post result to Jira** as a comment, after you confirm the exact text in a dialog. That is the only thing ever written to Jira.
-
-Playbooks are Markdown files in `playbooks/` (frontmatter: `id`, `name`, `applies_to`, `steps`, `permission_mode`, `allowed_tools`, `makes_changes`, `max_budget_usd`; body: the prompt template with `{{issue}}`, `{{steps}}`, `{{branch}}`, `{{worktree_path}}`, `{{user_note}}`). Shipped: `investigate-bug` (read-only), `fix-bug` (edits, runs tests, commits locally), `research-question` (read-only).
-
-Every step is a pg-boss job keyed by (run, step, attempt): retried 3 times with backoff, then the run goes to **failed** with the error, and **Retry** starts the step again. Every state change is recorded in the run's history.
-
-What the CLI's output means (logged out, usage limit, budget, timeouts...) is in [docs/adr/0003-agent-cli-signals.md](docs/adr/0003-agent-cli-signals.md). The CLI must be logged in: run `claude` in a terminal and use `/login` if classification falls back to rules with "auth".
-
-Settings (`.env`): `CLAUDE_BIN` (default `claude`), `CLASSIFIER_ENGINE` (`claude-cli` or `rules`), `CLASSIFIER_MODEL`, `PLAYBOOK_MODEL`, `PLAYBOOK_TIMEOUT_SECONDS` (default 1800), `WEB_BASE_URL` (links in Telegram messages).
-
 ### Try it without Jira or tokens
 
 ```bash
@@ -101,7 +77,7 @@ scripts/make-demo-repo.sh         # a throwaway git repo at .data/demo-repo for 
 CLAUDE_BIN=$PWD/scripts/fake-claude.mjs scripts/dev-fake.sh   # terminal 2: API against the fake Jira and a fake CLI
 pnpm --filter @tesserax/web dev         # terminal 3: web
 ```
-Then on Tasks, "Run pipeline" on DEMO-1, and enter `<repo>/.data/demo-repo` as its repo in the Inbox. Drop `CLAUDE_BIN=…` to use the real `claude`.
+Then on Tasks, click "Start workflow" on DEMO-1. Drop `CLAUDE_BIN=…` to use the real `claude`.
 
 ## Connect Jira Cloud (Tasks page)
 
@@ -137,7 +113,7 @@ Long polling with grammY, so no public URL or webhook is needed; the bot runs in
 
 Commands: `/tasks` (open Jira tasks), `/agents` (Claude Code sessions, who needs you), `/mcp` (enabled MCP servers), `/help`. Anyone not on the list gets no data.
 
-The bot also sends pipeline notifications to everyone on the list: classification ready (needs your decision), result ready (needs verify), and failures, each with a link to the run in the Inbox. Decisions and verification happen in the web app only.
+The bot also sends notifications to everyone on the list for workflow runs: waiting for a person, failed, and done, each with a link to the run page. Confirmations and decisions happen in the web app.
 
 ## Connect Claude Code (Agents page)
 

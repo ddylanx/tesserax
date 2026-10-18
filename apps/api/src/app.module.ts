@@ -3,7 +3,6 @@ import { findRepoRoot } from '@tesserax/config';
 import { createLogger } from '@tesserax/core';
 import { AgentsModule } from '@tesserax/mod-agents';
 import { McpModule } from '@tesserax/mod-mcp';
-import { PipelineModule } from '@tesserax/mod-pipeline';
 import { ProjectsModule } from '@tesserax/mod-projects';
 import { ReposModule } from '@tesserax/mod-repos';
 import { SkillsModule } from '@tesserax/mod-skills';
@@ -21,7 +20,6 @@ const root = findRepoRoot();
     McpModule,
     AgentsModule,
     TasksModule,
-    PipelineModule,
     SkillsModule.forRoot({ rootDir: root, usedBy: prefix => new WorkflowStore().referencing(prefix), logger: createLogger('skills') }),
     WorkflowModule,
     ReposModule,

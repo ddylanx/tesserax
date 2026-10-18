@@ -47,9 +47,6 @@ importers:
       '@tesserax/mod-mcp':
         specifier: workspace:*
         version: link:../../packages/modules/mcp
-      '@tesserax/mod-pipeline':
-        specifier: workspace:*
-        version: link:../../packages/modules/pipeline
       '@tesserax/mod-projects':
         specifier: workspace:*
         version: link:../../packages/modules/projects
@@ -280,52 +277,6 @@ importers:
         specifier: ^1.13.5
         version: 1.16.18
 
-  packages/modules/pipeline:
-    dependencies:
-      '@nestjs/common':
-        specifier: ^11.1.6
-        version: 11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)
-      '@tesserax/agent-runtime':
-        specifier: workspace:*
-        version: link:../../agent-runtime
-      '@tesserax/config':
-        specifier: workspace:*
-        version: link:../../config
-      '@tesserax/contracts':
-        specifier: workspace:*
-        version: link:../../contracts
-      '@tesserax/core':
-        specifier: workspace:*
-        version: link:../../core
-      '@tesserax/db':
-        specifier: workspace:*
-        version: link:../../db
-      '@tesserax/mod-classify':
-        specifier: workspace:*
-        version: link:../classify
-      '@tesserax/mod-repos':
-        specifier: workspace:*
-        version: link:../repos
-      '@tesserax/mod-tasks':
-        specifier: workspace:*
-        version: link:../tasks
-      kysely:
-        specifier: ^0.28.17
-        version: 0.28.17
-      yaml:
-        specifier: ^2.8.1
-        version: 2.9.1
-      zod:
-        specifier: ^4.1.13
-        version: 4.6.5
-    devDependencies:
-      '@swc-node/register':
-        specifier: ^1.10.10
-        version: 1.12.1(@swc/core@1.16.18)(@swc/types@0.1.28)(typescript@5.9.3)
-      '@swc/core':
-        specifier: ^1.13.5
-        version: 1.16.18
-
   packages/modules/projects:
     dependencies:
       '@nestjs/common':
@@ -467,9 +418,6 @@ importers:
       '@tesserax/mod-mcp':
         specifier: workspace:*
         version: link:../mcp
-      '@tesserax/mod-pipeline':
-        specifier: workspace:*
-        version: link:../pipeline
       '@tesserax/mod-tasks':
         specifier: workspace:*
         version: link:../tasks
@@ -4228,7 +4176,8 @@ snapshots:
 
   yallist@3.1.1: {}
 
-  yaml@2.9.1: {}
+  yaml@2.9.1:
+    optional: true
 
   zod@4.6.5: {}
 

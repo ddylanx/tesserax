@@ -5,7 +5,7 @@ import type { Classifier, ClassifierContext } from './classifier';
 export class RulesClassifier implements Classifier {
   readonly name = 'rules';
 
-  async classify({ task, playbooks, mappedRepo }: ClassifierContext): Promise<Classification> {
+  async classify({ task, mappedRepo }: ClassifierContext): Promise<Classification> {
     const issueType = (task.type ?? '').toLowerCase();
     const labels = task.labels.map(l => l.toLowerCase());
     let type: Classification['type'];
@@ -18,13 +18,10 @@ export class RulesClassifier implements Classifier {
 
     const automation: Classification['automation'] =
       type === 'question' || type === 'research' || type === 'review' ? 'auto' : type === 'bug' || type === 'feature' ? 'assisted' : 'manual';
-    const preferred = ({ bug: 'investigate-bug', question: 'research-question', research: 'research-question', feature: null, chore: null, review: null } as const)[type];
-    const playbook = preferred && playbooks.some(p => p.id === preferred) ? preferred : playbooks.find(p => p.appliesTo.includes(type))?.id ?? null;
 
     return {
       type,
       automation,
-      playbook,
       repo: mappedRepo,
       confidence: 0.4,
       reasoning: `Rules: issue type "${task.type ?? 'none'}"${labels.length ? `, labels ${labels.join(', ')}` : ''}${type === 'question' && !labels.includes('question') ? ', title is a question' : ''}.`,

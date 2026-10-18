@@ -65,7 +65,7 @@ export class TasksService {
     };
   }
 
-  /** Other modules (pipeline) subscribe to issues seen for the first time. */
+  /** Other modules (e.g. workflow) subscribe to issues seen for the first time. */
   onNewTasks(fn: NewTasksListener) {
     this.newTaskListeners.push(fn);
   }

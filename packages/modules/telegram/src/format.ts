@@ -1,4 +1,4 @@
-import type { AgentSessionList, McpList, PipelineRunDto, TaskList, WorkflowRunDto } from '@tesserax/contracts';
+import type { AgentSessionList, McpList, TaskList, WorkflowRunDto } from '@tesserax/contracts';
 
 export const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const MAX = 3900; // Telegram limit is 4096
@@ -65,34 +65,6 @@ export function formatMcp(list: McpList): string {
   return clamp(lines, n => `… and ${n} more`);
 }
 
-/** Pipeline notification, or null for transitions that need no message. Read-only: it only links to the Inbox. */
-export function formatPipelineNotice(run: PipelineRunDto, to: string, webBaseUrl: string): string | null {
-  const link = `${webBaseUrl.replace(/\/+$/, '')}/inbox?run=${run.id}`;
-  const key = esc(run.task.key ?? '?');
-  const title = esc(run.task.title.slice(0, 120));
-  const c = run.classification;
-  const r = run.result;
-  switch (to) {
-    case 'awaiting_decision':
-      return [
-        `🟠 <b>${key}</b> classified, needs your decision`,
-        title,
-        c ? `${esc(c.type)} · ${esc(c.automation)} · ${esc(c.playbook ?? 'no playbook')} · ${Math.round(c.confidence * 100)}% (${esc(run.classificationEngine ?? '')})` : '',
-        `Decide: ${esc(link)}`,
-      ].filter(Boolean).join('\n');
-    case 'awaiting_verify':
-      return [
-        `✅ <b>${key}</b> playbook ${esc(run.playbookId ?? '')} finished, please verify`,
-        title,
-        r?.diff ? `${r.diff.files} files, +${r.diff.insertions} −${r.diff.deletions}${r.commits.length ? `, ${r.commits.length} commits` : ''} on ${esc(run.branch ?? '')}` : '',
-        `Verify: ${esc(link)}`,
-      ].filter(Boolean).join('\n');
-    case 'failed':
-      return [`🔴 <b>${key}</b> failed${run.errorStep ? ` at ${esc(run.errorStep)}` : ''}`, esc((run.error ?? '').slice(0, 300)), `Open: ${esc(link)}`].join('\n');
-    default:
-      return null;
-  }
-}
 
 /** Workflow run notification. Read-only: it only links to the run page. */
 export function formatWorkflowNotice(run: WorkflowRunDto, event: 'waiting' | 'failed' | 'done', webBaseUrl: string): string {

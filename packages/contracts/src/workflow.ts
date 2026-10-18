@@ -361,6 +361,9 @@ export type WorkflowRunDetail = z.infer<typeof workflowRunDetailSchema>;
 export const workflowRunListSchema = z.object({ runs: z.array(workflowRunSchema), counts: z.record(z.string(), z.number()) });
 export type WorkflowRunList = z.infer<typeof workflowRunListSchema>;
 
+export const runDiffSchema = z.object({ base: z.string().nullable(), patch: z.string(), truncated: z.boolean() });
+export type RunDiff = z.infer<typeof runDiffSchema>;
+
 // ---------- user actions ----------
 
 export const gateActionSchema = z.object({

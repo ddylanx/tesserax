@@ -56,7 +56,7 @@ export async function startAgent(
 ): Promise<{ mode: 'running' } | { mode: 'handoff'; output: Record<string, unknown> }> {
   const c = ctx.config;
   const runDir = join(dataDir(ctx.appConfig), 'runs', ctx.run.id, ctx.nodeRun.id);
-  const model = c.model ?? ctx.appConfig.PLAYBOOK_MODEL;
+  const model = c.model ?? ctx.appConfig.AGENT_MODEL;
   if (executor === 'claude-cli' || executor === 'gemini-cli' || executor === 'antigravity-cli') {
     const sessionId = executor === 'claude-cli' ? randomUUID() : null;
     const pid = executor === 'claude-cli'

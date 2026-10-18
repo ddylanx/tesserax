@@ -20,7 +20,6 @@
     "@tesserax/db": "workspace:*",
     "@tesserax/mod-agents": "workspace:*",
     "@tesserax/mod-mcp": "workspace:*",
-    "@tesserax/mod-pipeline": "workspace:*",
     "@tesserax/mod-skills": "workspace:*",
     "@tesserax/mod-tasks": "workspace:*",
     "@tesserax/mod-workflow": "workspace:*",

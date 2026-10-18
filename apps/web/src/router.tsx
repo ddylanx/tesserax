@@ -1,7 +1,6 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { Layout } from './layout';
 import { AgentsPage } from './routes/agents';
-import { InboxPage } from './routes/inbox';
 import { McpPage } from './routes/mcp';
 import { MetricsPage } from './routes/metrics';
 import { RunDetailPage } from './routes/run-detail';
@@ -17,15 +16,6 @@ import { ProjectDetailPage } from './routes/project-detail';
 
 const rootRoute = createRootRoute({ component: Layout });
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/runs' }); } });
-const inboxRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/inbox',
-  validateSearch: (s: Record<string, unknown>): { run?: string; group?: string } => ({
-    run: typeof s.run === 'string' ? s.run : undefined,
-    group: typeof s.group === 'string' ? s.group : undefined,
-  }),
-  component: InboxPage,
-});
 const runsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/runs',
@@ -46,7 +36,7 @@ const projectDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: 
 const systemRoute = createRoute({ getParentRoute: () => rootRoute, path: '/system', component: SystemPage });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, metricsRoute, inboxRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, metricsRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
 });
 
 declare module '@tanstack/react-router' {

@@ -41,24 +41,30 @@ export const envSchema = z.object({
   BITBUCKET_API_TOKEN: optional,
   BITBUCKET_API_URL: z.string().default('https://api.bitbucket.org/2.0'),
 
-  /** Claude Code CLI used for classification and playbook runs. */
+  /** Claude Code CLI used for classification and agent runs. */
   CLAUDE_BIN: z.string().default('claude'),
   /** Gemini CLI, an alternative engine for AI steps and agent runs. */
   GEMINI_BIN: z.string().default('gemini'),
   /** Antigravity CLI (`agy`), another engine for AI steps and agent runs. */
   ANTIGRAVITY_BIN: z.string().default(join(homedir(), '.local', 'bin', 'agy')),
-  /** What a new Jira issue starts: the node workflow (default), the older pipeline, or nothing. */
-  AUTO_START: z.enum(['workflow', 'pipeline', 'off']).default('workflow'),
+  /** What a new Jira issue starts: the node workflow (default) or nothing. */
+  AUTO_START: z.preprocess(v => {
+    if (v === 'pipeline') {
+      console.warn('[config] Deprecated AUTO_START=pipeline found in environment; treating as "workflow"');
+      return 'workflow';
+    }
+    return v;
+  }, z.enum(['workflow', 'off']).default('workflow')),
   /** claude-cli (default; falls back to rules on any failure) | rules */
   CLASSIFIER_ENGINE: z.enum(['claude-cli', 'rules']).default('claude-cli'),
   /** Model alias for classification (empty: the CLI's default). */
   CLASSIFIER_MODEL: optional,
-  /** Model alias for playbook runs (empty: the CLI's default). */
+  /** Model alias for agent runs (empty: the CLI's default). */
+  AGENT_MODEL: optional,
+  /** Deprecated: use AGENT_MODEL instead. */
   PLAYBOOK_MODEL: optional,
   /** Runtime data (worktrees, run logs). Default <repo>/.data */
   TESSERAX_DATA_DIR: optional,
-  /** Max seconds for one headless playbook run. */
-  PLAYBOOK_TIMEOUT_SECONDS: z.coerce.number().int().positive().default(1800),
   /** Base URL of the web app, for links in notifications. */
   WEB_BASE_URL: z.string().default('http://127.0.0.1:5180'),
 
@@ -71,7 +77,10 @@ export const envSchema = z.object({
       .map(Number)
       .filter(Number.isFinite),
   ),
-});
+}).transform(data => ({
+  ...data,
+  AGENT_MODEL: data.AGENT_MODEL ?? data.PLAYBOOK_MODEL,
+}));
 
 export type AppConfig = z.infer<typeof envSchema>;
 

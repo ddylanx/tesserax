@@ -4,16 +4,15 @@ import type { AppConfig } from '@tesserax/config';
 import { CONFIG, createLogger } from '@tesserax/core';
 import { AgentsModule, AgentsService } from '@tesserax/mod-agents';
 import { McpModule, McpService } from '@tesserax/mod-mcp';
-import { PipelineModule, PipelineService } from '@tesserax/mod-pipeline';
 import { TasksModule, TasksService } from '@tesserax/mod-tasks';
 import { WorkflowEngine, WorkflowModule } from '@tesserax/mod-workflow';
 import { HELP, createBot } from './bot';
-import { formatPipelineNotice, formatWorkflowNotice } from './format';
+import { formatWorkflowNotice } from './format';
 
 const log = createLogger('telegram');
 
 /** Read-only Telegram bot over long polling (no public URL needed). Off when TELEGRAM_BOT_TOKEN is empty. */
-@Module({ imports: [TasksModule, AgentsModule, McpModule, PipelineModule, WorkflowModule] })
+@Module({ imports: [TasksModule, AgentsModule, McpModule, WorkflowModule] })
 export class TelegramModule implements OnApplicationBootstrap, OnApplicationShutdown {
   private bot?: Bot;
 
@@ -22,7 +21,6 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
     private readonly tasks: TasksService,
     private readonly agents: AgentsService,
     private readonly mcp: McpService,
-    private readonly pipeline: PipelineService,
     private readonly workflow: WorkflowEngine,
   ) {}
 
@@ -33,14 +31,6 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
         .sendMessage(userId, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } })
         .catch(err => log.warn({ err: (err as Error).message, userId }, 'telegram notify failed'));
     }
-  }
-
-  /** Notifications only (no actions from Telegram yet): classification ready, awaiting verify, failed. */
-  private subscribePipeline() {
-    this.pipeline.onTransition(async (run, _from, to) => {
-      const text = formatPipelineNotice(run, to, this.config.WEB_BASE_URL);
-      if (text) await this.notify(text);
-    });
   }
 
   /** Workflow runs: waiting for a person, failed, done. */
@@ -58,7 +48,6 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
     }
     const allowed = this.config.TELEGRAM_ALLOWED_USER_IDS;
     if (allowed.length === 0) log.warn('TELEGRAM_ALLOWED_USER_IDS is empty: the bot will answer nobody except with their user id');
-    this.subscribePipeline();
     this.subscribeWorkflow();
     this.bot = createBot(token, allowed, {
       tasks: () => this.tasks.list({}),

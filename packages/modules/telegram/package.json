@@ -12,7 +12,6 @@
     "@tesserax/core": "workspace:*",
     "@tesserax/mod-agents": "workspace:*",
     "@tesserax/mod-mcp": "workspace:*",
-    "@tesserax/mod-pipeline": "workspace:*",
     "@tesserax/mod-tasks": "workspace:*",
     "@tesserax/mod-workflow": "workspace:*",
     "grammy": "^1.37.0"

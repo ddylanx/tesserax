@@ -41,7 +41,7 @@ const aiStep: NodeExecutor = async ctx => {
   const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.AGENT_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
@@ -61,7 +61,7 @@ const aiReview: NodeExecutor = async ctx => {
   );
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.AGENT_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
   });
   const verdict = [...text.matchAll(/VERDICT:\s*(PASS|FAIL)/gi)].at(-1)?.[1]?.toUpperCase();
   if (!verdict) throw new Error('The review did not end with VERDICT: PASS or VERDICT: FAIL');
@@ -160,7 +160,7 @@ async function draft(ctx: NodeContext) {
   const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
-    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.AGENT_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
   });
   return { text, wt, info, cost: costUsd, turns: numTurns, skillHash: skill?.hash ?? null };
 }
@@ -211,7 +211,7 @@ const gitPr: NodeExecutor = async ctx => {
 const aiClassify: NodeExecutor = async ctx => {
   await ctx.tasks.ensureDetail(ctx.task.id).catch(() => undefined);
   const task = (await ctx.tasks.getTask(ctx.task.id)) ?? ctx.task;
-  const { classification, engine, fallbackReason } = await ctx.classifier.classify({ task, playbooks: [], mappedRepo: null });
+  const { classification, engine, fallbackReason } = await ctx.classifier.classify({ task, mappedRepo: null });
   const vars = { ...((ctx.run.vars ?? {}) as object), classification: { ...classification, engine } };
   await ctx.engine.patchRun(ctx.run.id, { vars: JSON.stringify(vars) });
   const md = [

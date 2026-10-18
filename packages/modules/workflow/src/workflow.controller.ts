@@ -192,7 +192,7 @@ export class WorkflowController {
         const prompt = withSkills(renderTemplate(parsed.data.prompt, { task, artifacts: {}, repoPath: repo, worktreePath: repo }), [skill]);
         const started = Date.now();
         const { text, run } = await askClaude({
-          bin: this.config.CLAUDE_BIN, cwd, prompt, timeoutSeconds: 600, model: this.config.PLAYBOOK_MODEL,
+          bin: this.config.CLAUDE_BIN, cwd, prompt, timeoutSeconds: 600, model: this.config.AGENT_MODEL,
           allowedTools: ['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)'],
         });
         return { output: text, costUsd: run.result?.total_cost_usd ?? null, seconds: Math.round((Date.now() - started) / 1000), skillHash: skill.hash, cwd: repo ? 'repo (read-only)' : 'empty folder (no repo mapped)' };

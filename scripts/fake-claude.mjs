@@ -18,7 +18,7 @@ process.stdin.on('end', async () => {
     if (mode === 'invalid') return out({ subtype: 'success', is_error: false, result: 'I think it is a bug.' });
     const issue = input.slice(input.indexOf('<issue>'), input.indexOf('</issue>'));
     const bug = /type: bug|Safari|crash|exception/i.test(issue);
-    const reply = { type: bug ? 'bug' : 'question', automation: bug ? 'assisted' : 'auto', playbook: bug ? 'investigate-bug' : 'research-question', repo: null, confidence: 0.82, reasoning: 'Fake classifier: keyword match.' };
+    const reply = { type: bug ? 'bug' : 'question', automation: bug ? 'assisted' : 'auto', repo: null, confidence: 0.82, reasoning: 'Fake classifier: keyword match.' };
     out({ subtype: 'success', is_error: false, result: '```json\n' + JSON.stringify(reply) + '\n```' });
     if (mode === 'hang') setInterval(() => {}, 1000);
     return;
@@ -40,9 +40,9 @@ process.stdin.on('end', async () => {
     const fb = input.includes('asks for these changes') ? '\n\n(Revised after developer feedback.)' : '';
     return out({ subtype: 'success', is_error: false, result: `## Summary\nFake output of ${name} for the ticket.${fb}\n\n## Details\n- point one\n- point two` });
   }
-  // playbook run: make a visible change in the working folder
+  // agent run: make a visible change in the working folder
   await new Promise(r => setTimeout(r, Number(process.env.FAKE_CLAUDE_SLEEP ?? 1) * 1000));
   writeFileSync('OT_FAKE_CHANGE.md', `fake agent change\n`);
   appendFileSync('README.md', `\n<!-- touched by fake agent ${sid} -->\n`);
-  out({ subtype: 'success', is_error: false, result: `## Summary\nFake run of the playbook.\n\n- Read the issue\n- Changed README.md and added OT_FAKE_CHANGE.md\n\nPrompt length: ${input.length} chars.` });
+  out({ subtype: 'success', is_error: false, result: `## Summary\nFake run of the agent.\n\n- Read the issue\n- Changed README.md and added OT_FAKE_CHANGE.md\n\nPrompt length: ${input.length} chars.` });
 });

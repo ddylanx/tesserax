@@ -13,7 +13,7 @@ export interface RenderContext {
   projectVars?: Record<string, string>;
 }
 
-/** The ticket as delimited, untrusted data (the same framing as the classifier and playbooks). */
+/** The ticket as delimited, untrusted data (the same framing as the classifier). */
 export function issueBlock(t: TaskDetailDto): string {
   const body = [
     `key: ${t.key ?? ''}`, `title: ${t.title}`, `type: ${t.type ?? ''}`, `status: ${t.status ?? ''}`, `priority: ${t.priority ?? ''}`,

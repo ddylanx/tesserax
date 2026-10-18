@@ -111,3 +111,37 @@ test('WorkflowEngine resolves graph and nodes correctly', async () => {
   assert.throws(() => engine.node(run, 'non-existent'), /is not in this run's workflow/);
 });
 
+test('envSchema converts AUTO_START=pipeline to workflow with warning and falls back PLAYBOOK_MODEL to AGENT_MODEL', async () => {
+  const { envSchema } = await import('@tesserax/config');
+  const res1 = envSchema.safeParse({ AUTO_START: 'pipeline', PLAYBOOK_MODEL: 'legacy-model' });
+  assert.ok(res1.success);
+  assert.equal(res1.data.AUTO_START, 'workflow');
+  assert.equal(res1.data.AGENT_MODEL, 'legacy-model');
+
+  const res2 = envSchema.safeParse({ AUTO_START: 'off', AGENT_MODEL: 'new-model', PLAYBOOK_MODEL: 'legacy-model' });
+  assert.ok(res2.success);
+  assert.equal(res2.data.AUTO_START, 'off');
+  assert.equal(res2.data.AGENT_MODEL, 'new-model');
+});
+
+test('classificationSchema and runDiffSchema validate expected contracts without playbook', async () => {
+  const { classificationSchema, runDiffSchema } = await import('@tesserax/contracts');
+  const parsedClassify = classificationSchema.safeParse({
+    type: 'bug',
+    automation: 'assisted',
+    repo: 'my-repo',
+    confidence: 0.95,
+    reasoning: 'Clear bug description',
+  });
+  assert.ok(parsedClassify.success);
+  assert.equal('playbook' in (parsedClassify.data as any), false);
+
+  const parsedDiff = runDiffSchema.safeParse({
+    base: 'origin/main',
+    patch: '--- a/file\n+++ b/file',
+    truncated: false,
+  });
+  assert.ok(parsedDiff.success);
+  assert.equal(parsedDiff.data.base, 'origin/main');
+});
+

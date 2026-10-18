@@ -2,7 +2,6 @@ import type { Classification, TaskDetailDto } from '@tesserax/contracts';
 
 export interface ClassifierContext {
   task: TaskDetailDto;
-  playbooks: { id: string; name: string; appliesTo: string[]; description: string }[];
   mappedRepo: string | null;
 }
 

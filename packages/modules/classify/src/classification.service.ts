@@ -4,7 +4,7 @@ import type { Classification } from '@tesserax/contracts';
 import type { Classifier, ClassifierContext } from './classifier';
 import { RulesClassifier } from './rules.classifier';
 
-const log = createLogger('pipeline.classify');
+const log = createLogger('classify');
 
 /** Tries each engine in order; the rules engine always answers. */
 @Injectable()
@@ -21,8 +21,6 @@ export class ClassificationService {
     for (const engine of this.engines) {
       try {
         const classification = await engine.classify(ctx);
-        // Only playbooks that exist; the repo comes from config/repos.json, not from the issue text.
-        if (classification.playbook && !ctx.playbooks.some(p => p.id === classification.playbook)) classification.playbook = null;
         classification.repo = ctx.mappedRepo;
         return { classification, engine: engine.name, fallbackReason };
       } catch (err) {
