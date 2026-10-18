@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "approved-tool": {
+      "command": "uvx",
+      "args": ["approved-tool-package"],
+      "env": {
+        "TOOL_TOKEN": "secret_approved_val"
+      }
+    },
+    "rejected-tool": {
+      "command": "uvx",
+      "args": ["rejected-tool-package"]
+    },
+    "unapproved-tool": {
+      "command": "uvx",
+      "args": ["unapproved-tool-package"]
+    }
+  }
+}

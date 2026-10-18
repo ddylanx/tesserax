@@ -29,7 +29,7 @@ Stop with Ctrl+C. `pnpm db:down` stops Postgres (data is kept in a Docker volume
 
 - **Inbox**: the automation pipeline (below): issues waiting for your decision, running playbooks, results waiting for you to verify.
 
-- **MCP**: every MCP server configured on this machine (Claude Code user/local/project scopes, Cursor, Claude Desktop, Codex, Gemini, Antigravity), on/off, read-only. It reuses the reader in `../agent-cockpit/src/mcp.mjs` (`AGENT_COCKPIT_MCP_PATH` to point elsewhere); without it, a built-in Claude Code-only reader is used. Only names, transport and env key names are read, never values.
+- **MCP**: every MCP server configured on this machine (Claude Code user/local/project scopes, Cursor, Claude Desktop, Codex, Gemini, Antigravity), on/off, read-only. Read directly from local configurations across supported tools (Claude Code, Cursor, Claude Desktop, Codex CLI, Gemini CLI, Antigravity). Only names, transport and env key names are read, never values.
 - **Tasks**: your Jira Cloud issues, read-only, synced every ~2 minutes (pg-boss schedule with up to 30 s jitter) and on start; "Sync now" queues one right away. Filters: text, workspace, status, project, archived. Issues the query stops returning are archived, not deleted.
 - **Agents**: Claude Code sessions on this machine: running / needs you / idle / ended, folder, git branch, last activity, prompt and tool counts, token usage. Click a row for its recent events. Fed by Claude Code hooks (below).
 - **System**: health of Postgres and pg-boss, workspaces, schedules, which integrations are configured.

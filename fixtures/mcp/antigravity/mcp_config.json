@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "antigravity-mock": {
+      "type": "sse",
+      "url": "https://antigravity.example.com/sse",
+      "env": {
+        "ANTIGRAVITY_TOKEN": "secret_anti_val"
+      }
+    }
+  }
+}
