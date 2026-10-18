@@ -107,3 +107,44 @@ export const taskDetailSchema = taskSchema.extend({
   ),
 });
 export type TaskDetailDto = z.infer<typeof taskDetailSchema>;
+
+export interface TaskSourceRecord {
+  id: string;
+  kind: string;
+  projectId: string;
+  config: unknown;
+}
+
+export interface TaskRecord {
+  id: string;
+  sourceId: string;
+  externalId: string;
+  key: string | null;
+  url: string | null;
+}
+
+export interface SyncResult {
+  upserted: number;
+  inserted: string[];
+  firstSync: boolean;
+  detailed: number;
+  archived: number;
+  truncated: boolean;
+}
+
+export interface TaskDetailUpdate {
+  comments: Array<{ author: string | null; created: string | null; body: string }>;
+  attachments: Array<{ filename: string; mimeType: string | null; size: number | null; created: string | null; author: string | null }>;
+}
+
+export interface TaskCommentResult {
+  id: string;
+  url?: string;
+}
+
+export interface TaskSource {
+  readonly kind: string; // 'jira' | 'github' | 'local'
+  sync(source: TaskSourceRecord): Promise<SyncResult>;
+  fetchDetail?(task: TaskRecord): Promise<TaskDetailUpdate>;
+  postComment?(task: TaskRecord, markdown: string): Promise<TaskCommentResult>;
+}

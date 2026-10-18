@@ -23,6 +23,7 @@ import { HandoffService } from './handoff.service';
 import { postReviewComment } from './review';
 import { computeMetrics } from './metrics';
 import { SkillCatalog } from '@tesserax/mod-skills';
+import { PrProviderRegistry } from './providers/pr-provider.registry';
 
 async function guard<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -40,6 +41,7 @@ export class WorkflowController {
     private readonly engine: WorkflowEngine,
     private readonly skills: SkillCatalog,
     private readonly tasks: TasksService,
+    private readonly prRegistry: PrProviderRegistry,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
     classifier: ClassificationService,
@@ -90,7 +92,7 @@ export class WorkflowController {
       try {
         const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', id).executeTakeFirstOrThrow();
         const task = await this.tasks.getTask(run.task_id);
-        const result = await postReviewComment(this.config, run, task!, parsed.data.text);
+        const result = await postReviewComment(this.prRegistry, run, task!, parsed.data.text);
         await this.engine.event(id, 'user', 'pr_comment_posted', result, nr.id);
         await this.engine.complete(nr.id, 'posted', { ...(nr.output as object), ...result }, 'user', ['running']);
         return result;

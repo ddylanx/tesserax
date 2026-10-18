@@ -19,6 +19,8 @@ export const repositorySchema = z.object({
   remote: z.string().min(1).max(100).optional(),
   /** Bitbucket "workspace/repo" when it cannot be read from the origin URL. */
   bitbucket: z.string().regex(/^[\w.-]+\/[\w.-]+$/).optional(),
+  /** Explicit PR provider (default: detected from remote URL or bitbucket field). */
+  pr: z.enum(['bitbucket', 'github']).optional(),
 });
 export type Repository = z.infer<typeof repositorySchema>;
 
@@ -91,6 +93,7 @@ export interface ResolvedWorkplace {
   base?: string;
   remote?: string;
   bitbucket?: string;
+  pr?: 'bitbucket' | 'github';
 }
 
 export const setTaskWorkplaceSchema = z.object({ workplaceId: slug.nullable() });

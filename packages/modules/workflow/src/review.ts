@@ -5,13 +5,14 @@ import { basename, join } from 'node:path';
 import { promisify } from 'node:util';
 import type { AppConfig } from '@tesserax/config';
 import { dataDir } from '@tesserax/config';
-import type { TaskDetailDto } from '@tesserax/contracts';
+import type { PrProvider, PrRef, TaskDetailDto } from '@tesserax/contracts';
 import type { WorkflowRun } from '@tesserax/db';
 import { resolveBaseRef } from '@tesserax/agent-runtime';
 import { repoRegistry } from '@tesserax/mod-repos';
-import { BitbucketClient, commentOnPr, findOpenPr, parseBitbucketRemote, parsePrUrl, remoteUrl } from './bitbucket';
+import { remoteUrl } from './bitbucket';
 import type { WorkflowEngine } from './engine.service';
 import { FatalNodeError } from './executors/types';
+import { PrProviderRegistry } from './providers/pr-provider.registry';
 import { ensureWorktreeLinks, getProjectVars } from './worktree-links';
 
 const exec = promisify(execFile);
@@ -53,22 +54,27 @@ export async function ensureReviewWorktree(engine: WorkflowEngine, config: AppCo
   return { worktree: path, repoPath: entry.path, baseRef, branch: review.sourceBranch };
 }
 
-/** Posts the approved review on the member's Bitbucket PR (PR from the task's URL, else the open PR for the branch). */
-export async function postReviewComment(config: AppConfig, run: WorkflowRun, task: TaskDetailDto, markdown: string) {
-  const email = config.BITBUCKET_EMAIL ?? config.JIRA_EMAIL;
-  if (!config.BITBUCKET_API_TOKEN || !email) {
-    throw new Error('Bitbucket is not configured: add BITBUCKET_API_TOKEN (Atlassian API token with Bitbucket scopes read:repository, read:pullrequest, write:pullrequest) to .env, or Skip.');
-  }
-  const client = new BitbucketClient({ baseUrl: config.BITBUCKET_API_URL, email, token: config.BITBUCKET_API_TOKEN });
-  let pr = task.review?.prUrl ? parsePrUrl(task.review.prUrl) : null;
-  if (!pr) {
+/** Posts the approved review on the member's PR using the resolved PR provider. */
+export async function postReviewComment(prRegistry: PrProviderRegistry, run: WorkflowRun, task: TaskDetailDto, markdown: string) {
+  let resolvedPr: { provider: PrProvider; pr: PrRef } | null = null;
+  if (task.review?.prUrl) {
+    resolvedPr = prRegistry.parsePrUrl(task.review.prUrl);
+    if (!resolvedPr) {
+      throw new Error(`Unsupported PR URL: "${task.review.prUrl}". No matching PR provider found.`);
+    }
+  } else {
     const entry = repoRegistry.resolve(task);
     if (!entry || !run.branch) throw new Error('No PR link on the task and no repo/branch to look it up.');
-    const repo = entry.bitbucket ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! } : parseBitbucketRemote(await remoteUrl(entry.path, entry.remote ?? 'origin'));
-    if (!repo) throw new Error('The repo is not on Bitbucket (or set its Bitbucket workspace/repo on the Repos page).');
-    pr = await findOpenPr(client, repo.workspace, repo.slug, run.branch);
-    if (!pr) throw new Error(`No open PR found for branch ${run.branch}. Add the PR link to the task.`);
+    const explicitKind = entry.pr ?? (entry.bitbucket ? 'bitbucket' : null);
+    const gitRemoteUrl = entry.bitbucket ?? (await remoteUrl(entry.path, entry.remote ?? 'origin'));
+    const resolved = prRegistry.resolve(gitRemoteUrl, explicitKind);
+    if (!resolved) {
+      throw new Error('The repo does not match any PR provider (or set its provider / workspace on the Repos page).');
+    }
+    const foundPr = await resolved.provider.findOpenPr(resolved.repo, run.branch);
+    if (!foundPr) throw new Error(`No open PR found for branch ${run.branch}. Add the PR link to the task.`);
+    resolvedPr = { provider: resolved.provider, pr: foundPr };
   }
-  const { id } = await commentOnPr(client, pr, markdown);
-  return { commentId: id, prUrl: pr.url };
+  const { id } = await resolvedPr.provider.comment(resolvedPr.pr, markdown);
+  return { commentId: id, prUrl: resolvedPr.pr.url };
 }

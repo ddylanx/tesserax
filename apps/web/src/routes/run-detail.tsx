@@ -263,10 +263,10 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
       <CardContent className="flex flex-col gap-3 text-sm">
         {node.type !== 'trigger.jira' && run.status !== 'running' && !waiting && <RunFrom run={run} node={node} />}
         {agentOf(node) && ['running', 'waiting', 'failed', 'cancelled', 'done'].includes(run.status) && last?.status !== 'running' && !(waiting && node.type === 'agent.run') && <AgentPicker run={run} node={node} />}
-        {last && ['ai.step', 'ai.review', 'agent.run', 'doc.write', 'jira.comment', 'git.pr'].includes(node.type) && last.status !== 'waiting' && <LiveLog runId={run.id} nodeRun={last} />}
+        {last && ['ai.step', 'ai.review', 'agent.run', 'doc.write', 'jira.comment', 'task.comment', 'git.pr'].includes(node.type) && last.status !== 'waiting' && <LiveLog runId={run.id} nodeRun={last} />}
         {waiting && node.type === 'human.gate' && <GatePanel run={run} cfg={cfg} />}
         {waiting && node.type === 'evaluate' && <EvaluatePanel run={run} criteria={cfg.criteria ?? []} />}
-        {waiting && (node.type === 'jira.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type} output={cfg.output ?? ''} />}
+        {waiting && (node.type === 'jira.comment' || node.type === 'task.comment' || node.type === 'git.pr') && last && <ConfirmPanel run={run} nodeRun={last} type={node.type as 'jira.comment' | 'task.comment' | 'git.pr'} output={cfg.output ?? ''} />}
         {waiting && node.type === 'agent.run' && last?.output.choose === true && <ExecutorPicker run={run} error={last.error} />}
         {waiting && node.type === 'pr.comment' && last && <PrCommentPanel run={run} nodeRun={last} />}
         {!waiting && last?.status === 'done' && node.type === 'pr.comment' && typeof last.output.prUrl === 'string' && last.port === 'posted' && (
@@ -281,7 +281,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
           <p className="text-xs text-muted-foreground">Written to <code>{last.output.path}</code>{last.output.commit ? <> and committed ({String(last.output.commit)})</> : ' (unchanged, no commit)'}.</p>
         )}
         {!waiting && node.type === 'human.gate' && (cfg.show ?? []).map(n => <ArtifactView key={n} run={run} name={n} />)}
-        {cfg.output && !(waiting && (node.type === 'jira.comment' || node.type === 'git.pr')) && <ArtifactView run={run} name={cfg.output} />}
+        {cfg.output && !(waiting && (node.type === 'jira.comment' || node.type === 'task.comment' || node.type === 'git.pr')) && <ArtifactView run={run} name={cfg.output} />}
         {node.type === 'agent.run' && <DiffToggle runId={run.id} />}
         {node.type === 'evaluate' && run.evaluation && (
           <div className="text-xs">{Object.entries(run.evaluation.scores).map(([k, v]) => <div key={k}>{k}: <b>{v}/5</b></div>)}{run.evaluation.note && <p className="mt-1 text-muted-foreground">“{run.evaluation.note}”</p>}</div>
@@ -349,7 +349,7 @@ function GatePanel({ run, cfg }: { run: WorkflowRunDetail; cfg: { show?: string[
   );
 }
 
-function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; nodeRun: NodeRunDto; type: 'jira.comment' | 'git.pr'; output: string }) {
+function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; nodeRun: NodeRunDto; type: 'jira.comment' | 'task.comment' | 'git.pr'; output: string }) {
   const qc = useQueryClient();
   const o = nodeRun.output as { title?: string; target?: string; source?: string; commits?: string[]; uncommitted?: string[] };
   const [text, setText] = useState(() => artifactsOf(run, output)[0]?.content ?? '');

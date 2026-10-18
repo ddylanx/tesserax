@@ -192,3 +192,45 @@ test('WorkflowEngine resolves graph and nodes correctly', async () => {
   assert.throws(() => engine.node(run, 'non-existent'), /is not in this run's workflow/);
 });
 
+test('validates workflows with task.comment and alias jira.comment nodes', () => {
+  const wTask: WorkflowDefinition = {
+    id: 'wf-task', name: 'Workflow with task.comment', description: '',
+    nodes: [
+      { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+      { id: 'c', type: 'task.comment', label: 'Comment', position: { x: 0, y: 0 }, config: { prompt: 'draft comment' } },
+    ],
+    edges: [{ id: 'e1', source: 't', port: 'next', target: 'c' }],
+  };
+  assert.deepEqual(validateWorkflow(wTask), []);
+
+  const wJira: WorkflowDefinition = {
+    id: 'wf-jira', name: 'Workflow with jira.comment alias', description: '',
+    nodes: [
+      { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+      { id: 'c', type: 'jira.comment', label: 'Jira Comment', position: { x: 0, y: 0 }, config: { prompt: 'draft comment' } },
+    ],
+    edges: [{ id: 'e1', source: 't', port: 'next', target: 'c' }],
+  };
+  assert.deepEqual(validateWorkflow(wJira), []);
+
+  // Both node types support 'posted' and 'skipped' ports
+  const wPorts: WorkflowDefinition = {
+    id: 'wf-ports', name: 'Workflow ports check', description: '',
+    nodes: [
+      { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+      { id: 'tc', type: 'task.comment', label: 'TC', position: { x: 0, y: 0 }, config: { prompt: 'p' } },
+      { id: 'jc', type: 'jira.comment', label: 'JC', position: { x: 0, y: 0 }, config: { prompt: 'p' } },
+      { id: 'end1', type: 'evaluate', label: 'End1', position: { x: 0, y: 0 }, config: {} },
+      { id: 'end2', type: 'evaluate', label: 'End2', position: { x: 0, y: 0 }, config: {} },
+    ],
+    edges: [
+      { id: 'e1', source: 't', port: 'next', target: 'tc' },
+      { id: 'e2', source: 'tc', port: 'posted', target: 'jc' },
+      { id: 'e3', source: 'tc', port: 'skipped', target: 'end1' },
+      { id: 'e4', source: 'jc', port: 'posted', target: 'end1' },
+      { id: 'e5', source: 'jc', port: 'skipped', target: 'end2' },
+    ],
+  };
+  assert.deepEqual(validateWorkflow(wPorts), []);
+});
+

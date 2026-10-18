@@ -353,14 +353,18 @@ export class WorkflowEngine {
     if (!Number(claimed.numUpdatedRows)) throw new RunConflict('This step is already being confirmed.');
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
     const node = this.node(run, nr.node_id);
-    const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : 'jira_comment');
+    const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : (nr.node_type === 'task.comment' ? 'task_comment' : 'jira_comment'));
     try {
       if ((await this.latestArtifact(runId, outputName))?.content !== a.text) await this.saveArtifact(runId, nr.id, outputName, a.text, 'user');
-      const result = nr.node_type === 'jira.comment'
-        ? await this.vcs.postJiraComment(run, a.text)
+      const isCommentNode = nr.node_type === 'jira.comment' || nr.node_type === 'task.comment';
+      const result = isCommentNode
+        ? await this.vcs.postTaskComment(run, a.text)
         : await this.vcs.openPullRequest(run, nr, a);
-      await this.event(runId, 'user', nr.node_type === 'jira.comment' ? 'jira_comment_posted' : 'pull_request_opened', result, nr.id);
-      await this.complete(nr.id, nr.node_type === 'jira.comment' ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
+      const actionName = nr.node_type === 'jira.comment'
+        ? 'jira_comment_posted'
+        : (nr.node_type === 'task.comment' ? 'task_comment_posted' : 'pull_request_opened');
+      await this.event(runId, 'user', actionName, result, nr.id);
+      await this.complete(nr.id, isCommentNode ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
       return result;
     } catch (err) {
       const message = String((err as Error).message ?? err).slice(0, 2000);

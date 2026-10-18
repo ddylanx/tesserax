@@ -1,6 +1,6 @@
 import { Inject, Module, type OnApplicationBootstrap, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { AppConfig } from '@tesserax/config';
-import { CONFIG, DB, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@tesserax/core';
+import { CONFIG, DB, PR_PROVIDERS, QUEUE, SCHEDULES, createLogger, type Queue, type ScheduleRegistry } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { ClassificationService, ClassifyModule } from '@tesserax/mod-classify';
 import { TasksModule, TasksService } from '@tesserax/mod-tasks';
@@ -11,6 +11,8 @@ import { ArtifactService } from './artifact.service';
 import { WorkflowQueryService } from './query.service';
 import { WorkflowVcsService } from './vcs.service';
 import { SkillCatalog } from '@tesserax/mod-skills';
+import { BitbucketPrProvider } from './providers/bitbucket-pr-provider';
+import { PrProviderRegistry } from './providers/pr-provider.registry';
 
 const log = createLogger('workflow');
 
@@ -18,12 +20,19 @@ const log = createLogger('workflow');
   imports: [TasksModule, ClassifyModule],
   controllers: [WorkflowController],
   providers: [
+    BitbucketPrProvider,
+    {
+      provide: PR_PROVIDERS,
+      useFactory: (bb: BitbucketPrProvider) => [bb],
+      inject: [BitbucketPrProvider],
+    },
+    PrProviderRegistry,
     ArtifactService,
     WorkflowQueryService,
     WorkflowVcsService,
     WorkflowEngine,
   ],
-  exports: [WorkflowEngine, ArtifactService, WorkflowQueryService, WorkflowVcsService],
+  exports: [WorkflowEngine, ArtifactService, WorkflowQueryService, WorkflowVcsService, PrProviderRegistry],
 })
 export class WorkflowModule implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private watcher?: NodeJS.Timeout;

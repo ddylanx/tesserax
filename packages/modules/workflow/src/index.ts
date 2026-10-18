@@ -6,3 +6,5 @@ export * from './artifact.service';
 export * from './query.service';
 export * from './vcs.service';
 export * from './worktree-links';
+export * from './providers/pr-provider.registry';
+export * from './providers/bitbucket-pr-provider';

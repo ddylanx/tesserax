@@ -6,7 +6,8 @@ import type { Db, NodeRun, WorkflowRun } from '@tesserax/db';
 import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@tesserax/agent-runtime';
 import { repoRegistry } from '@tesserax/mod-repos';
 import { TasksService } from '@tesserax/mod-tasks';
-import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
+import { pushBranch, remoteUrl } from './bitbucket';
+import { PrProviderRegistry } from './providers/pr-provider.registry';
 import { ensureWorktreeLinks, getProjectVars } from './worktree-links';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class WorkflowVcsService {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
     private readonly tasks: TasksService,
+    private readonly prRegistry: PrProviderRegistry,
   ) {}
 
   /**
@@ -70,29 +72,23 @@ export class WorkflowVcsService {
     if (!commits.length) {
       throw new Error(`Nothing is committed on ${run.branch} compared with ${run.base_ref}; there is nothing to open a PR for.`);
     }
-    const repo = entry?.bitbucket
-      ? { workspace: entry.bitbucket.split('/')[0]!, slug: entry.bitbucket.split('/')[1]! }
-      : parseBitbucketRemote(await remoteUrl(run.repo_path, remote));
-    if (!repo) {
-      throw new Error(`Remote "${remote}" is not a Bitbucket repository; set "Bitbucket workspace/repo" on the repository (Repos page).`);
-    }
-    const email = this.config.BITBUCKET_EMAIL ?? this.config.JIRA_EMAIL;
-    if (!this.config.BITBUCKET_API_TOKEN || !email) {
-      throw new Error('Bitbucket is not configured: set BITBUCKET_API_TOKEN (and BITBUCKET_EMAIL if it differs from JIRA_EMAIL) in .env.');
+    const explicitKind = entry?.pr ?? (entry?.bitbucket ? 'bitbucket' : null);
+    const gitRemoteUrl = entry?.bitbucket ?? (await remoteUrl(run.repo_path, remote));
+    const resolved = this.prRegistry.resolve(gitRemoteUrl, explicitKind);
+    if (!resolved) {
+      const hint = explicitKind
+        ? `Provider "${explicitKind}" could not detect repository from "${gitRemoteUrl}".`
+        : `Remote "${remote}" is not supported by any PR provider; configure "pr" or set repository details on the Repos page.`;
+      throw new Error(hint);
     }
     const pushLog = await pushBranch(run.worktree_path, remote, run.branch).catch(e => {
       throw new Error(`git push failed: ${String((e as { stderr?: string }).stderr ?? (e as Error).message).trim().slice(0, 800)}`);
     });
-    const pr = await new BitbucketClient({
-      baseUrl: this.config.BITBUCKET_API_URL,
-      email,
-      token: this.config.BITBUCKET_API_TOKEN,
-    }).openPullRequest({
-      ...repo,
+    const pr = await resolved.provider.createPr(resolved.repo, {
       title,
-      description: a.text,
+      body: a.text,
       source: run.branch,
-      destination: target,
+      target,
     });
     return {
       prUrl: pr.url,
@@ -105,12 +101,17 @@ export class WorkflowVcsService {
     };
   }
 
-  async postJiraComment(run: WorkflowRun, text: string) {
+  async postTaskComment(run: WorkflowRun, text: string) {
     const task = await this.tasks.getTask(run.task_id);
-    if (!task?.key) throw new Error('This task has no Jira key.');
-    const client = await this.tasks.jiraClient();
-    if (!client) throw new Error('Jira is not configured (JIRA_* in .env).');
-    const { id } = await client.addComment(task.key, text);
-    return { commentId: id, issueKey: task.key };
+    const result = await this.tasks.postComment(run.task_id, text);
+    return {
+      commentId: result.id,
+      issueKey: task?.key ?? null,
+      commentUrl: result.url ?? null,
+    };
+  }
+
+  async postJiraComment(run: WorkflowRun, text: string) {
+    return this.postTaskComment(run, text);
   }
 }

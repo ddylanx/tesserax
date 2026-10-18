@@ -22,6 +22,7 @@ export const NODE_META: Record<string, NodeMeta> = {
   'check.command': { title: 'Checks', icon: TerminalSquare, tile: 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-300', accent: 'border-l-emerald-500', group: 'Code' },
   'doc.write': { title: 'Ticket doc', icon: FileText, tile: 'bg-teal-500/15 text-teal-600 dark:text-teal-300', accent: 'border-l-teal-500', group: 'Delivery' },
   'jira.comment': { title: 'Jira comment', icon: MessageSquare, tile: 'bg-blue-500/15 text-blue-600 dark:text-blue-300', accent: 'border-l-blue-500', group: 'Delivery' },
+  'task.comment': { title: 'Task comment', icon: MessageSquare, tile: 'bg-blue-500/15 text-blue-600 dark:text-blue-300', accent: 'border-l-blue-500', group: 'Delivery' },
   'pr.comment': { title: 'Comment on PR', icon: MessageSquareCode, tile: 'bg-cyan-500/15 text-cyan-600 dark:text-cyan-300', accent: 'border-l-cyan-500', group: 'Delivery' },
   'git.pr': { title: 'Pull request', icon: GitPullRequest, tile: 'bg-orange-500/15 text-orange-600 dark:text-orange-300', accent: 'border-l-orange-500', group: 'Delivery' },
 };

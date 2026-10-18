@@ -2,11 +2,12 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import { jiraConfigured, type AppConfig } from '@tesserax/config';
 import { randomUUID } from 'node:crypto';
-import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
+import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type SyncResult, type TaskCommentResult, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
 import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
-import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
+import { JIRA_SYNC_JOB, ensureJiraSource, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
+import { TaskSourceRegistry } from './task-source.registry';
 
 export type NewTasksListener = (taskIds: string[]) => Promise<void>;
 
@@ -21,6 +22,7 @@ export class TasksService {
     @Inject(QUEUE) private readonly queue: Queue,
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(PROJECT_DIRECTORY) private readonly projects: ProjectDirectory,
+    private readonly sourceRegistry: TaskSourceRegistry,
   ) {}
 
   async list(f: TaskQuery, limit = 500): Promise<TaskList> {
@@ -91,12 +93,25 @@ export class TasksService {
     return r ? this.toDetail(r) : null;
   }
 
-  /** Refreshes comments/attachments from Jira when they are missing (best effort). */
+  /** Refreshes comments/attachments from the task source when they are missing (best effort). */
   async ensureDetail(id: string): Promise<void> {
-    const t = await this.db.selectFrom('tasks').select(['id', 'key', 'external_id', 'detail_synced_at']).where('id', '=', id).executeTakeFirst();
-    const client = this.jiraClient();
-    if (!t || t.detail_synced_at || !client) return;
-    await syncTaskDetail(this.db, client, t);
+    const t = await this.db
+      .selectFrom('tasks as t')
+      .innerJoin('sources as s', 's.id', 't.source_id')
+      .select(['t.id', 't.key', 't.external_id', 't.url', 't.detail_synced_at', 's.id as source_id', 's.kind as source_kind'])
+      .where('t.id', '=', id)
+      .executeTakeFirst();
+    if (!t || t.detail_synced_at) return;
+    const provider = this.sourceRegistry.get(t.source_kind);
+    if (provider?.fetchDetail) {
+      await provider.fetchDetail({
+        id: t.id,
+        sourceId: t.source_id,
+        externalId: t.external_id,
+        key: t.key,
+        url: t.url,
+      });
+    }
   }
 
   private toDetail(r: any): TaskDetailDto {
@@ -239,5 +254,61 @@ export class TasksService {
     if (!jiraConfigured(this.config)) return { queued: false };
     const id = await this.queue.send(JIRA_SYNC_JOB, {}, { singletonKey: `${JIRA_SYNC_JOB}:manual`, singletonSeconds: 10 });
     return { queued: Boolean(id) };
+  }
+
+  canComment(sourceKind: string): boolean {
+    const provider = this.sourceRegistry.get(sourceKind);
+    return typeof provider?.postComment === 'function';
+  }
+
+  async postComment(taskId: string, markdown: string): Promise<TaskCommentResult> {
+    const task = await this.db
+      .selectFrom('tasks as t')
+      .innerJoin('sources as s', 's.id', 't.source_id')
+      .select(['t.id', 't.key', 't.external_id', 't.url', 't.source_id', 's.kind as source_kind'])
+      .where('t.id', '=', taskId)
+      .executeTakeFirst();
+    if (!task) throw new Error('Task not found');
+    const provider = this.sourceRegistry.get(task.source_kind);
+    if (!provider?.postComment) {
+      throw new Error(`Source "${task.source_kind}" does not support comments.`);
+    }
+    return provider.postComment(
+      {
+        id: task.id,
+        sourceId: task.source_id,
+        externalId: task.external_id,
+        key: task.key,
+        url: task.url,
+      },
+      markdown,
+    );
+  }
+
+  async syncAll(): Promise<SyncResult[]> {
+    if (jiraConfigured(this.config)) {
+      const creds = jiraCredentials(this.config);
+      if (creds) {
+        await ensureJiraSource(this.db, this.config, creds.site);
+      }
+    }
+    const sources = await this.db.selectFrom('sources').selectAll().execute();
+    const results: SyncResult[] = [];
+    for (const s of sources) {
+      const provider = this.sourceRegistry.get(s.kind);
+      if (!provider) continue;
+      const res = await provider.sync({
+        id: s.id,
+        kind: s.kind,
+        projectId: s.project_id,
+        config: s.config,
+      });
+      results.push(res);
+      if (res.inserted.length && !res.firstSync) {
+        await this.notifyNewTasks(res.inserted);
+      }
+    }
+    await this.projects.reassign();
+    return results;
   }
 }

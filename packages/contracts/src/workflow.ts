@@ -24,7 +24,7 @@ export const AI_ENGINES = ['claude', 'gemini', 'antigravity'] as const;
 export type AiEngine = (typeof AI_ENGINES)[number];
 export const AI_ENGINE_TITLES: Record<AiEngine, string> = { claude: 'Claude Code', gemini: 'Gemini CLI', antigravity: 'Antigravity CLI' };
 /** Node types whose config has an `engine`. */
-export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr'] as const;
+export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'task.comment', 'git.pr'] as const;
 
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
@@ -108,6 +108,18 @@ export const nodeConfigSchemas = {
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
   }),
+  'task.comment': z.object({
+    skill: z.string().optional(),
+    prompt: z.string().min(1),
+    inputs: z.array(artifactName).default([]),
+    output: artifactName.default('task_comment'),
+    allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().positive().optional(),
+    timeoutSeconds: z.number().int().positive().default(600),
+  }),
   'git.pr': z.object({
     skill: z.string().optional(),
     prompt: z.string().min(1),
@@ -145,13 +157,14 @@ export const NODE_PORTS: Record<NodeType, readonly string[]> = {
   'ai.review': ['pass', 'fail'],
   'doc.write': ['next'],
   'jira.comment': ['posted', 'skipped'],
+  'task.comment': ['posted', 'skipped'],
   'git.pr': ['opened', 'skipped'],
   'pr.comment': ['posted', 'skipped'],
   evaluate: ['end'],
 };
 
 /** Nodes that prepare a draft, then wait for the user's explicit confirmation before writing outside the machine. */
-export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'git.pr'];
+export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'task.comment', 'git.pr'];
 
 /** Node types that wait for the user instead of running. */
 export const HUMAN_NODE_TYPES: readonly NodeType[] = ['human.gate', 'evaluate'];
@@ -427,6 +440,7 @@ export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: stri
   'ai.review': { title: 'AI review', description: 'Reviews the diff against the spec with skills; ends PASS or FAIL.' },
   'doc.write': { title: 'Ticket doc', description: 'AI writes the ticket document into the repo (docs/<KEY>-<slug>.md) and commits it on the ticket branch.' },
   'jira.comment': { title: 'Jira comment', description: 'AI drafts a comment with the Jira-comment skill; posted only after you confirm.' },
+  'task.comment': { title: 'Task comment', description: 'AI drafts a comment on the task; posted only after you confirm.' },
   'git.pr': { title: 'Pull request', description: 'AI drafts the PR; after you confirm, the branch is pushed and a Bitbucket PR is opened.' },
   'pr.comment': { title: 'Comment on PR', description: 'Posts the review you approved as a comment on the member\'s Bitbucket PR, only after you confirm.' },
   evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },
@@ -452,5 +466,44 @@ export interface MetricsReport {
   }[];
   skills: { path: string; hash: string; current: boolean; nodeIds: string[]; uses: number; avgCostUsd: number | null; acceptedAsIs: number; edited: number; sentBack: number }[];
   evaluations: { runId: string; taskKey: string | null; workflowHash: string; scores: Record<string, number>; note: string | null; createdAt: string }[];
+}
+
+// ---------- PR Providers ----------
+
+export interface RepoRef {
+  owner: string; // Bitbucket workspace or GitHub org/user
+  repo: string;  // Repository slug
+}
+
+export interface PrRef {
+  owner: string;
+  repo: string;
+  id: number | string;
+  url: string;
+}
+
+export interface CreatePrInput {
+  source: string;
+  target: string;
+  title: string;
+  body: string;
+  draft?: boolean;
+}
+
+export interface CreatedPr extends PrRef {
+  existing: boolean;
+}
+
+export interface PrCommentResult {
+  id: number | string;
+}
+
+export interface PrProvider {
+  readonly kind: string; // 'bitbucket' | 'github'
+  detect(remoteUrl: string): RepoRef | null;
+  parsePrUrl(url: string): PrRef | null;
+  findOpenPr(repo: RepoRef, branch: string): Promise<PrRef | null>;
+  createPr(repo: RepoRef, input: CreatePrInput): Promise<CreatedPr>;
+  comment(pr: PrRef, markdown: string): Promise<PrCommentResult>;
 }
 

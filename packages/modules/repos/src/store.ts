@@ -37,8 +37,8 @@ export function normalizeOrigin(url: string | null | undefined): string | null {
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'repo';
 
-/** Legacy config/repos.json entry: project key -> path, or { path, base, remote, bitbucket }. */
-type LegacyEntry = string | { path: string; base?: string; remote?: string; bitbucket?: string };
+/** Legacy config/repos.json entry: project key -> path, or { path, base, remote, bitbucket, pr }. */
+type LegacyEntry = string | { path: string; base?: string; remote?: string; bitbucket?: string; pr?: 'bitbucket' | 'github' };
 
 /** Detects project stack conventions (test_command, worktree_links) from checkout manifest files. */
 export function detectRepoStack(checkoutPath: string): Record<string, string> {
@@ -273,7 +273,7 @@ export class RepoRegistryStore {
       const repo = reg.repositories.find(r => r.id === w.repositoryId);
       return {
         workplaceId: w.id, brand: w.brand, repositoryId: repo?.id ?? null, repositoryName: repo?.name ?? null, origin: repo?.origin ?? null,
-        path: w.path, base: w.base ?? repo?.base, remote: repo?.remote, bitbucket: repo?.bitbucket,
+        path: w.path, base: w.base ?? repo?.base, remote: repo?.remote, bitbucket: repo?.bitbucket, pr: repo?.pr,
       };
     }
     if (!task.project || !existsSync(this.legacyFile)) return null;
