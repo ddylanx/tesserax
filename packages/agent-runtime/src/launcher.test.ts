@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import { diffInfo, ensureWorktree, checkBranch } from './git';
 import { ALWAYS_DENIED, buildRunArgs } from './launcher';
 
-test('run args always deny push/merge/remote changes, whatever the playbook allows', () => {
+test('run args always deny push/merge/remote changes, whatever allowedTools contains', () => {
   const args = buildRunArgs({ sessionId: 's', permissionMode: 'acceptEdits', allowedTools: ['Edit', 'Bash(git push:*)'], maxBudgetUsd: 2 });
   const denied = args.slice(args.indexOf('--disallowedTools') + 1);
   for (const d of ['Bash(git push:*)', 'Bash(git merge:*)', 'Bash(git remote:*)', 'Bash(gh:*)']) assert.ok(denied.includes(d), d);

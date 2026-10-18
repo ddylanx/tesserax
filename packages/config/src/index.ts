@@ -19,7 +19,7 @@ const optional = z
   .optional()
   .transform(v => (v && v.trim() !== '' ? v.trim() : undefined));
 
-export const envSchema = z.object({
+export const rawEnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
   API_HOST: z.string().default('127.0.0.1'),
@@ -77,7 +77,9 @@ export const envSchema = z.object({
       .map(Number)
       .filter(Number.isFinite),
   ),
-}).transform(data => ({
+});
+
+export const envSchema = rawEnvSchema.transform(data => ({
   ...data,
   AGENT_MODEL: data.AGENT_MODEL ?? data.PLAYBOOK_MODEL,
 }));

@@ -6,7 +6,7 @@ import { ClaudeCliClassifier } from './claude-cli.classifier';
 
 const log = createLogger('classify');
 
-/** Issue classifier shared by Pipeline and Workflow. Rules engine always answers; Claude CLI goes first when configured. */
+/** Issue classifier for Workflow. Rules engine always answers; Claude CLI goes first when configured. */
 @Module({
   providers: [ClassificationService],
   exports: [ClassificationService],

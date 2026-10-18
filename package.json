@@ -10,7 +10,7 @@
     "init:data": "node scripts/init-data.mjs",
     "dev": "node scripts/init-data.mjs && pnpm db:up && turbo run dev",
     "typecheck": "turbo run typecheck",
-    "test": "turbo run test",
+    "test": "node scripts/init-data.mjs && turbo run test",
     "db:up": "docker compose -f infra/compose.dev.yml up -d --wait",
     "db:down": "docker compose -f infra/compose.dev.yml down",
     "db:migrate": "pnpm --filter @tesserax/db migrate",

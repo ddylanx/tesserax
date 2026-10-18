@@ -112,7 +112,11 @@ test('WorkflowEngine resolves graph and nodes correctly', async () => {
 });
 
 test('envSchema converts AUTO_START=pipeline to workflow with warning and falls back PLAYBOOK_MODEL to AGENT_MODEL', async () => {
-  const { envSchema } = await import('@tesserax/config');
+  const { envSchema, rawEnvSchema } = await import('@tesserax/config');
+  assert.ok(rawEnvSchema.shape.AUTO_START);
+  assert.ok(rawEnvSchema.shape.AGENT_MODEL);
+  assert.ok(rawEnvSchema.shape.PLAYBOOK_MODEL);
+
   const res1 = envSchema.safeParse({ AUTO_START: 'pipeline', PLAYBOOK_MODEL: 'legacy-model' });
   assert.ok(res1.success);
   assert.equal(res1.data.AUTO_START, 'workflow');

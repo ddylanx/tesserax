@@ -1,5 +1,5 @@
 #!/bin/sh
-# Creates a small throwaway git repo at .data/demo-repo for trying the pipeline with fixtures (project DEMO).
+# Creates a small throwaway git repo at .data/demo-repo for trying workflows with fixtures (project DEMO).
 set -e
 DIR="$(cd "$(dirname "$0")/.." && pwd)/.data/demo-repo"
 [ -d "$DIR/.git" ] && { echo "$DIR already exists"; exit 0; }
@@ -7,7 +7,7 @@ mkdir -p "$DIR/src" && cd "$DIR"
 git init -q -b main
 cat > README.md <<'MD'
 # Demo app
-A tiny app used to try the Tesserax pipeline.
+A tiny app used to try Tesserax workflows.
 MD
 cat > src/login.js <<'JS'
 export function submitLogin(form) {

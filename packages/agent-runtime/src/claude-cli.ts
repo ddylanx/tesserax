@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { envSchema } from '@tesserax/config';
+import { rawEnvSchema } from '@tesserax/config';
 import { appendFileSync, mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -14,7 +14,7 @@ const PARENT_SESSION_ENV = /^(CLAUDECODE$|CLAUDE_CODE_|CLAUDE_AGENT_SDK_|CLAUDE_
  * repo: it must not inherit our database URL or tokens (a Laravel test run connected to our Postgres through
  * DATABASE_URL). Generic names (NODE_ENV, LOG_LEVEL) are kept.
  */
-const OWN_ENV = new Set(Object.keys(envSchema.shape).filter(k => k !== 'NODE_ENV' && k !== 'LOG_LEVEL'));
+const OWN_ENV = new Set(Object.keys(rawEnvSchema.shape).filter(k => k !== 'NODE_ENV' && k !== 'LOG_LEVEL'));
 
 /**
  * Ambient host credentials and secrets that must not leak to child processes (agents, tests, scripts)
@@ -93,7 +93,7 @@ export function detectSignal(run: Pick<ClaudeRun, 'exitCode' | 'timedOut' | 'std
   }
   if (/usage limit|limit reached|limit will reset|resets? (at|in) |rate_limit_error|\b429\b/i.test(text)) return { signal: 'quota', message: firstLine(text) };
   if (/overloaded_error|\b529\b|Overloaded/i.test(text)) return { signal: 'overloaded', message: firstLine(text) };
-  if (run.result?.subtype === 'error_max_budget_usd' || /max(imum)? budget/i.test(text)) return { signal: 'budget', message: 'Stopped at the playbook budget (--max-budget-usd).' };
+  if (run.result?.subtype === 'error_max_budget_usd' || /max(imum)? budget/i.test(text)) return { signal: 'budget', message: 'Stopped at the agent budget (--max-budget-usd).' };
   if (run.result?.subtype === 'error_max_turns') return { signal: 'max_turns', message: 'Stopped at the turn limit.' };
   if (run.timedOut) return { signal: 'timeout', message: 'Timed out and was stopped.' };
   if (!run.result) return { signal: 'no_output', message: firstLine(run.stderr) || `No result (exit ${run.exitCode}).` };

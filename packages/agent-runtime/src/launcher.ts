@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cleanEnv, detectSignal, parseResult, type AgentSignal, type ClaudeResult } from './claude-cli';
 
-/** Never allowed in a playbook run, whatever the playbook says. */
+/** Never allowed in an agent run. */
 export const ALWAYS_DENIED = [
   'Bash(git push:*)', 'Bash(git merge:*)', 'Bash(git rebase:*)', 'Bash(git remote:*)', 'Bash(git reset --hard:*)',
   'Bash(git checkout:*)', 'Bash(git switch:*)', 'Bash(git worktree:*)', 'Bash(git branch -D:*)', 'Bash(gh:*)',
