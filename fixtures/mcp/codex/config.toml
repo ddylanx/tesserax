@@ -1,0 +1,12 @@
+[mcp_servers.codex-mock]
+command = "uvx"
+args = ["codex-helper"]
+disabled = false
+
+[mcp_servers.codex-mock.env]
+CODEX_SECRET = "secret_codex_val"
+
+[mcp_servers.codex-remote]
+url = "https://codex.example.com/mcp"
+type = "http"
+disabled = true
