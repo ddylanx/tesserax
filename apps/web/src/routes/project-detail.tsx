@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { AI_ENGINES, type Project, type ProjectSettings, type TaskList, type WorkflowRunList } from '@tesserax/contracts';
+import { AI_ENGINES, type Project, type ProjectSettings, type RepoInspection, type TaskList, type WorkflowRunList } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -119,6 +119,36 @@ function Settings({ project }: { project: Project }) {
   const setRules = (patch: Partial<ProjectSettings['rules']>) => setS({ ...s, rules: { ...rules, ...patch } });
   const varRows = Object.entries(s.vars);
   const missing = s.workplaceIds.filter(id => repos.data && !repos.data.workplaces.some(w => w.id === id));
+  const wp = repos.data?.workplaces.find(w => w.id === s.workplaceIds[0]);
+  const [suggestMsg, setSuggestMsg] = useState<{ text: string; isError?: boolean } | null>(null);
+  const [suggesting, setSuggesting] = useState(false);
+
+  const handleSuggest = async () => {
+    if (!wp) return;
+    setSuggesting(true);
+    setSuggestMsg(null);
+    try {
+      const data = await api<RepoInspection>('/api/repos/inspect', {
+        method: 'POST',
+        body: JSON.stringify({ path: wp.path }),
+      });
+      if (data.suggestedVars && Object.keys(data.suggestedVars).length > 0) {
+        const merged = { ...data.suggestedVars, ...s.vars };
+        for (const [k, v] of Object.entries(data.suggestedVars)) {
+          if (!merged[k]?.trim()) merged[k] = v;
+        }
+        setS({ ...s, vars: merged });
+        setSuggestMsg({ text: 'Suggested settings filled from repo. Review and click Save below.' });
+      } else {
+        setSuggestMsg({ text: 'No stack detected to suggest variables from.', isError: true });
+      }
+    } catch (e) {
+      setSuggestMsg({ text: `Inspection failed: ${(e as Error).message}`, isError: true });
+    } finally {
+      setSuggesting(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-4">
       <Card>
@@ -173,9 +203,25 @@ function Settings({ project }: { project: Project }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Variables</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>Variables</CardTitle>
+          <Button
+            size="sm"
+            variant="outline"
+            type="button"
+            disabled={!wp || suggesting}
+            title={!wp ? 'Assign a workplace first to detect settings' : undefined}
+            onClick={handleSuggest}
+          >
+            {suggesting ? 'Suggesting...' : 'Suggest from repo'}
+          </Button>
+        </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
-          <p className="text-xs text-muted-foreground">Use them in workflows as <code>{'{{project.name}}'}</code>; shell steps read <code>$TX_PROJECT_NAME</code>.</p>
+          {suggestMsg && (
+            <p className={`text-xs ${suggestMsg.isError ? 'text-destructive text-red-600' : 'text-emerald-600'}`}>
+              {suggestMsg.text}
+            </p>
+          )}
           {varRows.map(([k, v]) => (
             <div key={k} className="flex items-center gap-2">
               <code className="w-40">{k}</code>

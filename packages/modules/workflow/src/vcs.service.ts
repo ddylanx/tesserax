@@ -7,6 +7,7 @@ import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@tesserax/a
 import { repoRegistry } from '@tesserax/mod-repos';
 import { TasksService } from '@tesserax/mod-tasks';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
+import { ensureWorktreeLinks, getProjectVars } from './worktree-links';
 
 @Injectable()
 export class WorkflowVcsService {
@@ -30,6 +31,8 @@ export class WorkflowVcsService {
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
     if (run.worktree_path && run.repo_path && run.base_ref && run.branch) {
       const { path } = await ensureWorktree(run.repo_path, run.branch, dataDir(this.config), run.base_ref);
+      const projectVars = getProjectVars(run.vars);
+      ensureWorktreeLinks({ repoPath: run.repo_path, worktreePath: path, linksRaw: projectVars.worktree_links });
       return { worktree: path, repoPath: run.repo_path, baseRef: run.base_ref, branch: run.branch };
     }
     const task = await this.tasks.getTask(run.task_id);
@@ -41,6 +44,8 @@ export class WorkflowVcsService {
     const fetched = await fetchBase(entry.path, baseRef);
     const branch = run.branch ?? `tx/${task?.key ?? run.id.slice(0, 8)}`;
     const { path, created } = await ensureWorktree(entry.path, branch, dataDir(this.config), baseRef);
+    const projectVars = getProjectVars(run.vars);
+    ensureWorktreeLinks({ repoPath: entry.path, worktreePath: path, linksRaw: projectVars.worktree_links });
 
     await this.db
       .updateTable('workflow_runs')
