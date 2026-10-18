@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { findRepoRoot } from '@tesserax/config';
 import {
   repoRegistrySchema, repositorySchema, workplaceSchema,
-  type RepoInspection, type RepoRegistry, type Repository, type ResolvedWorkplace, type Workplace, type WorkplaceStatus,
+  type DemoRepoResponse, type RepoInspection, type RepoRegistry, type Repository, type ResolvedWorkplace, type Workplace, type WorkplaceStatus,
 } from '@tesserax/contracts';
 
 const git = (cwd: string, args: string[]) =>
@@ -285,6 +285,36 @@ export class RepoRegistryStore {
     } catch {
       return null;
     }
+  }
+
+  createDemoRepo(options?: { demoPath?: string; scriptPath?: string }): DemoRepoResponse {
+    const root = findRepoRoot();
+    const demoPath = options?.demoPath ?? join(root, '.data', 'demo-repo');
+    const scriptPath = options?.scriptPath ?? join(root, 'scripts', 'make-demo-repo.sh');
+    const hadGit = existsSync(join(demoPath, '.git'));
+    if (!hadGit) {
+      execFileSync('sh', [scriptPath], { encoding: 'utf8' });
+    }
+    const reg = this.read();
+    let repo = reg.repositories.find(r => r.id === 'demo-app');
+    let workplace = reg.workplaces.find(w => w.id === 'demo-app');
+    const alreadyExisted = Boolean(hadGit && repo && workplace);
+
+    if (!repo) {
+      repo = { id: 'demo-app', name: 'Demo app', origin: null, base: 'main' };
+      this.saveRepository(repo);
+    }
+    if (!workplace) {
+      workplace = { id: 'demo-app', repositoryId: 'demo-app', brand: 'demo', path: demoPath, base: 'main', projects: [] };
+      this.saveWorkplace(workplace);
+    }
+
+    return {
+      repository: repo,
+      workplace,
+      path: demoPath,
+      alreadyExisted,
+    };
   }
 }
 

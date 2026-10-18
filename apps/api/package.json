@@ -6,7 +6,8 @@
     "dev": "node -r @swc-node/register src/main.ts",
     "dev:watch": "node --watch -r @swc-node/register src/main.ts",
     "start": "node -r @swc-node/register src/main.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
   },
   "dependencies": {
     "@tesserax/mod-projects": "workspace:*",

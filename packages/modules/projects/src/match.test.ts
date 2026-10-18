@@ -36,3 +36,64 @@ test('findRuleConflict names the other project', () => {
   assert.match(findRuleConflict(others, project('x', 2, { sourceIds: ['s1'] }).settings)!, /"a"/);
   assert.equal(findRuleConflict(others, project('x', 2, { jiraKeys: ['DEMO'] }).settings), null);
 });
+
+test('addWorkplaceToDefault links workplace to default project when workplaceIds is configured', async () => {
+  let updatedSettings: any = null;
+  const mockDb = {
+    selectFrom: () => ({
+      selectAll: () => ({
+        where: () => ({
+          executeTakeFirst: async () => ({
+            id: 'proj-1',
+            is_default: true,
+            settings: { workplaceIds: ['existing-wp'] },
+          }),
+        }),
+      }),
+    }),
+    updateTable: () => ({
+      set: (val: any) => ({
+        where: () => ({
+          execute: async () => { updatedSettings = JSON.parse(val.settings); },
+        }),
+      }),
+    }),
+  } as any;
+
+  const { ProjectsService } = await import('./projects.service');
+  const service = new ProjectsService(mockDb, {} as any);
+  await service.addWorkplaceToDefault('demo-app');
+
+  assert.deepEqual(updatedSettings?.workplaceIds, ['existing-wp', 'demo-app']);
+});
+
+test('addWorkplaceToDefault does nothing when workplaceIds is empty (all workplaces allowed)', async () => {
+  let updated = false;
+  const mockDb = {
+    selectFrom: () => ({
+      selectAll: () => ({
+        where: () => ({
+          executeTakeFirst: async () => ({
+            id: 'proj-1',
+            is_default: true,
+            settings: { workplaceIds: [] },
+          }),
+        }),
+      }),
+    }),
+    updateTable: () => ({
+      set: () => ({
+        where: () => ({
+          execute: async () => { updated = true; },
+        }),
+      }),
+    }),
+  } as any;
+
+  const { ProjectsService } = await import('./projects.service');
+  const service = new ProjectsService(mockDb, {} as any);
+  await service.addWorkplaceToDefault('demo-app');
+
+  assert.equal(updated, false);
+});
+

@@ -94,3 +94,12 @@ export interface ResolvedWorkplace {
 }
 
 export const setTaskWorkplaceSchema = z.object({ workplaceId: slug.nullable() });
+
+export const demoRepoResponseSchema = z.object({
+  repository: repositorySchema,
+  workplace: workplaceSchema,
+  path: z.string(),
+  alreadyExisted: z.boolean(),
+});
+export type DemoRepoResponse = z.infer<typeof demoRepoResponseSchema>;
+

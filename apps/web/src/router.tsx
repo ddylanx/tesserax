@@ -29,7 +29,10 @@ const inboxRoute = createRoute({
 const runsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/runs',
-  validateSearch: (s: Record<string, unknown>): { status?: string } => ({ status: typeof s.status === 'string' ? s.status : undefined }),
+  validateSearch: (s: Record<string, unknown>): { status?: string; onboarding?: string } => ({
+    status: typeof s.status === 'string' ? s.status : undefined,
+    onboarding: typeof s.onboarding === 'string' ? s.onboarding : undefined,
+  }),
   component: RunsPage,
 });
 const runDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: '/runs/$runId', component: RunDetailPage });

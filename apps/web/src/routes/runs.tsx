@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useSearch } from '@tanstack/react-router';
 import type { WorkflowRunList } from '@tesserax/contracts';
+import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,13 +22,16 @@ export const RUN_STATUS: Record<string, { label: string; variant: 'green' | 'amb
 const TABS = ['waiting', 'running', 'failed', 'done', 'all'] as const;
 
 export function RunsPage() {
-  const search = useSearch({ strict: false }) as { status?: string };
+  const search = useSearch({ strict: false }) as { status?: string; onboarding?: string };
   const status = search.status ?? 'waiting';
   const navigate = useNavigate();
   const { scopeParam, selected: scopeSelected } = useProjectScope();
   const q = useQuery({ queryKey: ['wf', 'runs', status, scopeParam], queryFn: () => api<WorkflowRunList>(`/api/workflow-runs?status=${status}&${scopeParam}`), refetchInterval: 4000 });
   const counts = q.data?.counts ?? {};
   const runs = q.data?.runs ?? [];
+  const totalRuns = Object.values(counts).reduce((a, b) => a + b, 0);
+  const showOnboarding = !q.isLoading && (totalRuns === 0 || search.onboarding === '1');
+
   return (
     <Page title="Runs" description="Each ticket moves through the workflow's nodes; gates wait for you.">
       <div className="flex flex-wrap gap-1">
@@ -38,11 +42,17 @@ export function RunsPage() {
           </Button>
         ))}
       </div>
-      <Card>
-        <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && runs.length === 0}
-          emptyText="No runs here. Start one with “Start workflow” on the Tasks page (you pick the workflow); new Jira issues start the one the routing rules suggest, and you can switch it on the run until its first step finishes." />
-        {runs.length > 0 && (
-          <Table>
+      {showOnboarding ? (
+        <OnboardingChecklist
+          totalRuns={totalRuns}
+          onClose={() => navigate({ to: '/runs', search: { status } as never })}
+        />
+      ) : (
+        <Card>
+          <QueryState isLoading={q.isLoading} error={q.error} empty={!q.isLoading && runs.length === 0}
+            emptyText="No runs here. Start one with “Start workflow” on the Tasks page (you pick the workflow); new Jira issues start the one the routing rules suggest, and you can switch it on the run until its first step finishes." />
+          {runs.length > 0 && (
+            <Table>
             <THead><Tr><Th>Ticket</Th><Th>Workflow</Th><Th>Status</Th><Th>Current step</Th><Th>Cost</Th><Th>Updated</Th></Tr></THead>
             <TBody>
               {runs.map(r => (
@@ -60,8 +70,9 @@ export function RunsPage() {
               ))}
             </TBody>
           </Table>
-        )}
-      </Card>
+          )}
+        </Card>
+      )}
     </Page>
   );
 }

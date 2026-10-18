@@ -76,6 +76,8 @@ export interface ProjectDirectory {
   saveRouting(idOrSlug: string, routing: z.infer<typeof routingSchema>): Promise<Project>;
   /** Re-applies the rules to tasks that were not moved by hand (all, or one source); returns how many changed project. */
   reassign(sourceId?: string): Promise<number>;
+  /** Links a workplace to the default project (if workplaceIds is configured). */
+  addWorkplaceToDefault(workplaceId: string): Promise<void>;
 }
 
 export const projectSummarySchema = z.object({

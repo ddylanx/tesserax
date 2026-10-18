@@ -154,3 +154,46 @@ test('detectRepoStack identifies stack from repository manifest files', () => {
     execFileSync('rm', ['-rf', root]);
   }
 });
+
+test('createDemoRepo creates repository and workplace in workplaces.json and is idempotent', async t => {
+  const { root, checkout, store } = sandbox();
+  t.after(() => execFileSync('rm', ['-rf', root]));
+  const demoPath = checkout('demo-repo', 'https://github.com/example/demo');
+  const res1 = store.createDemoRepo({ demoPath });
+  assert.equal(res1.repository.id, 'demo-app');
+  assert.equal(res1.workplace.id, 'demo-app');
+  assert.equal(res1.path, demoPath);
+  assert.equal(res1.alreadyExisted, false);
+
+  const reg1 = store.read();
+  assert.equal(reg1.repositories.length, 1);
+  assert.equal(reg1.workplaces.length, 1);
+
+  // Calling a second time is idempotent
+  const res2 = store.createDemoRepo({ demoPath });
+  assert.equal(res2.alreadyExisted, true);
+  const reg2 = store.read();
+  assert.equal(reg2.repositories.length, 1);
+  assert.equal(reg2.workplaces.length, 1);
+});
+
+test('ReposController.createDemo calls store.createDemoRepo and links workplace to default project', async () => {
+  let linkedWorkplace: string | null = null;
+  const mockProjects: any = {
+    addWorkplaceToDefault: async (id: string) => { linkedWorkplace = id; },
+  };
+  const mockStore: any = {
+    createDemoRepo: () => ({
+      repository: { id: 'demo-app', name: 'Demo app', origin: null, base: 'main' },
+      workplace: { id: 'demo-app', repositoryId: 'demo-app', brand: 'demo', path: '/mock/path', base: 'main', projects: [] },
+      path: '/mock/path',
+      alreadyExisted: false,
+    }),
+  };
+  const { ReposController } = await import('./repos.controller');
+  const controller = new ReposController(mockStore, {} as any, mockProjects);
+  const result = await controller.createDemo();
+  assert.equal(result.repository.id, 'demo-app');
+  assert.equal(linkedWorkplace, 'demo-app');
+});
+

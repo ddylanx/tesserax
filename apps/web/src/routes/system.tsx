@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from '@tanstack/react-router';
 import type { FeedbackStats, SystemInfo } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -15,12 +16,32 @@ export function SystemPage() {
       {s && (
         <div className="grid gap-4 md:grid-cols-2">
           <Card>
-            <CardHeader><CardTitle>Health</CardTitle></CardHeader>
-            <CardContent className="flex flex-wrap gap-2 text-sm">
-              <Badge variant={s.health.status === 'ok' ? 'green' : 'red'}>overall: {s.health.status}</Badge>
-              <Badge variant={s.health.db === 'ok' ? 'green' : 'red'}>postgres: {s.health.db}</Badge>
-              <Badge variant={s.health.queue === 'ok' ? 'green' : 'red'}>pg-boss: {s.health.queue}</Badge>
-              <Badge variant="outline">uptime {Math.round(s.health.uptimeSeconds / 60)} min</Badge>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+              <CardTitle>Health</CardTitle>
+              <Link to="/runs" search={{ onboarding: '1' } as never} className="text-xs text-primary hover:underline font-medium">
+                Getting started &rarr;
+              </Link>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={s.health.status === 'ok' ? 'green' : 'red'}>overall: {s.health.status}</Badge>
+                <Badge variant={s.health.db === 'ok' ? 'green' : 'red'}>postgres: {s.health.db}</Badge>
+                <Badge variant={s.health.queue === 'ok' ? 'green' : 'red'}>pg-boss: {s.health.queue}</Badge>
+                <Badge variant="outline">uptime {Math.round(s.health.uptimeSeconds / 60)} min</Badge>
+              </div>
+              {s.environment && (
+                <div className="flex flex-col gap-1.5 border-t pt-2 text-xs">
+                  <div className="font-medium text-muted-foreground">Environment</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    <Badge variant={s.environment.git ? 'green' : 'red'}>git: {s.environment.git ? 'found' : 'missing'}</Badge>
+                    {s.environment.agents.map(a => (
+                      <Badge key={a.id} variant={a.signedIn === 'yes' ? 'green' : a.installed ? 'amber' : 'outline'}>
+                        {a.id}: {a.signedIn === 'yes' ? 'ready' : a.installed ? 'installed' : 'missing'}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           <Card>
