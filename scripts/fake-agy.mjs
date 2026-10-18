@@ -23,6 +23,7 @@ if (mode === 'auth') {
 }
 if (mode === 'denied' || (mode === 'denied-once' && !args.includes('--conversation'))) {
   console.error('jetski: no output produced');
+  if (streaming) emit({ event: 'step_update', step_update: { step_index: 1, state: 'ERROR', step_type: 'tool', tool_name: 'view_file', tool_info: { name: 'view_file', error: { type: 'TOOL_ERROR', message: 'permission check failed for read_file "/outside/notes.md": user denied permission for read_file(/outside/notes.md)' } } } });
   out({ status: 'SUCCESS', response: '', denied_actions: [{ action: 'command', display_name: 'RunCommand' }] });
   process.exit(0);
 }

@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { test } from 'node:test';
-import { allowedCommands, antigravityArgs, antigravitySignal, deniedConversation, launchAntigravityDetached, parseAntigravity, readAntigravityOutcome, runAntigravity, withToolHint } from './antigravity';
+import { allowedCommands, antigravityArgs, antigravitySignal, blockedActions, deniedConversation, launchAntigravityDetached, parseAntigravity, readAntigravityOutcome, runAntigravity, withToolHint } from './antigravity';
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { readLiveLog, renderLiveLog } from './livelog';
@@ -86,10 +86,14 @@ test('antigravity: a turn stopped by a refused tool is continued in the same con
   assert.equal(deniedConversation({ conversation_id: 'c', response: '', denied_actions: [{ action: 'read_file' }] }), 'c');
   assert.equal(deniedConversation({ conversation_id: 'c', response: 'answer', denied_actions: [{ action: 'read_file' }] }), null);
   assert.equal(deniedConversation({ conversation_id: 'c', response: '' }), null);
+  const raw = JSON.stringify({ error: { message: 'permission check failed for read_file "/repo/.git/config": user denied' } });
+  assert.deepEqual(blockedActions(`${raw}\n${raw}`), ['read_file /repo/.git/config']);
   process.env.FAKE_AGY_MODE = 'denied-once';
   try {
     const r = await runAntigravity({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000 });
     assert.equal(r.signal, 'ok');
+    assert.deepEqual(r.blocked, ['read_file /outside/notes.md']);
+    assert.match(r.text!, /^> \*\*Antigravity was refused.*`read_file \/outside\/notes\.md`/);
     const dir = mkdtempSync(join(tmpdir(), 'agy-denied-'));
     const workDir = mkdtempSync(join(tmpdir(), 'agy-denied-work-'));
     writeFileSync(join(workDir, 'README.md'), '# x\n');
@@ -98,6 +102,8 @@ test('antigravity: a turn stopped by a refused tool is continued in the same con
     const outcome = readAntigravityOutcome(dir, pid, false);
     assert.equal(outcome.finished, true);
     assert.equal(outcome.signal, 'ok');
+    assert.deepEqual(outcome.blocked, ['read_file /outside/notes.md']);
+    assert.match(outcome.text!, /Antigravity was refused/);
     assert.equal(readFileSync(join(dir, 'stdout.json'), 'utf8').match(/"event":"result"/g)?.length, 2);
   } finally {
     delete process.env.FAKE_AGY_MODE;

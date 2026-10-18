@@ -107,7 +107,18 @@ export const withToolHint = (prompt: string, mode: 'plan' | 'accept-edits' = 'pl
  */
 export const DENIED_RETRIES = 2;
 export const DENIED_FOLLOW_UP =
-  'The tool you just tried was refused: this run cannot ask anyone for permission, and only the working folder is readable. Do not try it again or work around it. Carry on with the rest of the task without it and finish with your answer.';
+  'The tool you just tried was refused: this run cannot ask anyone for permission, and only the working folder is readable. Do not try it again or work around it. Carry on with the rest of the task without it and finish with your answer. In that answer add a short section `## Not read` listing each refused file or command and what you assumed instead (keep any required last line, such as the VERDICT line, last).';
+
+/** What agy was refused, from the tool errors in its event stream, e.g. `read_file /repo/.git/config`. */
+export function blockedActions(stdout: string): string[] {
+  const found = new Set<string>();
+  for (const m of stdout.matchAll(/permission check failed for ([a-z_]+) \\?"((?:[^"\\]|\\.)*?)\\?"/g)) found.add(`${m[1]} ${m[2]}`);
+  return [...found];
+}
+
+/** Shown at the top of the step's artifact so the gate sees what the agent worked without. */
+export const blockedNote = (blocked: string[]) =>
+  blocked.length ? `> **Antigravity was refused (it went on without them):** ${blocked.map(b => `\`${b}\``).join(', ')}. Check the "Not read" section for what it assumed.\n\n` : '';
 
 /** The conversation to continue when the turn ended only because a tool was refused (no answer). */
 export function deniedConversation(out: AntigravityOutput | null): string | null {
@@ -115,20 +126,25 @@ export function deniedConversation(out: AntigravityOutput | null): string | null
 }
 
 /** One headless call, read-only (`--mode plan`); a turn stopped by a refused tool is continued (DENIED_RETRIES). */
-export async function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
+export async function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null; blocked: string[] }> {
   const git = gitCommonDir(o.cwd);
   const deadline = Date.now() + o.timeoutMs;
   if (o.logFile) mkdirSync(dirname(o.logFile), { recursive: true });
   let args = antigravityArgs('plan', withToolHint(o.prompt), o.model, git ? [git] : []);
+  const blocked = new Set<string>();
   for (let attempt = 0; ; attempt++) {
     const r = await runAntigravityOnce({ ...o, args, timeoutMs: Math.max(1000, deadline - Date.now()) });
+    for (const b of blockedActions(r.stdout)) blocked.add(b);
     const conversation = attempt < DENIED_RETRIES && r.signal === 'denied' ? deniedConversation(r.out) : null;
-    if (!conversation) return { text: r.out?.response?.trim() || null, signal: r.signal, message: r.message };
+    if (!conversation) {
+      const text = r.out?.response?.trim() || null;
+      return { text: text && blockedNote([...blocked]) + text, signal: r.signal, message: r.message, blocked: [...blocked] };
+    }
     args = [...antigravityArgs('plan', DENIED_FOLLOW_UP, o.model, git ? [git] : []).slice(0, -1), '--conversation', conversation, `--print=${DENIED_FOLLOW_UP}`];
   }
 }
 
-function runAntigravityOnce(o: { bin: string; cwd: string; args: string[]; timeoutMs: number; logFile?: string }): Promise<{ out: AntigravityOutput | null; signal: AntigravitySignal; message: string | null }> {
+function runAntigravityOnce(o: { bin: string; cwd: string; args: string[]; timeoutMs: number; logFile?: string }): Promise<{ out: AntigravityOutput | null; stdout: string; signal: AntigravitySignal; message: string | null }> {
   return new Promise(resolve => {
     let stdout = '';
     let stderr = '';
@@ -145,7 +161,7 @@ function runAntigravityOnce(o: { bin: string; cwd: string; args: string[]; timeo
       done = true;
       clearTimeout(timer);
       const out = parseAntigravity(stdout);
-      resolve({ out, ...antigravitySignal({ out, stderr, exitCode: code, timedOut: timedOut && !out?.response, spawnError }) });
+      resolve({ out, stdout, ...antigravitySignal({ out, stderr, exitCode: code, timedOut: timedOut && !out?.response, spawnError }) });
     };
     child.stdout.on('data', d => {
       stdout += d;
@@ -211,7 +227,10 @@ export function readAntigravityOutcome(runDir: string, pid: number | null, timed
   const exitFile = existsSync(join(runDir, 'exit_code'));
   const finished = exitFile || !isAlive(pid) || timedOut;
   const exitCode = exitFile ? Number(read('exit_code').trim()) : null;
-  const out = parseAntigravity(read('stdout.json'));
+  const stdout = read('stdout.json');
+  const out = parseAntigravity(stdout);
   const { signal, message } = antigravitySignal({ out, stderr: read('stderr.log').slice(-20_000), exitCode, timedOut: timedOut && !out?.response });
-  return { finished, exitCode, text: out?.response?.trim() || null, signal, message };
+  const blocked = blockedActions(stdout);
+  const text = out?.response?.trim() || null;
+  return { finished, exitCode, text: text && blockedNote(blocked) + text, signal, message: message && blocked.length ? `${message} Refused: ${blocked.join(', ')}.` : message, blocked };
 }
