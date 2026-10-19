@@ -10,6 +10,7 @@ import { prepareAgent } from './executors';
 import { projectSkills } from './project-skills';
 import type { NodeContext } from './executors/types';
 import { SkillCatalog } from '@tesserax/mod-skills';
+import type { McpService } from '@tesserax/mod-mcp';
 
 /** Choosing who does an agent step, and finishing work done by you in an editor. Built by the controller. */
 export class HandoffService {
@@ -20,6 +21,7 @@ export class HandoffService {
     private readonly tasks: TasksService,
     private readonly skills: SkillCatalog,
     private readonly classifier: ClassificationService,
+    private readonly mcp?: McpService,
   ) {}
 
   executors() {
@@ -56,6 +58,7 @@ export class HandoffService {
         projectVars: ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {},
         run, nodeRun: nr, node, config: nodeConfigSchemas['agent.run'].parse(node.config), task,
         artifacts: await this.engine.latestArtifacts(runId), feedback: ((nr.input ?? {}) as { feedback?: string }).feedback ?? null,
+        mcp: this.mcp,
       };
       await this.engine.event(runId, 'user', 'executor_chosen', { executor }, nr.id);
       const vars = (run.vars ?? {}) as { executor?: Record<string, string> };

@@ -47,15 +47,30 @@ export function geminiSignal(o: { out: GeminiOutput | null; stderr: string; exit
   return { signal: 'ok', message: null };
 }
 
-export const geminiArgs = (mode: 'plan' | 'auto_edit', model?: string) => ['-p', '', '-o', 'json', '--approval-mode', mode, ...(model ? ['-m', model] : [])];
+export const geminiArgs = (
+  mode: 'plan' | 'auto_edit',
+  model?: string,
+  allowedMcpServers: string[] = [],
+) => [
+  '-p', '', '-o', 'json', '--approval-mode', mode,
+  ...(model ? ['-m', model] : []),
+  ...(allowedMcpServers.length ? ['--allowed-mcp-server-names', allowedMcpServers.join(',')] : []),
+];
 
 /** One headless call, read-only (approval mode "plan"). */
-export function runGemini(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string }): Promise<{ text: string | null; signal: GeminiSignal; message: string | null }> {
+export function runGemini(o: {
+  bin: string;
+  cwd: string;
+  prompt: string;
+  timeoutMs: number;
+  model?: string;
+  allowedMcpServers?: string[];
+}): Promise<{ text: string | null; signal: GeminiSignal; message: string | null }> {
   return new Promise(resolve => {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
-    const child = spawn(o.bin, geminiArgs('plan', o.model), { cwd: o.cwd, env: cleanEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(o.bin, geminiArgs('plan', o.model, o.allowedMcpServers ?? []), { cwd: o.cwd, env: cleanEnv(), stdio: ['pipe', 'pipe', 'pipe'] });
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
@@ -80,10 +95,17 @@ export function runGemini(o: { bin: string; cwd: string; prompt: string; timeout
 }
 
 /** Detached agent run (edits allowed, no shell): prompt from a file, output and exit code into runDir. */
-export function launchGeminiDetached(o: { bin: string; cwd: string; runDir: string; prompt: string; model?: string }): number {
+export function launchGeminiDetached(o: {
+  bin: string;
+  cwd: string;
+  runDir: string;
+  prompt: string;
+  model?: string;
+  allowedMcpServers?: string[];
+}): number {
   mkdirSync(o.runDir, { recursive: true });
   writeFileSync(join(o.runDir, 'prompt.md'), o.prompt, { mode: 0o600 });
-  const args = geminiArgs('auto_edit', o.model);
+  const args = geminiArgs('auto_edit', o.model, o.allowedMcpServers ?? []);
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'gemini', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
   const script = '"$TESSERAX_BIN" "$@" < "$TESSERAX_RUN_DIR/prompt.md" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';
   const child = spawn('/bin/sh', ['-c', script, 'ot-run', ...args], {

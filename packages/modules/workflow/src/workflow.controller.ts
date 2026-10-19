@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, ConflictException, Controller, Get, HttpCode, Inject, NotFoundException, Param, ParseUUIDPipe, Post, Put, Query,
+  BadRequestException, Body, ConflictException, Controller, Get, HttpCode, Inject, NotFoundException, Optional, Param, ParseUUIDPipe, Post, Put, Query,
 } from '@nestjs/common';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -15,6 +15,7 @@ import { diffInfo, diffPatch } from '@tesserax/agent-runtime';
 import { ClassificationService } from '@tesserax/mod-classify';
 import { TasksService } from '@tesserax/mod-tasks';
 import { repoRegistry } from '@tesserax/mod-repos';
+import type { McpService } from '@tesserax/mod-mcp';
 import { askClaude } from './executors/claude';
 import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
@@ -43,8 +44,9 @@ export class WorkflowController {
     @Inject(CONFIG) private readonly config: AppConfig,
     @Inject(DB) private readonly db: Db,
     classifier: ClassificationService,
+    @Optional() private readonly mcp?: McpService,
   ) {
-    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier);
+    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp);
   }
 
   private readonly handoff: HandoffService;

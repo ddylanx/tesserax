@@ -79,6 +79,20 @@ export interface AgentEventsTable {
   received_at: Generated<Date>;
 }
 
+export interface McpPolicyTable {
+  server: string;
+  mode: string; // 'off' | 'all' | 'tools'
+  tools: Json; // string[]
+  engines: Json; // ('claude' | 'antigravity' | 'gemini')[]
+  updated_at: Generated<Date>;
+}
+
+export interface McpToolCacheTable {
+  server: string;
+  tools: Json; // { name: string; description?: string }[]
+  read_at: Generated<Date>;
+}
+
 export type TaskStatusCategory = 'todo' | 'in_progress' | 'done';
 
 export interface TasksTable {
@@ -271,6 +285,8 @@ export interface Database {
   agents: AgentsTable;
   agent_sessions: AgentSessionsTable;
   agent_events: AgentEventsTable;
+  mcp_policy: McpPolicyTable;
+  mcp_tool_cache: McpToolCacheTable;
 }
 
 export type ProjectRow = Selectable<ProjectsTable>;
@@ -287,3 +303,8 @@ export type WorkflowRun = Selectable<WorkflowRunsTable>;
 export type WorkflowRunUpdate = Updateable<WorkflowRunsTable>;
 export type NodeRun = Selectable<NodeRunsTable>;
 export type NodeRunUpdate = Updateable<NodeRunsTable>;
+export type McpPolicyRow = Selectable<McpPolicyTable>;
+export type NewMcpPolicy = Insertable<McpPolicyTable>;
+export type McpPolicyUpdate = Updateable<McpPolicyTable>;
+export type McpToolCacheRow = Selectable<McpToolCacheTable>;
+export type NewMcpToolCache = Insertable<McpToolCacheTable>;

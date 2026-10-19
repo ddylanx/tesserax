@@ -14,6 +14,65 @@ test('run args always deny push/merge/remote changes, whatever the playbook allo
   assert.deepEqual(denied, ALWAYS_DENIED);
   assert.equal(args[args.indexOf('--max-budget-usd') + 1], '2');
   assert.ok(args.includes('--strict-mcp-config'));
+  assert.ok(!args.includes('--mcp-config'));
+});
+
+test('buildRunArgs includes mcp-config and mcp tool allowances when mcpServers are provided', () => {
+  const runDir = '/tmp/test-run-dir';
+  const args = buildRunArgs({
+    sessionId: 's',
+    permissionMode: 'default',
+    allowedTools: ['Read'],
+    runDir,
+    mcpServers: [
+      { name: 'db', definition: { command: 'db-cli' }, tools: ['query'] },
+      { name: 'files', definition: { command: 'file-cli' }, tools: '*' },
+    ],
+  });
+
+  const mcpConfigIdx = args.indexOf('--mcp-config');
+  assert.ok(mcpConfigIdx >= 0);
+  assert.equal(args[mcpConfigIdx + 1], join(runDir, 'mcp.json'));
+  assert.equal(args[mcpConfigIdx + 2], '--strict-mcp-config');
+
+  const allowedIdx = args.indexOf('--allowedTools');
+  const allowed = args.slice(allowedIdx + 1, args.indexOf('--disallowedTools'));
+  assert.ok(allowed.includes('Read'));
+  assert.ok(allowed.includes('mcp__db__query'));
+  assert.ok(allowed.includes('mcp__files__*'));
+});
+
+test('launchDetached writes mcp.json with mode 0600 when mcpServers are configured', async () => {
+  const { launchDetached } = await import('./launcher');
+  const { existsSync, readFileSync, statSync } = await import('node:fs');
+  const runDir = mkdtempSync(join(tmpdir(), 'ot-launcher-mcp-'));
+
+  launchDetached({
+    bin: '/usr/bin/true',
+    cwd: tmpdir(),
+    runDir,
+    prompt: 'hello',
+    sessionId: 'test-session',
+    permissionMode: 'default',
+    allowedTools: [],
+    mcpServers: [
+      { name: 'postgres', definition: { command: 'pg-tool', env: { DB_URL: 'secret' } }, tools: ['query'] },
+    ],
+  });
+
+  const mcpFile = join(runDir, 'mcp.json');
+  assert.ok(existsSync(mcpFile));
+  const content = JSON.parse(readFileSync(mcpFile, 'utf8'));
+  assert.deepEqual(content, {
+    mcpServers: {
+      postgres: { command: 'pg-tool', env: { DB_URL: 'secret' } },
+    },
+  });
+
+  if (process.platform !== 'win32') {
+    const mode = statSync(mcpFile).mode & 0o777;
+    assert.equal(mode, 0o600);
+  }
 });
 
 test('branch names are checked', () => {

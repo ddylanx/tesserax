@@ -12,6 +12,9 @@ import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
 import { projectSkills } from './project-skills';
 import type { SkillCatalog } from '@tesserax/mod-skills';
+import { existsSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import type { McpService } from '@tesserax/mod-mcp';
 
 const log = createLogger('workflow.jobs');
 
@@ -23,6 +26,7 @@ export interface JobDeps {
   skills: SkillCatalog;
   config: AppConfig;
   queue: Queue;
+  mcp?: McpService;
 }
 
 /** Node runs executing in this process right now (to tell them apart from ones orphaned by a restart). */
@@ -96,7 +100,7 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     const projectVars = ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {};
     const result = await executor({
       engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr, node, config, task,
-      artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null,
+      artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
     });
     if ('async' in result) return; // finishes later (agent runs)
     if ('wait' in result) {
@@ -167,6 +171,16 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
   await d.engine.saveArtifact(run.id, nr.id, output, content, 'ai');
   await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null });
   log.info({ runId: run.id, signal: outcome.signal }, 'agent node finished');
+  if (nr.run_dir) {
+    const mcpFile = join(nr.run_dir, 'mcp.json');
+    if (existsSync(mcpFile)) {
+      try {
+        rmSync(mcpFile, { force: true });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
   await d.engine.complete(
     nr.id,
     outcome.signal === 'ok' ? 'done' : 'failed',

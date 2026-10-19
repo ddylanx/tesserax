@@ -2,12 +2,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import type { McpServerDto } from '@tesserax/contracts';
-import type { McpStatusProvider } from '../provider';
+import type { FullMcpServer, McpStatusProvider } from '../provider';
 
 type ServerCfg = {
   type?: string;
   url?: string;
   command?: string;
+  args?: string[];
   disabled?: boolean;
   env?: Record<string, unknown>;
   envKeys?: string[];
@@ -87,6 +88,8 @@ export function parseCodexToml(content: string): Record<string, ServerCfg> {
       if (!entry.envKeys.includes(key)) {
         entry.envKeys.push(key);
       }
+      entry.env ??= {};
+      entry.env[key] = unquote(val);
     } else {
       if (key === 'command') {
         entry.command = unquote(val);
@@ -97,6 +100,12 @@ export function parseCodexToml(content: string): Record<string, ServerCfg> {
       } else if (key === 'disabled') {
         const cleanBool = unquote(val).toLowerCase();
         entry.disabled = cleanBool === 'true';
+      } else if (key === 'args') {
+        try {
+          entry.args = JSON.parse(val);
+        } catch {
+          /* ignore */
+        }
       } else if (key === 'env') {
         const inlineMatches = val.matchAll(/([a-zA-Z0-9_]+)\s*=/g);
         entry.envKeys ??= [];
@@ -128,7 +137,12 @@ export class BuiltinMcpProvider implements McpStatusProvider {
   ) {}
 
   async list(projectDirs: string[]): Promise<McpServerDto[]> {
-    const out: McpServerDto[] = [];
+    const full = await this.listFull(projectDirs);
+    return full.map(({ definition, ...dto }) => dto);
+  }
+
+  async listFull(projectDirs: string[]): Promise<FullMcpServer[]> {
+    const out: FullMcpServer[] = [];
     const uniqueProjectDirs = [...new Set(projectDirs)];
 
     const short = (p: string) => {
@@ -174,6 +188,7 @@ export class BuiltinMcpProvider implements McpStatusProvider {
           target,
           enabled: isOn(name, cfg),
           envKeys,
+          definition: { ...cfg },
         });
       }
     };

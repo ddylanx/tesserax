@@ -81,7 +81,6 @@ test('launchAntigravityDetached includes gitCommonDir in args when run in git re
   assert.ok(cmd.args.includes('--add-dir'));
 });
 
-
 test('antigravity: a turn stopped by a refused tool is continued in the same conversation', async () => {
   assert.equal(deniedConversation({ conversation_id: 'c', response: '', denied_actions: [{ action: 'read_file' }] }), 'c');
   assert.equal(deniedConversation({ conversation_id: 'c', response: 'answer', denied_actions: [{ action: 'read_file' }] }), null);
@@ -109,3 +108,9 @@ test('antigravity: a turn stopped by a refused tool is continued in the same con
     delete process.env.FAKE_AGY_MODE;
   }
 });
+
+test('antigravity: withToolHint includes allowed MCP tools when specified', () => {
+  const hint = withToolHint('do it', 'plan', [], ['db/query', 'github/search']);
+  assert.match(hint, /Allowed MCP tools for this run: db\/query, github\/search\. Calls to other MCP tools will be refused\./);
+});
+

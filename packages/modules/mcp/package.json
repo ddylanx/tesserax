@@ -9,7 +9,9 @@
     "@nestjs/common": "^11.1.6",
     "@tesserax/config": "workspace:*",
     "@tesserax/contracts": "workspace:*",
-    "@tesserax/core": "workspace:*"
+    "@tesserax/core": "workspace:*",
+    "@tesserax/db": "workspace:*",
+    "kysely": "^0.28.17"
   },
   "devDependencies": { "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }
 }

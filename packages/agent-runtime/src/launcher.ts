@@ -23,17 +23,35 @@ export interface LaunchOptions {
   env?: Record<string, string>;
   /** stream-json (one event per line, so the run can be followed live) instead of a single json result. */
   stream?: boolean;
+  mcpServers?: { name: string; definition: Record<string, unknown>; tools: string[] | '*' }[];
 }
 
-export function buildRunArgs(o: Omit<LaunchOptions, 'bin' | 'cwd' | 'runDir' | 'prompt' | 'env'>): string[] {
+export function buildRunArgs(o: Omit<LaunchOptions, 'bin' | 'cwd' | 'prompt' | 'env' | 'runDir'> & { runDir?: string }): string[] {
+  const mcpTools: string[] = [];
+  if (o.mcpServers && o.mcpServers.length > 0) {
+    for (const s of o.mcpServers) {
+      if (s.tools === '*') {
+        mcpTools.push(`mcp__${s.name}__*`);
+      } else {
+        for (const t of s.tools) {
+          mcpTools.push(`mcp__${s.name}__${t}`);
+        }
+      }
+    }
+  }
+
+  const mcpConfigPath = o.runDir ? join(o.runDir, 'mcp.json') : 'mcp.json';
+
   return [
     '-p', '--output-format', o.stream ? 'stream-json' : 'json', ...(o.stream ? ['--verbose'] : []),
     '--session-id', o.sessionId,
     '--permission-mode', o.permissionMode,
-    '--strict-mcp-config',
+    ...(o.mcpServers && o.mcpServers.length > 0
+      ? ['--mcp-config', mcpConfigPath, '--strict-mcp-config']
+      : ['--strict-mcp-config']),
     ...(o.maxBudgetUsd ? ['--max-budget-usd', String(o.maxBudgetUsd)] : []),
     ...(o.model ? ['--model', o.model] : []),
-    '--allowedTools', ...o.allowedTools,
+    '--allowedTools', ...o.allowedTools, ...mcpTools,
     '--disallowedTools', ...ALWAYS_DENIED,
   ];
 }
@@ -45,6 +63,12 @@ export function buildRunArgs(o: Omit<LaunchOptions, 'bin' | 'cwd' | 'runDir' | '
 export function launchDetached(o: LaunchOptions): number {
   mkdirSync(o.runDir, { recursive: true });
   writeFileSync(join(o.runDir, 'prompt.md'), o.prompt, { mode: 0o600 });
+  if (o.mcpServers && o.mcpServers.length > 0) {
+    const mcpConfig = {
+      mcpServers: Object.fromEntries(o.mcpServers.map(s => [s.name, s.definition])),
+    };
+    writeFileSync(join(o.runDir, 'mcp.json'), JSON.stringify(mcpConfig, null, 2), { mode: 0o600 });
+  }
   const args = buildRunArgs(o);
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
   const script = '"$TESSERAX_BIN" "$@" < "$TESSERAX_RUN_DIR/prompt.md" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';

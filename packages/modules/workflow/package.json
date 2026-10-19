@@ -16,6 +16,7 @@
     "@tesserax/agent-runtime": "workspace:*",
     "@tesserax/mod-classify": "workspace:*",
     "@tesserax/mod-tasks": "workspace:*",
+    "@tesserax/mod-mcp": "workspace:*",
     "kysely": "^0.28.17"
   },
   "devDependencies": { "@swc-node/register": "^1.10.10", "@swc/core": "^1.13.5" }
