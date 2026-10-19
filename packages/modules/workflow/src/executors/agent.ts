@@ -58,15 +58,28 @@ export async function startAgent(
   const runDir = join(dataDir(ctx.appConfig), 'runs', ctx.run.id, ctx.nodeRun.id);
   const model = c.model ?? ctx.appConfig.PLAYBOOK_MODEL;
   if (executor === 'claude-cli' || executor === 'gemini-cli' || executor === 'antigravity-cli') {
+    const engine: 'claude' | 'gemini' | 'antigravity' =
+      executor === 'gemini-cli' ? 'gemini' : executor === 'antigravity-cli' ? 'antigravity' : 'claude';
+    const mcpGrant = ctx.mcp
+      ? await ctx.mcp.grantFor({ engine, node: ctx.node.config, projectDirs: [prepared.worktree] })
+      : undefined;
+
     const sessionId = executor === 'claude-cli' ? randomUUID() : null;
     const pid = executor === 'claude-cli'
       ? launchDetached({
           bin: ctx.appConfig.CLAUDE_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, sessionId: sessionId!,
           permissionMode: c.permissionMode, allowedTools: c.allowedTools, maxBudgetUsd: c.maxBudgetUsd, model, stream: true,
+          mcpServers: mcpGrant?.servers,
         })
       : executor === 'gemini-cli'
-        ? launchGeminiDetached({ bin: ctx.appConfig.GEMINI_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model })
-        : launchAntigravityDetached({ bin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model });
+        ? launchGeminiDetached({
+            bin: ctx.appConfig.GEMINI_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model,
+            allowedMcpServers: (mcpGrant?.servers ?? []).map(s => s.name),
+          })
+        : launchAntigravityDetached({
+            bin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model,
+            allowedMcpTools: (mcpGrant?.servers ?? []).flatMap(s => s.tools === '*' ? [`${s.name}/*`] : s.tools.map(t => `${s.name}/${t}`)),
+          });
     await ctx.engine.patchNode(ctx.nodeRun.id, { process_id: pid, run_dir: runDir, agent_session_id: sessionId, skill_hash: prepared.skillHash });
     await ctx.engine.event(ctx.run.id, 'job', 'agent_started', { executor, pid, sessionId, worktree: prepared.worktree }, ctx.nodeRun.id);
     return { mode: 'running' };

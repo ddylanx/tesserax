@@ -5,6 +5,7 @@ import type { ClassificationService } from '@tesserax/mod-classify';
 import type { TasksService } from '@tesserax/mod-tasks';
 import type { WorkflowEngine } from '../engine.service';
 import type { SkillCatalog } from '@tesserax/mod-skills';
+import type { McpService } from '@tesserax/mod-mcp';
 
 export interface NodeContext {
   engine: WorkflowEngine;
@@ -22,6 +23,7 @@ export interface NodeContext {
   feedback: string | null;
   /** Variables of the run's project as they were when the run started. */
   projectVars: Record<string, string>;
+  mcp?: McpService;
 }
 
 export type NodeResult =

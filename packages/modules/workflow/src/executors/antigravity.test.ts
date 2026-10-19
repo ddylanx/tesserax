@@ -68,3 +68,9 @@ test('antigravity: the prompt lists the shell commands its settings allow', () =
   assert.match(hint, /edit files inside the working folder/);
   assert.match(withToolHint('x', 'plan', []), /Shell commands are not available/);
 });
+
+test('antigravity: withToolHint includes allowed MCP tools when specified', () => {
+  const hint = withToolHint('do it', 'plan', [], ['db/query', 'github/search']);
+  assert.match(hint, /Allowed MCP tools for this run: db\/query, github\/search\. Calls to other MCP tools will be refused\./);
+});
+
