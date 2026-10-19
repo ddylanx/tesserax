@@ -272,6 +272,12 @@ importers:
       '@tesserax/core':
         specifier: workspace:*
         version: link:../../core
+      '@tesserax/db':
+        specifier: workspace:*
+        version: link:../../db
+      kysely:
+        specifier: ^0.28.17
+        version: 0.28.17
     devDependencies:
       '@swc-node/register':
         specifier: ^1.10.10
@@ -510,6 +516,9 @@ importers:
       '@tesserax/mod-classify':
         specifier: workspace:*
         version: link:../classify
+      '@tesserax/mod-mcp':
+        specifier: workspace:*
+        version: link:../mcp
       '@tesserax/mod-repos':
         specifier: workspace:*
         version: link:../repos
