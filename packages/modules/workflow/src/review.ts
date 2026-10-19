@@ -12,6 +12,7 @@ import { repoRegistry } from '@tesserax/mod-repos';
 import { BitbucketClient, commentOnPr, findOpenPr, parseBitbucketRemote, parsePrUrl, remoteUrl } from './bitbucket';
 import type { WorkflowEngine } from './engine.service';
 import { FatalNodeError } from './executors/types';
+import { ensureWorktreeLinks, getProjectVars } from './worktree-links';
 
 const exec = promisify(execFile);
 const gitEnv = () => ({ ...process.env, GIT_TERMINAL_PROMPT: '0', GIT_SSH_COMMAND: 'ssh -o BatchMode=yes -o ConnectTimeout=15' });
@@ -42,6 +43,8 @@ export async function ensureReviewWorktree(engine: WorkflowEngine, config: AppCo
     await git(entry.path, ['worktree', 'prune']);
     await git(entry.path, ['worktree', 'add', '--quiet', '--detach', path, `${remote}/${review.sourceBranch}`]);
   }
+  const projectVars = getProjectVars(run.vars);
+  ensureWorktreeLinks({ repoPath: entry.path, worktreePath: path, linksRaw: projectVars.worktree_links });
   const baseRef = `${remote}/${target}`;
   if (run.worktree_path !== path || run.base_ref !== baseRef) {
     await engine.patchRun(run.id, { repo_path: entry.path, base_ref: baseRef, branch: review.sourceBranch, worktree_path: path });

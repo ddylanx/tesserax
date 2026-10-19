@@ -1,23 +1,15 @@
-import { join } from 'node:path';
 import { Module } from '@nestjs/common';
-import { findRepoRoot } from '@tesserax/config';
 import { createLogger } from '@tesserax/core';
 import { McpController } from './mcp.controller';
 import { McpService } from './mcp.service';
 import { MCP_STATUS_PROVIDER, type McpStatusProvider } from './provider';
-import { AgentCockpitMcpProvider } from './providers/agent-cockpit.provider';
-import { ClaudeConfigMcpProvider } from './providers/claude-config.provider';
+import { BuiltinMcpProvider } from './providers/builtin.provider';
 
 const log = createLogger('mcp');
 
 export function chooseMcpProvider(): McpStatusProvider {
-  const cockpitPath = process.env.AGENT_COCKPIT_MCP_PATH || join(findRepoRoot(), '..', 'agent-cockpit', 'src', 'mcp.mjs');
-  if (AgentCockpitMcpProvider.available(cockpitPath)) {
-    log.info({ path: cockpitPath }, 'MCP provider: agent-cockpit');
-    return new AgentCockpitMcpProvider(cockpitPath);
-  }
-  log.info('MCP provider: claude-config (agent-cockpit not found)');
-  return new ClaudeConfigMcpProvider();
+  log.info('MCP provider: builtin');
+  return new BuiltinMcpProvider();
 }
 
 @Module({

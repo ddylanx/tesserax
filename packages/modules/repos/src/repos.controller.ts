@@ -1,6 +1,6 @@
-import { BadRequestException, Body, Controller, Delete, Get, Inject, Param, Post, Put } from '@nestjs/common';
-import type { RepoInspection, RepoRegistryView } from '@tesserax/contracts';
-import { DB } from '@tesserax/core';
+import { BadRequestException, Body, Controller, Delete, Get, Inject, Optional, Param, Post, Put } from '@nestjs/common';
+import type { DemoRepoResponse, ProjectDirectory, RepoInspection, RepoRegistryView } from '@tesserax/contracts';
+import { DB, PROJECT_DIRECTORY } from '@tesserax/core';
 import { sql, type Kysely } from 'kysely';
 import { RepoRegistryStore } from './store';
 
@@ -19,7 +19,17 @@ export class ReposController {
   constructor(
     private readonly store: RepoRegistryStore,
     @Inject(DB) private readonly db: Kysely<any>,
+    @Optional() @Inject(PROJECT_DIRECTORY) private readonly projects?: ProjectDirectory,
   ) {}
+
+  @Post('demo')
+  async createDemo(): Promise<DemoRepoResponse> {
+    const res = bad(() => this.store.createDemoRepo()) as DemoRepoResponse;
+    if (this.projects) {
+      await this.projects.addWorkplaceToDefault(res.workplace.id);
+    }
+    return res;
+  }
 
   @Get()
   async view(): Promise<RepoRegistryView> {

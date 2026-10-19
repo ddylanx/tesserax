@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "claude-desktop-mock": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem"],
+      "env": {
+        "DESKTOP_SECRET": "secret_desktop_val"
+      }
+    }
+  }
+}

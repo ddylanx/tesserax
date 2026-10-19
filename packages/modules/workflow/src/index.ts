@@ -5,3 +5,4 @@ export * from './render';
 export * from './artifact.service';
 export * from './query.service';
 export * from './vcs.service';
+export * from './worktree-links';

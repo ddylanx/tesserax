@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gemini-mock": {
+      "command": "gemini-mcp",
+      "args": ["serve"],
+      "env": {
+        "GEMINI_API_KEY": "secret_gemini_val"
+      }
+    }
+  }
+}

@@ -77,6 +77,16 @@ export class ProjectsService implements ProjectDirectory, OnModuleInit {
     return changed;
   }
 
+  async addWorkplaceToDefault(workplaceId: string): Promise<void> {
+    const row = await this.db.selectFrom('projects').selectAll().where('is_default', '=', true).executeTakeFirst();
+    if (!row) return;
+    const settings = projectSettingsSchema.parse(row.settings ?? {});
+    if (settings.workplaceIds.length > 0 && !settings.workplaceIds.includes(workplaceId)) {
+      settings.workplaceIds.push(workplaceId);
+      await this.db.updateTable('projects').set({ settings: JSON.stringify(settings) }).where('id', '=', row.id).execute();
+    }
+  }
+
   async list(): Promise<Project[]> {
     const rows = await this.db.selectFrom('projects').selectAll().orderBy('position').orderBy('created_at').execute();
     return rows.map(toProject);

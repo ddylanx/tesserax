@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "claude-user-mock": {
+      "type": "http",
+      "url": "https://claude-user.example.com/mcp",
+      "env": {
+        "CLAUDE_USER_SECRET": "secret_claude_val"
+      }
+    }
+  },
+  "projects": {
+    "/mock/project": {
+      "mcpServers": {
+        "claude-local-mock": {
+          "command": "/usr/local/bin/node"
+        }
+      },
+      "enabledMcpjsonServers": ["approved-tool"],
+      "disabledMcpjsonServers": ["rejected-tool"]
+    }
+  }
+}

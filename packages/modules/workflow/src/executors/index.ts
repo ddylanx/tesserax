@@ -9,6 +9,7 @@ import { askAgent } from './claude';
 import { liveLogFile } from './livelog';
 import { startAgent } from './agent';
 import { ensureReviewWorktree } from '../review';
+import { getProjectInfo } from '../worktree-links';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
 
 async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?: string; baseRef?: string; branch?: string; diff?: string } = {}) {
@@ -25,6 +26,7 @@ const worktree = async (ctx: NodeContext) => {
   try {
     return await ctx.engine.ensureRunWorktree(ctx.run.id);
   } catch (e) {
+    if (e instanceof FatalNodeError) throw e;
     throw new FatalNodeError((e as Error).message);
   }
 };
@@ -103,6 +105,15 @@ const checkCommand: NodeExecutor = async ctx => {
   const c = ctx.config;
   const wt = await worktree(ctx);
   const rc = await renderCtx(ctx, wt);
+  for (const raw of ((c.commands ?? []) as string[])) {
+    if (raw.includes('project.test_command') || raw.includes('TX_PROJECT_TEST_COMMAND')) {
+      const testCmd = rc.projectVars?.test_command?.trim();
+      if (!testCmd) {
+        const projectName = getProjectInfo(ctx.run.vars).name || ctx.task.project || 'unnamed';
+        throw new FatalNodeError(`Project ${projectName} has no test_command; set it on the project page`);
+      }
+    }
+  }
   const shellEnv = buildShellEnv(rc);
   const lines: string[] = [`# Checks in ${wt.worktree}`, ''];
   const results: { command: string; exitCode: number | null; seconds: number }[] = [];
