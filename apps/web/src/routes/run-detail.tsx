@@ -24,6 +24,10 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
 
+/** A step that finished through its failed / fail port (agent stopped, checks or review failed) is shown as such, not as a plain "done". */
+const stateOf = (n: NodeRunDto | undefined): NodeState =>
+  !n ? 'idle' : n.output.skipped ? 'skipped' : n.status === 'done' && (n.port === 'failed' || n.port === 'fail') ? 'ended_failed' : (n.status as NodeState);
+
 /** The model picked for a step in this run only (run vars `model`). */
 const modelOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars.model as Record<string, string> | undefined)?.[node.id];
@@ -113,7 +117,7 @@ export function RunDetailPage() {
           id: n.id, type: 'card', position: n.position, selected: n.id === selected,
           data: {
             node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id), agentOverride: agentOverrideOf(r, n), model: modelShownOf(r, n),
-            state: (latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle') as NodeState,
+            state: stateOf(latest.get(n.id)),
           },
         }),
       ),

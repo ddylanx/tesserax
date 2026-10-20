@@ -5,7 +5,7 @@ import { AGENT_EXECUTOR_INFO, AI_ENGINE_TITLES, ENGINE_NODE_TYPES, type AgentExe
 import { cn } from '@/lib/utils';
 import { metaOf, portTone } from './meta';
 
-export type NodeState = 'idle' | 'queued' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled' | 'skipped';
+export type NodeState = 'idle' | 'queued' | 'running' | 'waiting' | 'done' | 'ended_failed' | 'failed' | 'cancelled' | 'skipped';
 
 export type CardData = {
   node: WorkflowNode;
@@ -44,6 +44,8 @@ const STATE: Record<NodeState, { ring: string; badge: string; label: string }> =
   running: { ring: 'ring-2 ring-sky-500 animate-pulse', badge: 'bg-sky-500/15 text-sky-600', label: 'running' },
   waiting: { ring: 'ring-2 ring-amber-500', badge: 'bg-amber-500/20 text-amber-700 dark:text-amber-300', label: 'waiting for you' },
   done: { ring: 'ring-1 ring-emerald-500/60', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', label: 'done' },
+  /** finished, but through its failed / fail port: the run moved on along that edge */
+  ended_failed: { ring: 'ring-2 ring-red-500/60', badge: 'bg-red-500/15 text-red-600', label: 'done → failed' },
   failed: { ring: 'ring-2 ring-red-500', badge: 'bg-red-500/15 text-red-600', label: 'failed' },
   cancelled: { ring: 'opacity-60', badge: 'bg-muted text-muted-foreground', label: 'cancelled' },
   skipped: { ring: 'opacity-50 border-dashed', badge: 'bg-muted text-muted-foreground', label: 'skipped' },
