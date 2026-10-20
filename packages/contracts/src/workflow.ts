@@ -368,7 +368,13 @@ export const workflowRunDetailSchema = workflowRunSchema.extend({
 });
 export type WorkflowRunDetail = z.infer<typeof workflowRunDetailSchema>;
 
-export const workflowRunListSchema = z.object({ runs: z.array(workflowRunSchema), counts: z.record(z.string(), z.number()) });
+export const workflowRunListSchema = z.object({
+  runs: z.array(workflowRunSchema),
+  /** Per status, under the other filters (not the status one). */
+  counts: z.record(z.string(), z.number()),
+  /** Workflows that have a run in the project scope, for the filter. */
+  workflows: z.array(z.string()).optional(),
+});
 export type WorkflowRunList = z.infer<typeof workflowRunListSchema>;
 
 // ---------- user actions ----------

@@ -13,7 +13,7 @@ import { TasksService } from '@tesserax/mod-tasks';
 import { repoRegistry } from '@tesserax/mod-repos';
 import { RoutingStore, WorkflowStore } from './stores';
 import { ArtifactService } from './artifact.service';
-import { WorkflowQueryService } from './query.service';
+import { type RunListFilter, WorkflowQueryService } from './query.service';
 import { WorkflowVcsService } from './vcs.service';
 
 const log = createLogger('workflow');
@@ -514,8 +514,8 @@ export class WorkflowEngine {
 
   // ---------- reads (delegated) ----------
 
-  listRuns(status?: string, project?: string): Promise<WorkflowRunList> {
-    return this.queries.listRuns(status, project);
+  listRuns(filter: RunListFilter): Promise<WorkflowRunList> {
+    return this.queries.listRuns(filter);
   }
 
   getRun(id: string): Promise<WorkflowRunDto | null> {

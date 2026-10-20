@@ -224,8 +224,8 @@ export class WorkflowController {
   }
 
   @Get('workflow-runs')
-  runs(@Query('status') status?: string, @Query('project') project?: string): Promise<WorkflowRunList> {
-    return this.engine.listRuns(status, project);
+  runs(@Query('status') status?: string, @Query('project') project?: string, @Query('workflow') workflow?: string, @Query('q') q?: string): Promise<WorkflowRunList> {
+    return this.engine.listRuns({ status, project, workflow, q });
   }
 
   @Get('workflow-runs/:id')

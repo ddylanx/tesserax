@@ -12,6 +12,13 @@ import type { Db } from '@tesserax/db';
 import { repoRegistry } from '@tesserax/mod-repos';
 import { TasksService } from '@tesserax/mod-tasks';
 
+export interface RunListFilter {
+  status?: string;
+  project?: string;
+  workflow?: string;
+  q?: string;
+}
+
 export const iso = (d: Date | string | null | undefined) => (d ? new Date(d).toISOString() : null);
 
 @Injectable()
@@ -22,23 +29,53 @@ export class WorkflowQueryService {
     private readonly tasks: TasksService,
   ) {}
 
-  /** `project` is a project slug: only runs of tasks in that project. */
-  async listRuns(status?: string, project?: string): Promise<WorkflowRunList> {
+  /**
+   * `status` and `workflow` take one value or a comma list ('all' / empty = any); `project` is a project slug;
+   * `q` matches the ticket key or title. `counts` ignores `status` so every status chip can show its number.
+   */
+  async listRuns(f: RunListFilter = {}): Promise<WorkflowRunList> {
+    const list = (v?: string) => (v ?? '').split(',').map(x => x.trim()).filter(x => x && x !== 'all');
+    const statuses = list(f.status);
+    const workflows = list(f.workflow);
+    const term = f.q?.trim() ? `%${f.q.trim().replace(/[\\%_]/g, m => `\\${m}`)}%` : null;
     let q = this.baseQuery().orderBy('r.updated_at', 'desc').limit(300);
-    if (status && status !== 'all') q = q.where('r.status', '=', status as never);
-    if (project) q = q.where('w.slug', '=', project);
-    const rows = await q.execute();
     let cq = this.db
       .selectFrom('workflow_runs as r')
       .innerJoin('tasks as t', 't.id', 'r.task_id')
       .innerJoin('projects as w', 'w.id', 't.project_id')
       .select(['r.status', sql<number>`count(*)::int`.as('n')])
       .groupBy('r.status');
-    if (project) cq = cq.where('w.slug', '=', project);
-    const counts = await cq.execute();
+    if (statuses.length) q = q.where('r.status', 'in', statuses as never);
+    if (f.project) {
+      q = q.where('w.slug', '=', f.project);
+      cq = cq.where('w.slug', '=', f.project);
+    }
+    if (workflows.length) {
+      q = q.where('r.workflow_id', 'in', workflows);
+      cq = cq.where('r.workflow_id', 'in', workflows);
+    }
+    if (term) {
+      q = q.where(eb => eb.or([eb('t.key', 'ilike', term), eb('t.title', 'ilike', term)]));
+      cq = cq.where(eb => eb.or([eb('t.key', 'ilike', term), eb('t.title', 'ilike', term)]));
+    }
+    const [rows, counts, wf] = await Promise.all([
+      q.execute(),
+      cq.execute(),
+      // every workflow that has a run in scope, for the filter dropdown
+      this.db
+        .selectFrom('workflow_runs as r')
+        .innerJoin('tasks as t', 't.id', 'r.task_id')
+        .innerJoin('projects as w', 'w.id', 't.project_id')
+        .select('r.workflow_id')
+        .distinct()
+        .$if(!!f.project, b => b.where('w.slug', '=', f.project!))
+        .orderBy('r.workflow_id')
+        .execute(),
+    ]);
     return {
       runs: rows.map(r => this.toDto(r)),
       counts: Object.fromEntries(counts.map(c => [c.status, c.n])),
+      workflows: wf.map(w => w.workflow_id),
     };
   }
 
