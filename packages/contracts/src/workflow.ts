@@ -409,15 +409,15 @@ export const executorActionSchema = z.object({ executor: z.enum(AGENT_EXECUTORS)
  */
 export const nodeAgentActionSchema = z.object({ nodeId: z.string().min(1).max(200), agent: z.string().min(1).max(100).nullable() });
 export type NodeAgentAction = z.infer<typeof nodeAgentActionSchema>;
+/** The model for one step in this run only; null = the workflow's model (or the CLI's default when it names none). */
+export const nodeModelActionSchema = z.object({ nodeId: z.string().min(1).max(200), model: z.string().trim().min(1).max(100).regex(/^(?!-)[\w.:\[\]\/-]+$/, 'a model id such as sonnet or claude-opus-5-5').nullable() });
+export type NodeModelAction = z.infer<typeof nodeModelActionSchema>;
 /** Run a step that failed again (also when the run already moved on to a gate that waits for you). */
 export const rerunNodeActionSchema = z.object({ nodeId: z.string().min(1).max(200) });
 /** Pick a run up again at one step (also a cancelled or finished run): its documents (analysis, spec…) and worktree are kept. */
 export const runFromActionSchema = z.object({ nodeId: z.string().min(1).max(200) });
 export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
-/** The model for one step in this run only; null = the workflow's model (or the CLI's default when it names none). */
-export const nodeModelActionSchema = z.object({ nodeId: z.string().min(1).max(200), model: z.string().trim().min(1).max(100).regex(/^(?!-)[\w.:\[\]\/-]+$/, 'a model id such as sonnet or claude-opus-5-5').nullable() });
-export type NodeModelAction = z.infer<typeof nodeModelActionSchema>;
 export const prCommentActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('confirm'), confirm: z.literal(true), text: z.string().min(1).max(60_000) }),
   z.object({ action: z.literal('skip') }),

@@ -119,6 +119,7 @@ export class WorkflowQueryService {
         error: n.error,
         costUsd: n.cost_usd,
         numTurns: n.num_turns,
+        model: n.model,
         skillHash: n.skill_hash,
         agentSessionId: n.agent_session_id,
         startedAt: iso(n.started_at),
@@ -156,7 +157,6 @@ export class WorkflowQueryService {
       .selectAll('r')
       .select(eb => [
         't.id as t_id',
-        model: n.model,
         't.key as t_key',
         't.title as t_title',
         't.status as t_status',
