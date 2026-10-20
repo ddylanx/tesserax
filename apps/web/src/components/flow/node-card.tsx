@@ -21,6 +21,8 @@ export type CardData = {
   taken?: string[];
   /** agent picked for this run only (engine or executor id) */
   agentOverride?: string;
+  /** model picked for this run, else the one the step last used, else the workflow's */
+  model?: string;
 };
 
 /** Who does the step: the engine of an AI step or the executor of an agent step; null for other node types. */
@@ -83,7 +85,7 @@ export function NodeCard({ id, data, selected }: NodeProps<Node<CardData>>) {
         <div className="flex flex-wrap gap-1 px-3 pt-1.5">
           {agent && (
             <Pill className={data.agentOverride ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}>
-              <Bot className="size-2.5" />{agentTitle(agent)}{data.agentOverride ? ' · this run' : ''}
+              <Bot className="size-2.5" />{agentTitle(agent)}{data.model ? ` · ${data.model}` : ''}{data.agentOverride ? ' · this run' : ''}
             </Pill>
           )}
           {!!data.node.skipIf?.length && <Pill className="bg-muted text-muted-foreground"><EyeOff className="size-2.5" />skippable</Pill>}

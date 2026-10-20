@@ -80,7 +80,8 @@ export async function startAgent(
             bin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: prepared.worktree, runDir, prompt: prepared.prompt, model: c.model,
             allowedMcpTools: (mcpGrant?.servers ?? []).flatMap(s => s.tools === '*' ? [`${s.name}/*`] : s.tools.map(t => `${s.name}/${t}`)),
           });
-    await ctx.engine.patchNode(ctx.nodeRun.id, { process_id: pid, run_dir: runDir, agent_session_id: sessionId, skill_hash: prepared.skillHash });
+    // the model asked for; Claude Code's own report replaces it when the run is finalized
+    await ctx.engine.patchNode(ctx.nodeRun.id, { process_id: pid, run_dir: runDir, agent_session_id: sessionId, skill_hash: prepared.skillHash, model: (executor === 'claude-cli' ? model : c.model) ?? null });
     await ctx.engine.event(ctx.run.id, 'job', 'agent_started', { executor, pid, sessionId, worktree: prepared.worktree }, ctx.nodeRun.id);
     return { mode: 'running' };
   }

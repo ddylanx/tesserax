@@ -232,6 +232,7 @@ export interface NodeRunsTable {
   skill_hash: string | null;
   cost_usd: number | null;
   num_turns: number | null;
+  model: string | null;
   agent_session_id: string | null;
   process_id: number | null;
   run_dir: string | null;

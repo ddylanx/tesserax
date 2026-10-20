@@ -119,6 +119,7 @@ export class WorkflowQueryService {
       .selectAll('r')
       .select(eb => [
         't.id as t_id',
+        model: n.model,
         't.key as t_key',
         't.title as t_title',
         't.status as t_status',

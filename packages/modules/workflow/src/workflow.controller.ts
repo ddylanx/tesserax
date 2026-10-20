@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { AppConfig } from '@tesserax/config';
 import {
-  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
+  NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
 import { CONFIG, DB } from '@tesserax/core';
@@ -72,6 +72,15 @@ export class WorkflowController {
     const parsed = nodeAgentActionSchema.safeParse(body);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues[0]?.message ?? 'Invalid body');
     return guard(() => this.engine.setNodeAgent(id, parsed.data.nodeId, parsed.data.agent));
+  }
+
+  /** The model for one AI or agent step in this run only; model null = the workflow's model (or the CLI's default). */
+  @Post('workflow-runs/:id/model')
+  @HttpCode(200)
+  setNodeModel(@Param('id', ParseUUIDPipe) id: string, @Body() body: unknown) {
+    const parsed = nodeModelActionSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues[0]?.message ?? 'Invalid body');
+    return guard(() => this.engine.setNodeModel(id, parsed.data.nodeId, parsed.data.model));
   }
 
   /** Post the approved review on the member's PR (confirm: true + the exact text), or skip. */

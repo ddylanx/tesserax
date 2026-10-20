@@ -1,8 +1,8 @@
 import type { AppConfig } from '@tesserax/config';
-import { nodeConfigSchemas, type NodeType } from '@tesserax/contracts';
+import { MODEL_NODE_TYPES, nodeConfigSchemas, type NodeType } from '@tesserax/contracts';
 import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
-import { diffInfo, isAlive, readOutcome, stopProcess } from '@tesserax/agent-runtime';
+import { diffInfo, isAlive, readOutcome, resultModel, stopProcess } from '@tesserax/agent-runtime';
 import type { ClassificationService } from '@tesserax/mod-classify';
 import type { TasksService } from '@tesserax/mod-tasks';
 import { FINALIZE_QUEUE, NODE_QUEUE, STEP_RETRY, type WorkflowEngine } from './engine.service';
@@ -65,6 +65,8 @@ export async function runNodeJob(d: JobDeps, data: { nodeRunId: string }, meta: 
   }
 }
 
+const hasModel = (type: string) => (MODEL_NODE_TYPES as readonly string[]).includes(type);
+
 async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string }, meta: JobMeta) {
   const nr = await d.db
     .updateTable('node_runs')
@@ -84,8 +86,15 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if (!task) throw new FatalNodeError('The task no longer exists');
     const config = nodeConfigSchemas[node.type].parse(node.config);
     // the agent picked on the run page for this run only wins over the workflow's engine
-    const engineOverride = ((run.vars ?? {}) as { engine?: Record<string, string> }).engine?.[node.id];
-    if (engineOverride && 'engine' in config) Object.assign(config, { engine: engineOverride });
+    const runVars = (run.vars ?? {}) as { engine?: Record<string, string>; model?: Record<string, string> };
+    const engineOverride = runVars.engine?.[node.id];
+    if (engineOverride && 'engine' in config && engineOverride !== (config as { engine?: string }).engine) {
+      // a model the workflow named is for its own engine (an Antigravity model id means nothing to Claude Code)
+      Object.assign(config, { engine: engineOverride, model: undefined });
+    }
+    // the model picked on the run page for this run only wins over the workflow's model
+    const modelOverride = runVars.model?.[node.id];
+    if (modelOverride && hasModel(node.type)) Object.assign(config, { model: modelOverride });
     const project = run.project_id ? await d.engine.projects.get(run.project_id) : null;
     if (project && 'engine' in config) {
       const allowed = project.settings.engines.allowed;
@@ -93,7 +102,7 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
       if (allowed && current && !allowed.includes(current)) {
         const fallback = project.settings.engines.default;
         if (!fallback || !allowed.includes(fallback)) throw new FatalNodeError(`Engine "${current}" is not allowed in project "${project.name}" (allowed: ${allowed.join(', ') || 'none'}).`);
-        Object.assign(config, { engine: fallback });
+        Object.assign(config, { engine: fallback, ...(modelOverride ? {} : { model: undefined }) });
       }
     }
     const input = (nr.input ?? {}) as { feedback?: string };
@@ -105,11 +114,11 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if ('async' in result) return; // finishes later (agent runs)
     if ('wait' in result) {
       if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, skill_hash: result.skillHash ?? null });
+      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
       return;
     }
     if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, skill_hash: result.skillHash ?? null });
+    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
     await d.engine.complete(nr.id, result.port, result.output ?? {}, 'job', ['running']);
   } catch (err) {
     const message = String((err as Error)?.message ?? err).slice(0, 4000);
@@ -169,7 +178,8 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
     diff?.stat ? `\n\`\`\`\n${diff.stat}\n\`\`\`` : '',
   ].join('\n');
   await d.engine.saveArtifact(run.id, nr.id, output, content, 'ai');
-  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null });
+  const usedModel = resultModel(r);
+  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}) });
   log.info({ runId: run.id, signal: outcome.signal }, 'agent node finished');
   if (nr.run_dir) {
     const mcpFile = join(nr.run_dir, 'mcp.json');

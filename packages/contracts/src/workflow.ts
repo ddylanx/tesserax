@@ -25,6 +25,14 @@ export type AiEngine = (typeof AI_ENGINES)[number];
 export const AI_ENGINE_TITLES: Record<AiEngine, string> = { claude: 'Claude Code', gemini: 'Gemini CLI', antigravity: 'Antigravity CLI' };
 /** Node types whose config has an `engine`. */
 export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr'] as const;
+/** Node types whose config has a `model` a run can override per step (unset = the CLI's own default model). */
+export const MODEL_NODE_TYPES = [...ENGINE_NODE_TYPES, 'agent.run'] as const;
+/** Suggestions for the model field (any id the CLI accepts works): Claude Code aliases, `agy models` ids. */
+export const AI_MODEL_SUGGESTIONS: Record<AiEngine, string[]> = {
+  claude: ['opus', 'sonnet', 'haiku', 'fable'],
+  gemini: [],
+  antigravity: ['gemini-3.8-flash-high', 'gemini-3.8-flash-medium', 'gemini-3.8-flash-low', 'claude-sonnet-4-6', 'claude-opus-4-6-thinking', 'gpt-oss-120b-medium'],
+};
 
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
@@ -326,6 +334,8 @@ export const nodeRunSchema = z.object({
   error: z.string().nullable(),
   costUsd: z.number().nullable(),
   numTurns: z.number().nullable(),
+  /** Model the step used: reported by Claude Code, else the one asked for; null = the CLI's default (not reported). */
+  model: z.string().nullable(),
   skillHash: z.string().nullable(),
   agentSessionId: z.string().nullable(),
   startedAt: z.string().nullable(),
@@ -399,6 +409,9 @@ export const rerunNodeActionSchema = z.object({ nodeId: z.string().min(1).max(20
 export const runFromActionSchema = z.object({ nodeId: z.string().min(1).max(200) });
 export const handoffActionSchema = z.object({ outcome: z.enum(['done', 'failed']), note: z.string().max(4000).optional() });
 
+/** The model for one step in this run only; null = the workflow's model (or the CLI's default when it names none). */
+export const nodeModelActionSchema = z.object({ nodeId: z.string().min(1).max(200), model: z.string().trim().min(1).max(100).regex(/^(?!-)[\w.:\[\]\/-]+$/, 'a model id such as sonnet or claude-opus-5-5').nullable() });
+export type NodeModelAction = z.infer<typeof nodeModelActionSchema>;
 export const prCommentActionSchema = z.discriminatedUnion('action', [
   z.object({ action: z.literal('confirm'), confirm: z.literal(true), text: z.string().min(1).max(60_000) }),
   z.object({ action: z.literal('skip') }),

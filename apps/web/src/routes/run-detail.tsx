@@ -4,7 +4,7 @@ import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, type Ed
 import '@xyflow/react/dist/style.css';
 import { ExternalLink, GitBranch } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AGENT_EXECUTORS, AI_ENGINES, HUMAN_NODE_TYPES, NODE_PORTS, type NodeType, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@tesserax/contracts';
+import { AGENT_EXECUTORS, AI_ENGINES, AI_MODEL_SUGGESTIONS, HUMAN_NODE_TYPES, MODEL_NODE_TYPES, type AiEngine, NODE_PORTS, type NodeType, type ArtifactDto, type NodeRunDto, type RunDiff, type WorkflowNode, type WorkflowRunDetail } from '@tesserax/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { metaOf } from '@/components/flow/meta';
 import { agentOf, agentTitle, nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
@@ -23,6 +23,18 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 /** The agent picked for a step in this run only (run vars `engine` / `executor`). */
 const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
+
+/** The model picked for a step in this run only (run vars `model`). */
+const modelOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
+  (run.vars.model as Record<string, string> | undefined)?.[node.id];
+
+/** The model a step's card shows: picked for this run, else the one its last run used, else the workflow's. */
+const modelShownOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
+  modelOverrideOf(run, node) ?? run.nodeRuns.findLast(n => n.nodeId === node.id && n.model)?.model ?? (node.config as { model?: string }).model;
+
+/** The CLI behind an engine or a CLI executor (whose model ids apply); null for editors and "ask". */
+const cliOf = (agent: string): AiEngine | null =>
+  (AI_ENGINES as readonly string[]).includes(agent) ? (agent as AiEngine) : (({ 'claude-cli': 'claude', 'gemini-cli': 'gemini', 'antigravity-cli': 'antigravity' }) as Record<string, AiEngine>)[agent] ?? null;
 
 /** The step failed (or left through "failed") and nothing ran after it except gates waiting for you: it can run again. */
 const canRerun = (run: WorkflowRunDetail, nodeId: string) => {
@@ -100,7 +112,7 @@ export function RunDetailPage() {
         (n): Node<CardData> => ({
           id: n.id, type: 'card', position: n.position, selected: n.id === selected,
           data: {
-            node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id), agentOverride: agentOverrideOf(r, n),
+            node: n, ports: [...(NODE_PORTS[n.type] ?? [])], runs: count.get(n.id) ?? 0, taken: takenPorts.get(n.id), agentOverride: agentOverrideOf(r, n), model: modelShownOf(r, n),
             state: (latest.get(n.id)?.output.skipped ? 'skipped' : latest.get(n.id)?.status ?? 'idle') as NodeState,
           },
         }),
@@ -296,6 +308,9 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     <b>#{n.attempt}</b><span>{n.status}{n.port ? ` → ${n.port}` : ''}</span>
                     {n.costUsd != null && <span>${n.costUsd.toFixed(3)}</span>}
                     {n.numTurns != null && <span>{n.numTurns} turns</span>}
+                    {(MODEL_NODE_TYPES as readonly string[]).includes(n.nodeType) && (n.model
+                      ? <span title="Model this run used (reported by Claude Code, else the one asked for)">model {n.model}</span>
+                      : ['done', 'failed'].includes(n.status) && <span className="text-muted-foreground" title="No model was passed and the CLI did not report one">CLI default model</span>)}
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>
@@ -518,11 +533,48 @@ function AgentPicker({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode
         </select>
         {failedHere && <Button size="sm" disabled={action.isPending} onClick={() => action.mutate({ path: 'rerun', body: { nodeId: node.id } })}>Retry with {agentTitle(override ?? fromWorkflow)}</Button>}
       </label>
+      {cliOf(override ?? fromWorkflow) && <ModelPicker run={run} node={node} cli={cliOf(override ?? fromWorkflow)!} sameAgent={!override} />}
       <p className="text-[11px] text-muted-foreground">
         Only this run changes; the workflow keeps {agentTitle(fromWorkflow)}. Used the next time this step starts (also a retry or a loop back).
       </p>
       {set.error && <p className="text-xs text-red-600">{(set.error as Error).message}</p>}
       {action.error && <p className="text-xs text-red-600">{(action.error as Error).message}</p>}
+    </div>
+  );
+}
+
+/** The model for this step in this run only; empty = the workflow's model, or the CLI's own default when it names none. */
+function ModelPicker({ run, node, cli, sameAgent }: { run: WorkflowRunDetail; node: WorkflowNode; cli: AiEngine; sameAgent: boolean }) {
+  const qc = useQueryClient();
+  const override = modelOverrideOf(run, node) ?? '';
+  const [value, setValue] = useState(override);
+  useEffect(() => setValue(override), [override]);
+  const set = useMutation({
+    mutationFn: (model: string | null) => api(`/api/workflow-runs/${run.id}/model`, { method: 'POST', body: JSON.stringify({ nodeId: node.id, model }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['wf'] }),
+  });
+  // the workflow's model is for the workflow's agent; another agent picked for this run starts from its CLI's default
+  const fromWorkflow = sameAgent ? (node.config as { model?: string }).model : undefined;
+  const save = () => value.trim() !== override && set.mutate(value.trim() || null);
+  const listId = `models-${node.id}`;
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-medium">Model for this run</span>
+        <input
+          list={listId}
+          className="w-48 rounded border bg-card px-1.5 py-1 text-xs"
+          placeholder={fromWorkflow ? `workflow: ${fromWorkflow}` : `${agentTitle(cli)} default`}
+          value={value}
+          disabled={set.isPending}
+          onChange={e => setValue(e.target.value)}
+          onBlur={save}
+          onKeyDown={e => e.key === 'Enter' && save()}
+        />
+        <datalist id={listId}>{AI_MODEL_SUGGESTIONS[cli].map(m => <option key={m} value={m} />)}</datalist>
+        {override && <Button size="sm" variant="ghost" disabled={set.isPending} onClick={() => set.mutate(null)}>Reset</Button>}
+      </label>
+      {set.error && <p className="text-xs text-red-600">{(set.error as Error).message}</p>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { ALWAYS_DENIED, runClaude, type ClaudeRun } from '@tesserax/agent-runtime';
+import { ALWAYS_DENIED, resultModel, runClaude, type ClaudeRun } from '@tesserax/agent-runtime';
 import type { McpGrant } from '@tesserax/contracts';
 import { FatalNodeError } from './types';
 
@@ -82,7 +82,10 @@ export async function askClaude(o: {
   }
 }
 
-/** Read-only AI call with the step's engine: Claude Code (default), Gemini CLI (approval mode "plan") or Antigravity CLI (mode "plan"). */
+/**
+ * Read-only AI call with the step's engine: Claude Code (default), Gemini CLI (approval mode "plan") or Antigravity CLI (mode "plan").
+ * `model` is the one Claude Code reports it used; Gemini and Antigravity do not report it, so it is the one asked for (null = the CLI's default).
+ */
 export async function askAgent(o: {
   engine?: 'claude' | 'gemini' | 'antigravity';
   claudeBin: string;
@@ -96,7 +99,7 @@ export async function askAgent(o: {
   maxBudgetUsd?: number;
   logFile?: string;
   mcpGrant?: McpGrant;
-}): Promise<{ text: string; costUsd: number | null; numTurns: number | null }> {
+}): Promise<{ text: string; costUsd: number | null; numTurns: number | null; model: string | null }> {
   if (o.engine === 'gemini') {
     const { runGemini } = await import('./gemini');
     const allowedMcpServers = (o.mcpGrant?.servers ?? []).map(s => s.name);
@@ -112,7 +115,7 @@ export async function askAgent(o: {
       const msg = `gemini ${r.signal}: ${r.message ?? 'empty answer'}`;
       throw ['auth', 'quota', 'not_installed', 'untrusted'].includes(r.signal) ? new FatalNodeError(msg) : new Error(msg);
     }
-    return { text: r.text, costUsd: null, numTurns: null };
+    return { text: r.text, costUsd: null, numTurns: null, model: o.model ?? null };
   }
   if (o.engine === 'antigravity') {
     const { runAntigravity } = await import('./antigravity');
@@ -132,7 +135,7 @@ export async function askAgent(o: {
       const msg = `antigravity ${r.signal}: ${r.message ?? 'empty answer'}`;
       throw ['auth', 'quota', 'not_installed'].includes(r.signal) ? new FatalNodeError(msg) : new Error(msg);
     }
-    return { text: r.text, costUsd: null, numTurns: null };
+    return { text: r.text, costUsd: null, numTurns: null, model: o.model ?? null };
   }
   const { text, run } = await askClaude({
     bin: o.claudeBin,
@@ -145,5 +148,5 @@ export async function askAgent(o: {
     logFile: o.logFile,
     mcpServers: o.mcpGrant?.servers,
   });
-  return { text, costUsd: run.result?.total_cost_usd ?? null, numTurns: run.result?.num_turns ?? null };
+  return { text, costUsd: run.result?.total_cost_usd ?? null, numTurns: run.result?.num_turns ?? null, model: resultModel(run.result) ?? o.model ?? null };
 }

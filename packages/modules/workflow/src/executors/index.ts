@@ -44,14 +44,14 @@ const aiStep: NodeExecutor = async ctx => {
   const mcpGrant = ctx.mcp
     ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
     : undefined;
-  const { text, costUsd, numTurns } = await askAgent({
+  const { text, costUsd, numTurns, model } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
     mcpGrant,
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
-    costUsd, numTurns, skillHash: skill?.hash ?? null,
+    costUsd, numTurns, model, skillHash: skill?.hash ?? null,
   };
 };
 
@@ -68,7 +68,7 @@ const aiReview: NodeExecutor = async ctx => {
   const mcpGrant = ctx.mcp
     ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
     : undefined;
-  const { text, costUsd, numTurns } = await askAgent({
+  const { text, costUsd, numTurns, model } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
     mcpGrant,
@@ -77,7 +77,7 @@ const aiReview: NodeExecutor = async ctx => {
   if (!verdict) throw new Error('The review did not end with VERDICT: PASS or VERDICT: FAIL');
   return {
     port: verdict === 'PASS' ? 'pass' : 'fail', artifact: { name: c.output, content: text },
-    output: { verdict, filesChanged: info.files }, costUsd, numTurns,
+    output: { verdict, filesChanged: info.files }, costUsd, numTurns, model,
     skillHash: skills.map(s => s.hash).join(',') || null,
   };
 };
@@ -183,12 +183,12 @@ async function draft(ctx: NodeContext) {
   const mcpGrant = ctx.mcp
     ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
     : undefined;
-  const { text, costUsd, numTurns } = await askAgent({
+  const { text, costUsd, numTurns, model } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
     mcpGrant,
   });
-  return { text, wt, info, cost: costUsd, turns: numTurns, skillHash: skill?.hash ?? null };
+  return { text, wt, info, cost: costUsd, turns: numTurns, model, skillHash: skill?.hash ?? null };
 }
 
 /** Writes the ticket document into the repo and commits only that file on the ticket branch (local). */
@@ -210,13 +210,13 @@ const docWrite: NodeExecutor = async ctx => {
     await git(d.wt.worktree, ['commit', '--no-verify', '-m', msg, '--', file]);
     commit = (await git(d.wt.worktree, ['rev-parse', '--short', 'HEAD'])).trim();
   }
-  return { port: 'next', artifact: { name: c.output, content: d.text }, output: { path: file, commit }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
+  return { port: 'next', artifact: { name: c.output, content: d.text }, output: { path: file, commit }, costUsd: d.cost, numTurns: d.turns, model: d.model, skillHash: d.skillHash };
 };
 
 const jiraComment: NodeExecutor = async ctx => {
   if (ctx.task.source !== 'jira') return { port: 'skipped', output: { skipped: true, reason: 'not a Jira task' } };
   const d = await draft(ctx);
-  return { wait: true, artifact: { name: ctx.config.output, content: d.text }, output: { issueKey: ctx.task.key }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
+  return { wait: true, artifact: { name: ctx.config.output, content: d.text }, output: { issueKey: ctx.task.key }, costUsd: d.cost, numTurns: d.turns, model: d.model, skillHash: d.skillHash };
 };
 
 const gitPr: NodeExecutor = async ctx => {
@@ -229,7 +229,7 @@ const gitPr: NodeExecutor = async ctx => {
     wait: true,
     artifact: { name: c.output, content: d.text },
     output: { title, source: d.wt.branch, target, commits: d.info?.commits ?? [], uncommitted: dirty },
-    costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash,
+    costUsd: d.cost, numTurns: d.turns, model: d.model, skillHash: d.skillHash,
   };
 };
 

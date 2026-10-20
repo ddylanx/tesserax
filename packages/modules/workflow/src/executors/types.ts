@@ -33,6 +33,8 @@ export type NodeResult =
       artifact?: { name: string; content: string };
       costUsd?: number | null;
       numTurns?: number | null;
+      /** Model the AI call used (null = the CLI's default, not reported). */
+      model?: string | null;
       skillHash?: string | null;
     }
   | { async: true }
@@ -43,6 +45,7 @@ export type NodeResult =
       artifact?: { name: string; content: string };
       costUsd?: number | null;
       numTurns?: number | null;
+      model?: string | null;
       skillHash?: string | null;
     };
 

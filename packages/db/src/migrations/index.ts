@@ -11,6 +11,7 @@ import * as m009 from './009_local_tasks';
 import * as m010 from './010_task_workplace';
 import * as m011 from './011_projects';
 import * as m012 from './012_mcp_policy';
+import * as m013 from './013_node_model';
 
 /** Ordered list of migrations. Add new files here; names sort lexically. */
 export const migrations: Record<string, Migration> = {
@@ -26,5 +27,6 @@ export const migrations: Record<string, Migration> = {
   '010_task_workplace': m010,
   '011_projects': m011,
   '012_mcp_policy': m012,
+  '013_node_model': m013,
 };
 

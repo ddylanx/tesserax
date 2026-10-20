@@ -52,6 +52,15 @@ export interface ClaudeResult {
   duration_ms?: number;
   num_turns?: number;
   structured_output?: unknown;
+  /** Tokens and cost per model the run used (keys are model ids, e.g. "claude-sonnet-5-5"). */
+  modelUsage?: Record<string, { costUSD?: number }>;
+}
+
+/** The model that did most of the run (largest cost in modelUsage); null when the CLI did not report one. */
+export function resultModel(r: object | null | undefined): string | null {
+  const usage = Object.entries((r as Pick<ClaudeResult, 'modelUsage'> | null | undefined)?.modelUsage ?? {});
+  if (!usage.length) return null;
+  return usage.reduce((a, b) => ((b[1]?.costUSD ?? 0) > (a[1]?.costUSD ?? 0) ? b : a))[0];
 }
 
 export type AgentSignal = 'ok' | 'not_installed' | 'nested_session' | 'auth' | 'quota' | 'overloaded' | 'budget' | 'max_turns' | 'timeout' | 'no_output' | 'error';

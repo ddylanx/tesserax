@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { AppConfig } from '@tesserax/config';
 import {
-  AGENT_EXECUTORS, AI_ENGINES, ENGINE_NODE_TYPES, CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
+  AGENT_EXECUTORS, AI_ENGINES, ENGINE_NODE_TYPES, MODEL_NODE_TYPES, CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
   type ConfirmAction, type ProjectDirectory, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@tesserax/contracts';
@@ -401,9 +401,32 @@ export class WorkflowEngine {
     const map = { ...((vars[key] ?? {}) as Record<string, string>) };
     if (agent === null) delete map[nodeId];
     else map[nodeId] = agent;
-    await this.patchRun(runId, { vars: JSON.stringify({ ...vars, [key]: map }) });
+    // a model picked for this step belonged to the previous agent (model ids differ per CLI)
+    const models = { ...((vars.model ?? {}) as Record<string, string>) };
+    delete models[nodeId];
+    await this.patchRun(runId, { vars: JSON.stringify({ ...vars, [key]: map, model: models }) });
     await this.event(runId, 'user', 'agent_changed', { node: nodeId, agent: agent ?? 'workflow default' });
     return { nodeId, agent };
+  }
+
+  /**
+   * The model for one step in this run only; null = the workflow's model (none = the CLI's default). Stored in run vars
+   * (`model`, keyed by node id) and read when the step starts, like the agent picked for the run.
+   */
+  async setNodeModel(runId: string, nodeId: string, model: string | null) {
+    const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
+    const node = this.graph(run).nodes.find(n => n.id === nodeId);
+    if (!node) throw new RunConflict(`No step ${nodeId} in this run.`);
+    if (!(MODEL_NODE_TYPES as readonly string[]).includes(node.type)) throw new RunConflict(`“${node.label}” has no model to choose.`);
+    const live = await this.db.selectFrom('node_runs').select('id').where('run_id', '=', runId).where('node_id', '=', nodeId).where('status', '=', 'running').executeTakeFirst();
+    if (live) throw new RunConflict(`“${node.label}” is running now; change the model after it ends (e.g. before a retry).`);
+    const vars = (run.vars ?? {}) as Record<string, unknown>;
+    const map = { ...((vars.model ?? {}) as Record<string, string>) };
+    if (model === null) delete map[nodeId];
+    else map[nodeId] = model;
+    await this.patchRun(runId, { vars: JSON.stringify({ ...vars, model: map }) });
+    await this.event(runId, 'user', 'model_changed', { node: nodeId, model: model ?? 'workflow default' });
+    return { nodeId, model };
   }
 
   /**
