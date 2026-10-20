@@ -6,7 +6,7 @@
     { "id": "trigger", "type": "trigger.jira", "label": "Review task", "position": { "x": 0, "y": 0 }, "config": {} },
     {
       "id": "checks", "type": "check.command", "label": "Tests on the PR branch", "position": { "x": 300, "y": 0 },
-      "config": { "commands": ["test -e vendor || ln -s \"{{repo_path}}/vendor\" vendor", "composer test", "vendor/bin/pint --test"], "output": "checks" }
+      "config": { "commands": ["{{project.test_command}}"], "output": "checks" }
     },
     {
       "id": "review", "type": "ai.review", "label": "AI reviews the PR", "position": { "x": 600, "y": 0 },

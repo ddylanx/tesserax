@@ -90,24 +90,44 @@ export function allowedCommands(settingsFile = join(homedir(), '.gemini', 'antig
  * Any shell command outside the allow rules is refused headless, and Antigravity then ends the whole run with no answer
  * and no edits (seen with `sed -n`), so tell the model up front exactly what it may run.
  */
-export const withToolHint = (prompt: string, mode: 'plan' | 'accept-edits' = 'plan', allowed: string[] = allowedCommands()) => {
+export const withToolHint = (
+  prompt: string,
+  mode: 'plan' | 'accept-edits' = 'plan',
+  allowed: string[] = allowedCommands(),
+  allowedMcpTools: string[] = [],
+) => {
   const shell = allowed.length
     ? `The only shell commands allowed are: ${allowed.map(c => `\`${c}\``).join(', ')}. Any other command (for example sed, find, awk, npm, php, composer) is refused and ends this run with nothing, so never try one: read files and line ranges with the file viewer and search with grep / git grep.`
     : 'Shell commands are not available.';
   const files = mode === 'plan'
     ? 'You may only read files inside the working folder.'
     : 'Read and edit files inside the working folder with your file tools (not the shell).';
-  return `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. ${files} ${shell} Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused anyway, do not stop: answer from what you have.)`;
+  const mcp = allowedMcpTools.length
+    ? ` Allowed MCP tools for this run: ${allowedMcpTools.join(', ')}. Calls to other MCP tools will be refused.`
+    : '';
+  return `${prompt}\n\n(Tooling note: this run cannot ask anyone for permission. ${files} ${shell}${mcp} Everything you need (the diff, test results, the task) is already in this message: do not inspect .git or search for the branch yourself. If a tool is refused anyway, do not stop: answer from what you have.)`;
 };
 
 /** One headless call, read-only (`--mode plan`). */
-export function runAntigravity(o: { bin: string; cwd: string; prompt: string; timeoutMs: number; model?: string; logFile?: string }): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
+export function runAntigravity(o: {
+  bin: string;
+  cwd: string;
+  prompt: string;
+  timeoutMs: number;
+  model?: string;
+  logFile?: string;
+  allowedMcpTools?: string[];
+}): Promise<{ text: string | null; signal: AntigravitySignal; message: string | null }> {
   return new Promise(resolve => {
     let stdout = '';
     let stderr = '';
     let timedOut = false;
     const git = gitCommonDir(o.cwd);
-    const child = spawn(o.bin, antigravityArgs('plan', withToolHint(o.prompt), o.model, git ? [git] : []), { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] });
+    const child = spawn(
+      o.bin,
+      antigravityArgs('plan', withToolHint(o.prompt, 'plan', undefined, o.allowedMcpTools ?? []), o.model, git ? [git] : []),
+      { cwd: o.cwd, env: cleanEnv(), stdio: ['ignore', 'pipe', 'pipe'] },
+    );
     const timer = setTimeout(() => {
       timedOut = true;
       child.kill('SIGTERM');
@@ -134,9 +154,16 @@ export function runAntigravity(o: { bin: string; cwd: string; prompt: string; ti
 }
 
 /** Detached agent run (`accept-edits`, no shell): prompt kept in runDir, output and exit code written there. */
-export function launchAntigravityDetached(o: { bin: string; cwd: string; runDir: string; prompt: string; model?: string }): number {
+export function launchAntigravityDetached(o: {
+  bin: string;
+  cwd: string;
+  runDir: string;
+  prompt: string;
+  model?: string;
+  allowedMcpTools?: string[];
+}): number {
   mkdirSync(o.runDir, { recursive: true });
-  writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt, 'accept-edits'), { mode: 0o600 });
+  writeFileSync(join(o.runDir, 'prompt.md'), withToolHint(o.prompt, 'accept-edits', undefined, o.allowedMcpTools ?? []), { mode: 0o600 });
   const args = ['--mode', 'accept-edits', '--output-format', 'stream-json', ...(o.model ? ['--model', o.model] : [])];
   writeFileSync(join(o.runDir, 'command.json'), JSON.stringify({ engine: 'antigravity', bin: o.bin, args, cwd: o.cwd, startedAt: new Date().toISOString() }, null, 2));
   const script = '"$TESSERAX_BIN" "$@" "--print=$(cat "$TESSERAX_RUN_DIR/prompt.md")" > "$TESSERAX_RUN_DIR/stdout.json" 2> "$TESSERAX_RUN_DIR/stderr.log"; echo $? > "$TESSERAX_RUN_DIR/exit_code"';

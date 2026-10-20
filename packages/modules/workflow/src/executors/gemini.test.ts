@@ -2,7 +2,7 @@ import { strict as assert } from 'node:assert';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import { askAgent } from './claude';
-import { geminiSignal, parseGemini, runGemini } from './gemini';
+import { geminiArgs, geminiSignal, parseGemini, runGemini } from './gemini';
 
 const FAKE = join(__dirname, '../../../../../scripts/fake-gemini.mjs');
 
@@ -25,4 +25,13 @@ test('gemini signals: missing binary, untrusted folder for edits, quota', async 
   assert.equal(geminiSignal({ out: { response: 'x' }, stderr: 'Approval mode overridden to "default" because the current folder is not trusted.', exitCode: 0, timedOut: false, needsEdits: true }).signal, 'untrusted');
   assert.equal(geminiSignal({ out: { error: { message: 'RESOURCE_EXHAUSTED: quota' } }, stderr: '', exitCode: 1, timedOut: false }).signal, 'quota');
   assert.equal(parseGemini('noise\n{"response":"r"}')?.response, 'r');
+});
+
+test('geminiArgs: includes --allowed-mcp-server-names when allowedMcpServers is provided', () => {
+  const args = geminiArgs('plan', 'gemini-1.5-pro', ['github', 'postgres']);
+  assert.ok(args.includes('--allowed-mcp-server-names'));
+  assert.equal(args[args.indexOf('--allowed-mcp-server-names') + 1], 'github,postgres');
+
+  const argsEmpty = geminiArgs('plan', undefined, []);
+  assert.ok(!argsEmpty.includes('--allowed-mcp-server-names'));
 });

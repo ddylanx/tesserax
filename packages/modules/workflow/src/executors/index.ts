@@ -9,6 +9,7 @@ import { askAgent } from './claude';
 import { liveLogFile } from './livelog';
 import { startAgent } from './agent';
 import { ensureReviewWorktree } from '../review';
+import { getProjectInfo } from '../worktree-links';
 import { FatalNodeError, type NodeContext, type NodeExecutor, type NodeResult } from './types';
 
 async function renderCtx(ctx: NodeContext, extra: { worktree?: string; repoPath?: string; baseRef?: string; branch?: string; diff?: string } = {}) {
@@ -25,6 +26,7 @@ const worktree = async (ctx: NodeContext) => {
   try {
     return await ctx.engine.ensureRunWorktree(ctx.run.id);
   } catch (e) {
+    if (e instanceof FatalNodeError) throw e;
     throw new FatalNodeError((e as Error).message);
   }
 };
@@ -39,9 +41,13 @@ const aiStep: NodeExecutor = async ctx => {
   const wt = await worktree(ctx);
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
+  const mcpGrant = ctx.mcp
+    ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
+    : undefined;
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    mcpGrant,
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
@@ -59,9 +65,13 @@ const aiReview: NodeExecutor = async ctx => {
     `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\nEnd your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL`,
     skills,
   );
+  const mcpGrant = ctx.mcp
+    ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
+    : undefined;
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    mcpGrant,
   });
   const verdict = [...text.matchAll(/VERDICT:\s*(PASS|FAIL)/gi)].at(-1)?.[1]?.toUpperCase();
   if (!verdict) throw new Error('The review did not end with VERDICT: PASS or VERDICT: FAIL');
@@ -103,6 +113,15 @@ const checkCommand: NodeExecutor = async ctx => {
   const c = ctx.config;
   const wt = await worktree(ctx);
   const rc = await renderCtx(ctx, wt);
+  for (const raw of ((c.commands ?? []) as string[])) {
+    if (raw.includes('project.test_command') || raw.includes('TX_PROJECT_TEST_COMMAND')) {
+      const testCmd = rc.projectVars?.test_command?.trim();
+      if (!testCmd) {
+        const projectName = getProjectInfo(ctx.run.vars).name || ctx.task.project || 'unnamed';
+        throw new FatalNodeError(`Project ${projectName} has no test_command; set it on the project page`);
+      }
+    }
+  }
   const shellEnv = buildShellEnv(rc);
   const lines: string[] = [`# Checks in ${wt.worktree}`, ''];
   const results: { command: string; exitCode: number | null; seconds: number }[] = [];
@@ -110,7 +129,10 @@ const checkCommand: NodeExecutor = async ctx => {
   const deadline = Date.now() + c.timeoutSeconds * 1000;
   for (const raw of c.commands as string[]) {
     const cmd = renderShellTemplate(raw, rc);
-    const r = await sh(cmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
+    const execCmd = /^"?\$TX_PROJECT_[A-Z0-9_]+"?$/.test(cmd.trim())
+      ? `eval "$${cmd.trim().replace(/^"?\$|"$/g, '')}"`
+      : cmd;
+    const r = await sh(execCmd, wt.worktree, Math.max(1000, deadline - Date.now()), shellEnv);
     results.push({ command: cmd, exitCode: r.code, seconds: Math.round(r.ms / 100) / 10 });
     const passed = r.code === 0 && !r.timedOut;
     // PHP deprecation notices (hundreds of lines at boot) would push the actual failure out of the tail we keep
@@ -158,9 +180,13 @@ async function draft(ctx: NodeContext) {
   const skill = c.skill ? ctx.skills.get(c.skill) : null;
   const info = await diffInfo(wt.worktree, wt.baseRef).catch(() => null);
   const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
+  const mcpGrant = ctx.mcp
+    ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
+    : undefined;
   const { text, costUsd, numTurns } = await askAgent({
     engine: c.engine, claudeBin: ctx.appConfig.CLAUDE_BIN, geminiBin: ctx.appConfig.GEMINI_BIN, antigravityBin: ctx.appConfig.ANTIGRAVITY_BIN, cwd: wt.worktree, prompt, allowedTools: c.allowedTools,
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
+    mcpGrant,
   });
   return { text, wt, info, cost: costUsd, turns: numTurns, skillHash: skill?.hash ?? null };
 }
