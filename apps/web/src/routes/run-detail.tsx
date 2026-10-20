@@ -310,7 +310,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {n.numTurns != null && <span>{n.numTurns} turns</span>}
                     {(MODEL_NODE_TYPES as readonly string[]).includes(n.nodeType) && (n.model
                       ? <span title="Model this run used (reported by Claude Code, else the one asked for)">model {n.model}</span>
-                      : ['done', 'failed'].includes(n.status) && <span className="text-muted-foreground" title="No model was passed and the CLI did not report one">CLI default model</span>)}
+                      : n.status === 'done' && <span className="text-muted-foreground" title="No model was passed and the CLI did not report one">CLI default model</span>)}
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>

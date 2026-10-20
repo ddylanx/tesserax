@@ -32,6 +32,8 @@ Observed or documented cases:
 
 Note: `subtype` is `"success"` even for the 401 case, so `is_error` and the text decide, never `subtype` alone.
 
+A clean finish (`is_error: false`, `subtype: "success"`, exit 0 or stopped after its result) is always `ok`: its `result` is the model's answer, and an answer that mentions "429" or "not logged in" (a spec about a GitHub client) must not read as a quota or login failure (seen 2026-10-20).
+
 ## Quirks found (2.1.72)
 
 - `--json-schema` made the process hang (no output) when it could not authenticate. We do not use it; the classifier asks for JSON in the prompt and validates the reply with Zod (it still reads `structured_output` if a newer CLI returns it).

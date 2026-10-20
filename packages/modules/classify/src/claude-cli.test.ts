@@ -86,3 +86,9 @@ test('detectSignal: max turns and budget subtypes', () => {
   assert.equal(detectSignal({ exitCode: 1, timedOut: false, stderr: '', result: { type: 'result', subtype: 'error_max_turns', is_error: true } }).signal, 'max_turns');
   assert.equal(detectSignal({ exitCode: 1, timedOut: false, stderr: '', result: { type: 'result', subtype: 'error_max_budget_usd', is_error: true } }).signal, 'budget');
 });
+
+test('detectSignal: a clean answer that mentions 429 or "not logged in" is ok', () => {
+  const result = { type: 'result' as const, subtype: 'success', is_error: false, result: 'Return null if gh is not logged in; 403 or 429 means the rate limit resets at x-ratelimit-reset.' };
+  assert.equal(detectSignal({ exitCode: 0, timedOut: false, stderr: '', result }).signal, 'ok');
+  assert.equal(detectSignal({ exitCode: 1, timedOut: false, stderr: '', result: { ...result, is_error: true, result: 'Failed to authenticate. API Error: 401' } }).signal, 'auth');
+});

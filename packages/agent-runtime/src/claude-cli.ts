@@ -95,6 +95,9 @@ export function parseResult(stdout: string): ClaudeResult | null {
 /** Classifies what the CLI told us. Documented in docs/adr/0003-agent-cli-signals.md. */
 export function detectSignal(run: Pick<ClaudeRun, 'exitCode' | 'timedOut' | 'stderr' | 'result'> & { spawnError?: string }): { signal: AgentSignal; message: string | null } {
   if (run.spawnError) return { signal: 'not_installed', message: run.spawnError };
+  // a clean result is the model's answer: never scan it for error words (a spec that mentions HTTP 429 or "not logged in")
+  const clean = run.result && !run.result.is_error && (run.result.subtype ?? 'success') === 'success' && !run.timedOut && (run.exitCode === 0 || run.exitCode === null);
+  if (clean) return { signal: 'ok', message: null };
   const text = `${run.result?.result ?? ''}\n${run.stderr}`;
   if (/cannot be launched inside another Claude Code session/i.test(text)) return { signal: 'nested_session', message: 'The CLI refused to start inside another Claude Code session (CLAUDECODE set).' };
   if (/Failed to authenticate|authentication_error|OAuth access token|Invalid API key|Please run \/login|not logged in/i.test(text)) {
