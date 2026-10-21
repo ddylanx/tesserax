@@ -4,6 +4,7 @@ import type { ProjectDirectory } from '@tesserax/contracts';
 import { CONFIG, DB, PROJECT_DIRECTORY, SCHEDULES, createLogger, type ScheduleRegistry } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JIRA_SYNC_JOB, runJiraSync } from './jobs/jira-sync.job';
+import { GITHUB_SYNC_JOB, runGithubSync } from './jobs/github-sync.job';
 import { TasksController } from './tasks.controller';
 import { TasksService } from './tasks.service';
 
@@ -36,6 +37,23 @@ export class TasksModule implements OnModuleInit {
         const result = await runJiraSync(this.db, this.config);
         await this.projects.reassign();
         if (result.inserted.length && !result.firstSync) await this.tasks.notifyNewTasks(result.inserted);
+      },
+    });
+
+    // GitHub sync: enabled when at least one github source exists (checked at run time).
+    this.schedules.register({
+      name: GITHUB_SYNC_JOB,
+      cron: '*/2 * * * *',
+      jitterSeconds: 30,
+      runOnStart: true,
+      enabled: true, // registered at boot; skips early when no sources exist
+      handler: async () => {
+        const results = await runGithubSync(this.db, this.config);
+        if (!results.length) return;
+        await this.projects.reassign();
+        for (const result of results) {
+          if (result.inserted.length && !result.firstSync) await this.tasks.notifyNewTasks(result.inserted);
+        }
       },
     });
   }

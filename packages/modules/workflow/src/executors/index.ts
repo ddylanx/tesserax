@@ -214,7 +214,7 @@ const docWrite: NodeExecutor = async ctx => {
 };
 
 const jiraComment: NodeExecutor = async ctx => {
-  if (ctx.task.source !== 'jira') return { port: 'skipped', output: { skipped: true, reason: 'not a Jira task' } };
+  if (ctx.task.source !== 'jira' && ctx.task.source !== 'github') return { port: 'skipped', output: { skipped: true, reason: 'not a Jira or GitHub task' } };
   const d = await draft(ctx);
   return { wait: true, artifact: { name: ctx.config.output, content: d.text }, output: { issueKey: ctx.task.key }, costUsd: d.cost, numTurns: d.turns, skillHash: d.skillHash };
 };
@@ -260,6 +260,7 @@ export const EXECUTORS: Partial<Record<NodeType, NodeExecutor>> = {
   'ai.classify': aiClassify,
   'doc.write': docWrite,
   'jira.comment': jiraComment,
+  'task.comment': jiraComment,
   'git.pr': gitPr,
   'trigger.jira': triggerJira,
   'ai.step': aiStep,

@@ -19,9 +19,18 @@ export function useWorkflowChoices(projectSlug?: string) {
 }
 
 /** Same choice the server makes when no workflow is given: first matching rule, else the default. */
-export function suggestWorkflow(routing: WorkflowRouting | undefined, issue: Issue): { id: string; rule: string | null } | null {
+export function suggestWorkflow(
+  routing: WorkflowRouting | undefined,
+  issue: Issue & { source?: string | null; labels?: string[] },
+): { id: string; rule: string | null } | null {
   if (!routing) return null;
-  const rule = routing.rules.find(r => conditionsMatch(r.when, { issue }));
+  const rule = routing.rules.find(r =>
+    conditionsMatch(r.when, {
+      issue,
+      source: issue?.source ? { kind: issue.source } : null,
+      labels: issue?.labels ?? [],
+    }),
+  );
   return rule ? { id: rule.workflow, rule: rule.name || 'a routing rule' } : { id: routing.default, rule: null };
 }
 

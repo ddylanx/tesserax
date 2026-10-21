@@ -7,7 +7,7 @@ const botInfo = { id: 1, is_bot: true as const, first_name: 'ot', username: 'ot_
 function setup(allowed: number[]) {
   const sent: { method: string; text?: string }[] = [];
   const bot = createBot('123:abc', allowed, {
-    tasks: async () => ({ jiraConfigured: true, boards: [], sources: [], tasks: [{ id: '1', projectSlug: 'company', source: 'jira', key: 'PAY-1', title: 'Fix <b>', status: 'In Progress', statusCategory: 'in_progress', priority: null, assignee: null, project: 'PAY', type: null, labels: [], url: 'https://x/browse/PAY-1', dueAt: null, updatedAt: null, archived: false }] }),
+    tasks: async () => ({ jiraConfigured: true, githubConfigured: false, boards: [], sources: [], tasks: [{ id: '1', projectSlug: 'company', source: 'jira', key: 'PAY-1', title: 'Fix <b>', status: 'In Progress', statusCategory: 'in_progress', priority: null, assignee: null, project: 'PAY', type: null, labels: [], url: 'https://x/browse/PAY-1', dueAt: null, updatedAt: null, archived: false }] }),
     agents: async () => ({ sessions: [], counts: {}, lastEventAt: null }),
     mcp: async () => ({ provider: 't', generatedAt: '', servers: [{ id: 'a', name: 'github', client: 'Claude Code', scope: 'user', file: '', transport: 'http', target: '', enabled: true, envKeys: [] }] }),
   }, botInfo as never);

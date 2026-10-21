@@ -23,7 +23,7 @@ import {
 import { TaskDialog } from '@/components/task-dialog';
 import { StartWorkflowDialog } from '@/components/workflow-picker';
 import { Link } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { TaskDetailDto, TaskDto, TaskList, TaskQuery, WorkflowRunList } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -176,6 +176,26 @@ export function TasksPage() {
   const params = new URLSearchParams(Object.entries({ ...f, project }).filter(([, v]) => v) as [string, string][]);
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ['tasks', f, project], queryFn: () => api<TaskList>(`/api/tasks?${params}`), refetchInterval: 30_000 });
+  const sourceKinds = useMemo(() => {
+    const list: { kind: string; label: string; icon: typeof Building2; activeClass: string }[] = [];
+    const available = new Set<string>();
+    for (const s of q.data?.sources ?? []) {
+      if (s.kind) available.add(s.kind);
+    }
+    if (q.data?.jiraConfigured || available.has('jira')) {
+      list.push({ kind: 'jira', label: 'Office (Jira)', icon: Building2, activeClass: 'bg-sky-500/15 text-sky-700 dark:text-sky-300' });
+    }
+    if (q.data?.githubConfigured || available.has('github')) {
+      list.push({ kind: 'github', label: 'GitHub', icon: FolderGit2, activeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' });
+    }
+    for (const k of available) {
+      if (k !== 'jira' && k !== 'github' && k !== 'local') {
+        list.push({ kind: k, label: k, icon: FolderGit2, activeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300' });
+      }
+    }
+    list.push({ kind: 'local', label: 'Local', icon: Laptop, activeClass: 'bg-purple-500/15 text-purple-700 dark:text-purple-300' });
+    return list;
+  }, [q.data]);
   const sync = useMutation({
     mutationFn: () => api<{ queued: boolean }>('/api/tasks/sync', { method: 'POST' }),
     onSuccess: () => setTimeout(() => qc.invalidateQueries({ queryKey: ['tasks'] }), 4000),
@@ -260,7 +280,7 @@ export function TasksPage() {
               )}
             </div>
 
-            {/* Source Segmented Control (Office vs Local) */}
+            {/* Source Segmented Control */}
             <div className="flex items-center rounded-md border bg-muted/50 p-0.5 text-xs">
               <button
                 type="button"
@@ -272,28 +292,23 @@ export function TasksPage() {
               >
                 All Sources
               </button>
-              <button
-                type="button"
-                onClick={() => set('source')('jira')}
-                className={cn(
-                  'flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all cursor-pointer',
-                  f.source === 'jira' ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Building2 className="size-3.5 text-sky-600 dark:text-sky-400" />
-                Office (Jira)
-              </button>
-              <button
-                type="button"
-                onClick={() => set('source')('local')}
-                className={cn(
-                  'flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all cursor-pointer',
-                  f.source === 'local' ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
-                )}
-              >
-                <Laptop className="size-3.5 text-purple-600 dark:text-purple-400" />
-                Local
-              </button>
+              {sourceKinds.map(s => {
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.kind}
+                    type="button"
+                    onClick={() => set('source')(s.kind)}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all cursor-pointer',
+                      f.source === s.kind ? `${s.activeClass} shadow-2xs font-semibold` : 'text-muted-foreground hover:text-foreground'
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                    {s.label}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Project Filter */}
@@ -444,16 +459,20 @@ export function TasksPage() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          {t.key ?? '–'}
+                          {t.source === 'github' ? `${t.project ?? ''}${t.key ?? ''}` : (t.key ?? '–')}
                           <ExternalLink className="size-3 opacity-70" />
                         </a>
                       ) : (
-                        <span className="font-mono font-medium">{t.key ?? '–'}</span>
+                        <span className="font-mono font-medium">{t.source === 'github' ? `${t.project ?? ''}${t.key ?? ''}` : (t.key ?? '–')}</span>
                       )}
                       <div className="flex flex-wrap gap-1">
                         {t.source === 'jira' ? (
                           <Badge variant="blue" className="text-[10px] font-semibold gap-1 px-1.5 py-0">
                             <Building2 className="size-2.5" /> Office
+                          </Badge>
+                        ) : t.source === 'github' ? (
+                          <Badge variant="green" className="text-[10px] font-semibold gap-1 px-1.5 py-0">
+                            <FolderGit2 className="size-2.5" /> GitHub
                           </Badge>
                         ) : (
                           <Badge variant="purple" className="text-[10px] font-semibold gap-1 px-1.5 py-0">

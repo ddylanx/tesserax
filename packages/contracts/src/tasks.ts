@@ -51,12 +51,37 @@ export const taskSourceSchema = z.object({
   taskCount: z.number(),
 });
 
+/** Config stored in sources.config for a GitHub source. */
+export const githubSourceConfigSchema = z.object({
+  repo: z.string().regex(/^[\w.-]+\/[\w.-]+$/, 'Format must be owner/name'),
+  labels: z.array(z.string()).default(['tesserax']),
+  assignee: z.string().optional(),
+});
+export type GithubSourceConfig = z.infer<typeof githubSourceConfigSchema>;
+
+export const githubSourceItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  config: z.unknown().optional(),
+  last_synced_at: z.string().nullable().optional(),
+  last_error: z.string().nullable().optional(),
+  project_slug: z.string().nullable().optional(),
+});
+export type GithubSourceItem = z.infer<typeof githubSourceItemSchema>;
+
+/** Input to create a GitHub source via the API. */
+export const createGithubSourceSchema = githubSourceConfigSchema.extend({
+  projectSlug: z.string().min(1).max(60).optional(),
+});
+export type CreateGithubSource = z.infer<typeof createGithubSourceSchema>;
+
 export const taskListSchema = z.object({
   tasks: z.array(taskSchema),
   /** Jira keys seen on tasks. */
   boards: z.array(z.string()),
   sources: z.array(taskSourceSchema),
   jiraConfigured: z.boolean(),
+  githubConfigured: z.boolean(),
 });
 export type TaskList = z.infer<typeof taskListSchema>;
 
