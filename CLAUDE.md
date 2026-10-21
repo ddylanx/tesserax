@@ -18,7 +18,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/modules/projects` (`@tesserax/mod-projects`) projects (spec: `docs/specs/0002-projects.md`): the `projects` table (was `workspaces`) and `ProjectsService`, provided globally under `PROJECT_DIRECTORY` (contract `ProjectDirectory` in `@tesserax/contracts`): `resolveForTask` (first project by position whose rules match, else the default project), `resolveForPath` (run worktree, then workplace folders), `reassign`. Tasks, workflow and agents depend on the contract, never on the table. A project's `settings` hold task rules (Jira keys = "Board" in the UI, sources, repositories), workplaces, enabled workflows/skills (null = all), routing, engines and variables (`{{project.<name>}}`, `$TX_PROJECT_<NAME>`). A task you move by hand is `project_pinned`; sync never moves it.
 - `packages/modules/repos` repos registry (Repos page): repositories (origin, base branch) and their workplaces (a local checkout per brand, with the Jira projects that default to it), stored in `config/workplaces.json` (gitignored; created from `config/repos.json` the first time). A task runs in its picked workplace (`tasks.workplace_id`), else the first workplace registered for its project; resolve with `repoRegistry.resolve(task)`.
 - `playbooks/*.md` playbook definitions (older pipeline) (frontmatter + prompt template). `config/repos.json` (gitignored) is the legacy project → repo map, still read as a fallback.
-- `.data/` (gitignored) worktrees and run logs. `scripts/fake-jira.mjs`, `scripts/fake-claude.mjs`, `fixtures/` for testing without accounts.
+- `.data/` (gitignored) worktrees and run logs. `scripts/fake-jira.mjs`, `scripts/fake-github.mjs`, `scripts/fake-claude.mjs`, `fixtures/` for testing without accounts.
 - `infra/compose.dev.yml` Postgres 16 (pgvector image) on 127.0.0.1:54329.
 
 ## Rules
@@ -36,4 +36,4 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - A run reads its routing, enabled workflows, allowed engines and variables from the task's project (`WorkflowEngine.startRun`, `jobs.ts`); skills outside the project's list fail the step (`project-skills.ts`). `@tesserax/mod-skills` stays free of project code.
 
 ## Commands
-`pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180; the api does not restart on file changes so running steps are not interrupted: restart `pnpm dev` after editing api code, or use `pnpm --filter @tesserax/api dev:watch`) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down`
+`pnpm dev` (starts Postgres in Docker, api on :4400, web on :5180; the api does not restart on file changes so running steps are not interrupted: restart `pnpm dev` after editing api code, or use `pnpm --filter @tesserax/api dev:watch`) · `pnpm typecheck` · `pnpm test` · `pnpm db:migrate` · `pnpm db:seed` · `pnpm db:down` · `pnpm github:check` · `pnpm fake-github`

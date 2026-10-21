@@ -1,12 +1,16 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { sql } from 'kysely';
-import { jiraConfigured, type AppConfig } from '@tesserax/config';
+import { jiraConfigured, githubConfigured, type AppConfig } from '@tesserax/config';
 import { randomUUID } from 'node:crypto';
-import { keyPrefixOf, type CreateLocalTask, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
+import { keyPrefixOf, type CreateGithubSource, type CreateLocalTask, type GithubSourceItem, type ProjectDirectory, type TaskDetailDto, type TaskDto, type TaskList, type TaskQuery, type UpdateLocalTask } from '@tesserax/contracts';
 import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { JiraClient } from './jira/client';
 import { JIRA_SYNC_JOB, jiraCredentials, syncTaskDetail } from './jobs/jira-sync.job';
+import { GITHUB_SYNC_JOB, ensureGithubSource } from './jobs/github-sync.job';
+import { GithubClient } from './github/client';
+import { mapComments } from './github/map';
+import { resolveGithubToken } from './github/token';
 
 export type NewTasksListener = (taskIds: string[]) => Promise<void>;
 
@@ -56,6 +60,7 @@ export class TasksService {
 
     return {
       jiraConfigured: jiraConfigured(this.config),
+      githubConfigured: githubConfigured(this.config),
       boards: boards.map(p => p.project!).filter(Boolean),
       sources: sources.map(s => ({
         id: s.id, projectSlug: s.project_slug, kind: s.kind, name: s.name,
@@ -91,12 +96,41 @@ export class TasksService {
     return r ? this.toDetail(r) : null;
   }
 
-  /** Refreshes comments/attachments from Jira when they are missing (best effort). */
+  /** Refreshes comments/attachments from Jira or GitHub when they are missing (best effort). */
   async ensureDetail(id: string): Promise<void> {
-    const t = await this.db.selectFrom('tasks').select(['id', 'key', 'external_id', 'detail_synced_at']).where('id', '=', id).executeTakeFirst();
-    const client = this.jiraClient();
-    if (!t || t.detail_synced_at || !client) return;
-    await syncTaskDetail(this.db, client, t);
+    const t = await this.db
+      .selectFrom('tasks as t')
+      .innerJoin('sources as s', 's.id', 't.source_id')
+      .select(['t.id', 't.key', 't.project', 't.external_id', 't.detail_synced_at', 's.kind'])
+      .where('t.id', '=', id)
+      .executeTakeFirst();
+    if (!t || t.detail_synced_at) return;
+    if (t.kind === 'jira') {
+      const client = this.jiraClient();
+      if (!client) return;
+      await syncTaskDetail(this.db, client, t);
+    } else if (t.kind === 'github') {
+      await this.syncGithubTaskDetail(t);
+    }
+  }
+
+  async syncGithubTaskDetail(task: { id: string; key: string | null; project: string | null }): Promise<void> {
+    const token = await resolveGithubToken(this.config);
+    if (!token) return;
+    const client = new GithubClient({ token, apiUrl: this.config.GITHUB_API_URL });
+    const repo = task.project ?? '';
+    const num = Number((task.key ?? '').replace('#', ''));
+    if (!repo || !num) return;
+    try {
+      const raw = await client.getComments(repo, num);
+      await this.db
+        .updateTable('tasks')
+        .set({ comments: JSON.stringify(mapComments(raw)), detail_synced_at: new Date() })
+        .where('id', '=', task.id)
+        .execute();
+    } catch {
+      // best-effort
+    }
   }
 
   private toDetail(r: any): TaskDetailDto {
@@ -204,7 +238,7 @@ export class TasksService {
   private async assertLocal(id: string) {
     const t = await this.db.selectFrom('tasks as t').innerJoin('sources as s', 's.id', 't.source_id').select(['t.id', 's.kind']).where('t.id', '=', id).executeTakeFirst();
     if (!t) throw new Error('Task not found');
-    if (t.kind !== 'local') throw new Error('Only local tasks can be changed here; Jira tasks are read-only.');
+    if (t.kind !== 'local') throw new Error('Only local tasks can be changed here; synced tasks are read-only.');
   }
 
   async updateLocal(id: string, input: UpdateLocalTask): Promise<TaskDetailDto> {
@@ -236,8 +270,61 @@ export class TasksService {
   }
 
   async syncNow(): Promise<{ queued: boolean }> {
-    if (!jiraConfigured(this.config)) return { queued: false };
-    const id = await this.queue.send(JIRA_SYNC_JOB, {}, { singletonKey: `${JIRA_SYNC_JOB}:manual`, singletonSeconds: 10 });
-    return { queued: Boolean(id) };
+    let queued = false;
+    if (jiraConfigured(this.config)) {
+      const id = await this.queue.send(JIRA_SYNC_JOB, {}, { singletonKey: `${JIRA_SYNC_JOB}:manual`, singletonSeconds: 10 });
+      if (id) queued = true;
+    }
+    const ghSources = await this.db.selectFrom('sources').select('id').where('kind', '=', 'github').execute();
+    if (ghSources.length > 0) {
+      const idGh = await this.queue.send(GITHUB_SYNC_JOB, {}, { singletonKey: `${GITHUB_SYNC_JOB}:manual`, singletonSeconds: 10 });
+      if (idGh) queued = true;
+    }
+    return { queued };
+  }
+
+  async addGithubSource(input: CreateGithubSource) {
+    let projectId: string;
+    if (input.projectSlug) {
+      const p = await this.projects.get(input.projectSlug);
+      if (!p) throw new NotFoundException(`Project "${input.projectSlug}" not found`);
+      projectId = p.id;
+    } else {
+      const list = await this.projects.list();
+      const def = list.find(p => p.isDefault) ?? list[0];
+      if (!def) throw new NotFoundException('No project found');
+      projectId = def.id;
+    }
+    return ensureGithubSource(this.db, {
+      projectId,
+      repo: input.repo,
+      labels: input.labels,
+      assignee: input.assignee,
+    });
+  }
+
+  async listGithubSources(): Promise<GithubSourceItem[]> {
+    const rows = await this.db
+      .selectFrom('sources as s')
+      .leftJoin('projects as p', 'p.id', 's.project_id')
+      .select(['s.id', 's.name', 's.config', 's.last_synced_at', 's.last_error', 'p.slug as project_slug'])
+      .where('s.kind', '=', 'github')
+      .execute();
+    return rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      config: typeof r.config === 'string' ? JSON.parse(r.config) : r.config,
+      last_synced_at: r.last_synced_at ? new Date(r.last_synced_at).toISOString() : null,
+      last_error: r.last_error,
+      project_slug: r.project_slug,
+    }));
+  }
+
+  async removeGithubSource(id: string): Promise<void> {
+    const s = await this.db.selectFrom('sources').select(['id', 'kind']).where('id', '=', id).executeTakeFirst();
+    if (!s) throw new NotFoundException('Source not found');
+    if (s.kind !== 'github') throw new BadRequestException('Only GitHub sources can be removed here');
+    // tasks.source_id is ON DELETE CASCADE, so the source's tasks go with it.
+    await this.db.deleteFrom('sources').where('id', '=', id).execute();
   }
 }

@@ -172,9 +172,102 @@ test('conditions: case-insensitive, list fields, not_in; routing picks the first
   assert.ok(!conditionsMatch([{ field: 'classification.type', op: 'in', values: ['question'] }], { issue, classification: null }));
   assert.ok(conditionsMatch([{ field: 'classification.type', op: 'in', values: ['question'] }], { issue, classification: { type: 'question' } }));
   assert.ok(!conditionsMatch([], { issue }), 'no conditions never skips');
-  const r = { default: 'default', rules: [{ name: 'shop', when: [{ field: 'issue.project' as const, op: 'in' as const, values: ['SHOP'] }], workflow: 'shop' }] };
+
+  // Test source.kind and top-level labels
+  assert.ok(conditionsMatch([{ field: 'source.kind', op: 'in', values: ['github'] }], { issue, source: { kind: 'GitHub' } }));
+  assert.ok(conditionsMatch([{ field: 'source.kind', op: 'not_in', values: ['jira'] }], { issue, source: { kind: 'github' } }));
+  assert.ok(conditionsMatch([{ field: 'labels', op: 'in', values: ['TESSERAX'] }], { issue, labels: ['tesserax', 'feature'] }));
+  assert.ok(conditionsMatch([{ field: 'labels', op: 'not_in', values: ['blocked'] }], { issue, labels: ['tesserax'] }));
+
+  const r = {
+    default: 'default',
+    rules: [
+      { name: 'shop', when: [{ field: 'issue.project' as const, op: 'in' as const, values: ['SHOP'] }], workflow: 'shop' },
+      { name: 'github-rule', when: [{ field: 'source.kind' as const, op: 'in' as const, values: ['github'] }], workflow: 'gh-flow' },
+    ],
+  };
   assert.equal(routeWorkflow(r, { project: 'SHOP' }), 'shop');
   assert.equal(routeWorkflow(r, { project: 'TC' }), 'default');
+  assert.equal(routeWorkflow(r, { project: 'TC' }, { source: { kind: 'github' } }), 'gh-flow');
+});
+
+test('task.comment node validates and existing jira.comment workflows still validate', () => {
+  const w1: WorkflowDefinition = {
+    id: 'w1', name: 'W1', description: '',
+    nodes: [
+      { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+      { id: 'c', type: 'task.comment', label: 'Comment', position: { x: 0, y: 0 }, config: { prompt: 'Write comment', output: 'task_comment' } },
+    ],
+    edges: [{ id: 'e1', source: 't', port: 'next', target: 'c' }],
+  };
+  assert.deepEqual(validateWorkflow(w1), []);
+
+  const w2: WorkflowDefinition = {
+    id: 'w2', name: 'W2', description: '',
+    nodes: [
+      { id: 't', type: 'trigger.jira', label: 'T', position: { x: 0, y: 0 }, config: {} },
+      { id: 'c', type: 'jira.comment', label: 'Comment', position: { x: 0, y: 0 }, config: { prompt: 'Write comment', output: 'jira_comment' } },
+    ],
+    edges: [{ id: 'e1', source: 't', port: 'next', target: 'c' }],
+  };
+  assert.deepEqual(validateWorkflow(w2), []);
+});
+
+test('jiraComment executor skips on non-jira/non-github task', async () => {
+  const { EXECUTORS } = await import('./executors');
+  const commentExec = EXECUTORS['jira.comment']!;
+
+  const localCtx = {
+    task: { id: '1', source: 'local', key: 'L-1' },
+    config: { output: 'task_comment' },
+  } as any;
+
+  const res = await commentExec(localCtx);
+  assert.equal((res as any).port, 'skipped');
+  assert.equal((res as any).output?.skipped, true);
+});
+
+test('WorkflowVcsService postTaskComment posts for GitHub and throws on unsupported source', async () => {
+  const { WorkflowVcsService } = await import('./vcs.service');
+  let postedToGithub: any = null;
+
+  const mockTasks: any = {
+    getTask: async (id: string) => ({
+      id,
+      source: 'github',
+      project: 'owner/repo',
+      key: '#123',
+    }),
+  };
+
+  const vcs = new WorkflowVcsService(
+    { GITHUB_TOKEN: 'fake-token', GITHUB_API_URL: 'https://api.github.com' } as any,
+    {} as any,
+    mockTasks,
+  );
+
+  // Mock global fetch
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+    postedToGithub = { url: url.toString(), init };
+    return Response.json({ id: 987 });
+  }) as typeof fetch;
+
+  try {
+    const res = await vcs.postTaskComment({ task_id: 'gh-task' } as any, 'Comment from test');
+    assert.deepEqual(res, { commentId: '987', issueKey: '#123' });
+    assert.ok(postedToGithub.url.includes('/repos/owner/repo/issues/123/comments'));
+    assert.equal(JSON.parse(postedToGithub.init.body).body, 'Comment from test');
+
+    // Unsupported source throws
+    mockTasks.getTask = async () => ({ id: 'local-task', source: 'local' });
+    await assert.rejects(
+      () => vcs.postTaskComment({ task_id: 'local-task' } as any, 'hello'),
+      /Posting comments to local tasks is not supported/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test('skip ports are validated', () => {
@@ -190,5 +283,105 @@ test('WorkflowEngine resolves graph and nodes correctly', async () => {
   assert.equal(engine.graph(run).id, 'x');
   assert.equal(engine.node(run, 't').type, 'trigger.jira');
   assert.throws(() => engine.node(run, 'non-existent'), /is not in this run's workflow/);
+});
+
+test('WorkflowEngine confirm posts task.comment once and second confirm fails (AC9)', async () => {
+  const { WorkflowEngine } = await import('./engine.service');
+  let postCount = 0;
+
+  const nodeRun = {
+    id: 'nr-1',
+    run_id: 'run-1',
+    node_id: 'c-1',
+    node_type: 'task.comment',
+    status: 'waiting',
+    output: {},
+  };
+
+  const workflowSnapshot = {
+    id: 'w-1',
+    nodes: [
+      { id: 'c-1', type: 'task.comment', config: { output: 'task_comment', prompt: 'test' } },
+    ],
+    edges: [],
+  };
+
+  const workflowRun = {
+    id: 'run-1',
+    task_id: 'gh-task-1',
+    workflow_snapshot: workflowSnapshot,
+  };
+
+  const db: any = {
+    selectFrom: (table: string) => {
+      const q: any = {
+        selectAll: () => q,
+        where: () => q,
+        orderBy: () => q,
+        execute: async () => [nodeRun],
+        executeTakeFirst: async () => (table === 'workflow_runs' ? workflowRun : (nodeRun.status === 'waiting' ? nodeRun : null)),
+        executeTakeFirstOrThrow: async () => (table === 'workflow_runs' ? workflowRun : nodeRun),
+      };
+      return q;
+    },
+    updateTable: (table: string) => ({
+      set: (updates: any) => {
+        let conditionStatus = 'waiting';
+        const uq: any = {
+          where: (col: string, _op: string, val: any) => {
+            if (col === 'status') conditionStatus = val;
+            return uq;
+          },
+          executeTakeFirst: async () => {
+            if (table === 'node_runs' && nodeRun.status === conditionStatus) {
+              Object.assign(nodeRun, updates);
+              return { numUpdatedRows: 1n };
+            }
+            return { numUpdatedRows: 0n };
+          },
+        };
+        return uq;
+      },
+    }),
+  };
+
+  const vcs: any = {
+    postTaskComment: async () => {
+      postCount++;
+      return { commentId: '99', issueKey: '#1' };
+    },
+  };
+
+  const engine = new WorkflowEngine(
+    db,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    {} as any,
+    vcs,
+    {} as any,
+  );
+
+  // Mock internal helpers
+  (engine as any).latestArtifact = async () => null;
+  (engine as any).saveArtifact = async () => {};
+  (engine as any).event = async () => {};
+  (engine as any).complete = async (id: string, port: string, output: any) => {
+    nodeRun.status = port; // 'posted'
+  };
+
+  // First confirm: posts successfully
+  const res = await engine.confirm('run-1', { action: 'confirm', confirm: true, text: 'Hello' });
+  assert.equal(postCount, 1);
+  assert.deepEqual(res, { commentId: '99', issueKey: '#1' });
+  assert.equal(nodeRun.status, 'posted');
+
+  // Second confirm: node is no longer waiting, throws RunConflict and does not post again
+  await assert.rejects(
+    () => engine.confirm('run-1', { action: 'confirm', confirm: true, text: 'Hello again' }),
+    /Nothing is waiting for you on this run|No step is currently waiting for input|This step is already being confirmed/,
+  );
+  assert.equal(postCount, 1, 'comment must not be posted a second time');
 });
 

@@ -1,7 +1,7 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { AppConfig } from '@tesserax/config';
-import { jiraConfigured } from '@tesserax/config';
+import { jiraConfigured, githubConfigured } from '@tesserax/config';
 import type { Health, SystemInfo } from '@tesserax/contracts';
 import { CONFIG, DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
@@ -35,6 +35,7 @@ export class SystemController {
       schedules: this.schedules.list(),
       integrations: [
         { name: 'Jira Cloud', configured: jiraConfigured(this.config), note: 'JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN' },
+        { name: 'GitHub', configured: githubConfigured(this.config), note: 'GITHUB_TOKEN' },
         { name: 'Telegram bot', configured: Boolean(this.config.TELEGRAM_BOT_TOKEN), note: 'TELEGRAM_BOT_TOKEN, TELEGRAM_ALLOWED_USER_IDS' },
       ],
     };

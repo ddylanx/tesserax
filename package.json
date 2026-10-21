@@ -19,7 +19,9 @@
     "hooks:install": "node scripts/claude-hooks.mjs install",
     "hooks:uninstall": "node scripts/claude-hooks.mjs uninstall",
     "fake-jira": "node scripts/fake-jira.mjs",
+    "fake-github": "node scripts/fake-github.mjs",
     "jira:check": "node scripts/jira-check.mjs",
+    "github:check": "node scripts/github-check.mjs",
     "docs:check": "node scripts/check-links.mjs"
   },
   "devDependencies": {

@@ -5,7 +5,7 @@ import { CONFIG, DB } from '@tesserax/core';
 import type { Db, NodeRun, WorkflowRun } from '@tesserax/db';
 import { diffInfo, ensureWorktree, fetchBase, resolveBaseRef } from '@tesserax/agent-runtime';
 import { repoRegistry } from '@tesserax/mod-repos';
-import { TasksService } from '@tesserax/mod-tasks';
+import { TasksService, GithubClient, resolveGithubToken } from '@tesserax/mod-tasks';
 import { BitbucketClient, parseBitbucketRemote, pushBranch, remoteUrl } from './bitbucket';
 import { ensureWorktreeLinks, getProjectVars } from './worktree-links';
 
@@ -112,5 +112,24 @@ export class WorkflowVcsService {
     if (!client) throw new Error('Jira is not configured (JIRA_* in .env).');
     const { id } = await client.addComment(task.key, text);
     return { commentId: id, issueKey: task.key };
+  }
+
+  async postTaskComment(run: WorkflowRun, text: string) {
+    const task = await this.tasks.getTask(run.task_id);
+    if (!task) throw new Error('Task not found');
+    if (task.source === 'jira') {
+      return this.postJiraComment(run, text);
+    }
+    if (task.source === 'github') {
+      const token = await resolveGithubToken(this.config);
+      if (!token) throw new Error('GitHub is not configured (GITHUB_TOKEN in .env or gh auth token).');
+      const client = new GithubClient({ token, apiUrl: this.config.GITHUB_API_URL });
+      const repo = task.project;
+      const num = Number((task.key ?? '').replace('#', ''));
+      if (!repo || !num) throw new Error(`Invalid GitHub task key (${task.key}) or project (${task.project})`);
+      const { id } = await client.postComment(repo, num, text);
+      return { commentId: String(id), issueKey: task.key };
+    }
+    throw new Error(`Posting comments to ${task.source} tasks is not supported.`);
   }
 }

@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Delete, Get, HttpCode, NotFoundException, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
-import { createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
+import { createGithubSourceSchema, createLocalTaskSchema, moveTaskSchema, setTaskWorkplaceSchema, taskQuerySchema, updateLocalTaskSchema, type GithubSourceItem, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { TasksService } from './tasks.service';
 
 @Controller('tasks')
@@ -11,6 +11,24 @@ export class TasksController {
     const parsed = taskQuerySchema.safeParse(query);
     if (!parsed.success) throw new BadRequestException(parsed.error.issues);
     return this.tasks.list(parsed.data);
+  }
+
+  @Get('sources/github')
+  async listGithubSources(): Promise<GithubSourceItem[]> {
+    return this.tasks.listGithubSources();
+  }
+
+  @Post('sources/github')
+  async createGithubSource(@Body() body: unknown) {
+    const parsed = createGithubSourceSchema.safeParse(body);
+    if (!parsed.success) throw new BadRequestException(parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; '));
+    return this.tasks.addGithubSource(parsed.data);
+  }
+
+  @Delete('sources/github/:id')
+  async removeGithubSource(@Param('id', ParseUUIDPipe) id: string) {
+    await this.tasks.removeGithubSource(id);
+    return { ok: true };
   }
 
   @Get(':id')

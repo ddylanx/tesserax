@@ -87,7 +87,10 @@ export class WorkflowEngine {
     if (!task) throw new Error('Task not found');
     const project = await this.projects.get(task.projectSlug);
     if (!project) throw new Error(`Project "${task.projectSlug}" not found`);
-    const workflowId = requested || routeWorkflow(project.settings.routing, task);
+    const workflowId = requested || routeWorkflow(project.settings.routing, task, {
+      source: task.source ? { kind: task.source } : null,
+      labels: task.labels ?? [],
+    });
     if (project.settings.workflows && !project.settings.workflows.includes(workflowId)) {
       throw new Error(`Workflow "${workflowId}" is not enabled in project "${project.name}".`);
     }
@@ -156,7 +159,12 @@ export class WorkflowEngine {
     if (node.skipIf?.length) {
       const task = await this.tasks.getTask(run.task_id);
       const vars = (run.vars ?? {}) as { classification?: { type?: string; automation?: string } };
-      if (task && conditionsMatch(node.skipIf, { issue: task, classification: vars.classification ?? null })) {
+      if (task && conditionsMatch(node.skipIf, {
+        issue: task,
+        classification: vars.classification ?? null,
+        source: task.source ? { kind: task.source } : null,
+        labels: task.labels ?? [],
+      })) {
         return this.skip(run.id, node.id, node.skipPort ?? NODE_PORTS[node.type][0]!, viaEdge, node.skipIf.map(describeCondition).join(' and '));
       }
     }
@@ -353,14 +361,15 @@ export class WorkflowEngine {
     if (!Number(claimed.numUpdatedRows)) throw new RunConflict('This step is already being confirmed.');
     const run = await this.db.selectFrom('workflow_runs').selectAll().where('id', '=', runId).executeTakeFirstOrThrow();
     const node = this.node(run, nr.node_id);
-    const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : 'jira_comment');
+    const isComment = nr.node_type === 'jira.comment' || nr.node_type === 'task.comment';
+    const outputName = (node.config as { output?: string }).output ?? (nr.node_type === 'git.pr' ? 'pr_description' : nr.node_type === 'task.comment' ? 'task_comment' : 'jira_comment');
     try {
       if ((await this.latestArtifact(runId, outputName))?.content !== a.text) await this.saveArtifact(runId, nr.id, outputName, a.text, 'user');
-      const result = nr.node_type === 'jira.comment'
-        ? await this.vcs.postJiraComment(run, a.text)
+      const result = isComment
+        ? await this.vcs.postTaskComment(run, a.text)
         : await this.vcs.openPullRequest(run, nr, a);
-      await this.event(runId, 'user', nr.node_type === 'jira.comment' ? 'jira_comment_posted' : 'pull_request_opened', result, nr.id);
-      await this.complete(nr.id, nr.node_type === 'jira.comment' ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
+      await this.event(runId, 'user', isComment ? (nr.node_type === 'jira.comment' ? 'jira_comment_posted' : 'task_comment_posted') : 'pull_request_opened', result, nr.id);
+      await this.complete(nr.id, isComment ? 'posted' : 'opened', { ...((nr.output ?? {}) as object), ...result }, 'user', ['running']);
       return result;
     } catch (err) {
       const message = String((err as Error).message ?? err).slice(0, 2000);

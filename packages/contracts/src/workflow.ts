@@ -24,7 +24,7 @@ export const AI_ENGINES = ['claude', 'gemini', 'antigravity'] as const;
 export type AiEngine = (typeof AI_ENGINES)[number];
 export const AI_ENGINE_TITLES: Record<AiEngine, string> = { claude: 'Claude Code', gemini: 'Gemini CLI', antigravity: 'Antigravity CLI' };
 /** Node types whose config has an `engine`. */
-export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr'] as const;
+export const ENGINE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'task.comment', 'git.pr'] as const;
 
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
@@ -108,6 +108,18 @@ export const nodeConfigSchemas = {
     maxBudgetUsd: z.number().positive().optional(),
     timeoutSeconds: z.number().int().positive().default(600),
   }),
+  'task.comment': z.object({
+    skill: z.string().optional(),
+    prompt: z.string().min(1),
+    inputs: z.array(artifactName).default([]),
+    output: artifactName.default('task_comment'),
+    allowedTools: tools,
+    /** Which CLI does this step: Claude Code (default), Gemini CLI or Antigravity CLI. A run can override it per step. */
+    engine: z.enum(AI_ENGINES).default('claude'),
+    model: z.string().optional(),
+    maxBudgetUsd: z.number().positive().optional(),
+    timeoutSeconds: z.number().int().positive().default(600),
+  }),
   'git.pr': z.object({
     skill: z.string().optional(),
     prompt: z.string().min(1),
@@ -145,13 +157,14 @@ export const NODE_PORTS: Record<NodeType, readonly string[]> = {
   'ai.review': ['pass', 'fail'],
   'doc.write': ['next'],
   'jira.comment': ['posted', 'skipped'],
+  'task.comment': ['posted', 'skipped'],
   'git.pr': ['opened', 'skipped'],
   'pr.comment': ['posted', 'skipped'],
   evaluate: ['end'],
 };
 
 /** Nodes that prepare a draft, then wait for the user's explicit confirmation before writing outside the machine. */
-export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'git.pr'];
+export const CONFIRM_NODE_TYPES: readonly NodeType[] = ['jira.comment', 'task.comment', 'git.pr'];
 
 /** Node types that wait for the user instead of running. */
 export const HUMAN_NODE_TYPES: readonly NodeType[] = ['human.gate', 'evaluate'];
@@ -160,6 +173,7 @@ export const HUMAN_NODE_TYPES: readonly NodeType[] = ['human.gate', 'evaluate'];
 
 export const CONDITION_FIELDS = [
   'classification.type', 'classification.automation', 'issue.type', 'issue.project', 'issue.priority', 'issue.status', 'issue.labels', 'issue.components',
+  'source.kind', 'labels',
 ] as const;
 export const conditionSchema = z.object({
   field: z.enum(CONDITION_FIELDS),
@@ -169,14 +183,33 @@ export const conditionSchema = z.object({
 export type Condition = z.infer<typeof conditionSchema>;
 
 export interface ConditionContext {
-  issue: { type?: string | null; project?: string | null; priority?: string | null; status?: string | null; labels?: string[]; components?: string[] };
+  issue: { type?: string | null; project?: string | null; priority?: string | null; status?: string | null; labels?: string[]; components?: string[]; source?: string | null };
   classification?: { type?: string; automation?: string } | null;
+  /** The task source (e.g. { kind: 'github' } or { kind: 'jira' }). */
+  source?: { kind?: string } | null;
+  /** Top-level task labels (from GitHub or Jira). */
+  labels?: string[];
 }
 
 /** All conditions must hold. Case-insensitive; list fields (labels, components) match when any element is in the values. */
 export function conditionsMatch(conds: Condition[] | undefined, ctx: ConditionContext): boolean {
   if (!conds?.length) return false;
   return conds.every(c => {
+    // Top-level labels field (GitHub / Jira labels on the task itself)
+    if (c.field === 'labels') {
+      const have = (ctx.labels ?? ctx.issue?.labels ?? []).map(x => x.toLowerCase());
+      const values = c.values.map(x => x.toLowerCase());
+      const hit = have.some(x => values.includes(x));
+      return c.op === 'in' ? hit : !hit;
+    }
+    // source.kind condition
+    if (c.field === 'source.kind') {
+      const kind = ctx.source?.kind ?? ctx.issue?.source;
+      const have = (kind ?? '').toLowerCase();
+      const values = c.values.map(x => x.toLowerCase());
+      const hit = values.includes(have);
+      return c.op === 'in' ? hit : !hit;
+    }
     const [scope, key] = c.field.split('.') as ['issue' | 'classification', string];
     const raw = (scope === 'issue' ? ctx.issue : ctx.classification ?? {}) as Record<string, unknown>;
     const v = raw?.[key];
@@ -273,8 +306,10 @@ export const routingSchema = z.object({
 export type WorkflowRouting = z.infer<typeof routingSchema>;
 
 /** First matching rule wins (issue fields only: classification is not known yet when a run starts). */
-export function routeWorkflow(r: WorkflowRouting, issue: ConditionContext['issue']): string {
-  return r.rules.find(rule => conditionsMatch(rule.when, { issue }))?.workflow ?? r.default;
+export function routeWorkflow(r: WorkflowRouting, issue: ConditionContext['issue'], extra?: { source?: { kind?: string } | null; labels?: string[] }): string {
+  const source = extra?.source ?? (issue?.source ? { kind: issue.source } : undefined);
+  const labels = extra?.labels ?? issue?.labels;
+  return r.rules.find(rule => conditionsMatch(rule.when, { issue, source, labels }))?.workflow ?? r.default;
 }
 
 /** Steps that only set a run up; a run may still switch workflow after them. */
@@ -427,6 +462,7 @@ export const NODE_TYPE_INFO: Record<NodeType, { title: string; description: stri
   'ai.review': { title: 'AI review', description: 'Reviews the diff against the spec with skills; ends PASS or FAIL.' },
   'doc.write': { title: 'Ticket doc', description: 'AI writes the ticket document into the repo (docs/<KEY>-<slug>.md) and commits it on the ticket branch.' },
   'jira.comment': { title: 'Jira comment', description: 'AI drafts a comment with the Jira-comment skill; posted only after you confirm.' },
+  'task.comment': { title: 'Task comment', description: 'AI drafts a comment on the task (Jira or GitHub issue); posted only after you confirm.' },
   'git.pr': { title: 'Pull request', description: 'AI drafts the PR; after you confirm, the branch is pushed and a Bitbucket PR is opened.' },
   'pr.comment': { title: 'Comment on PR', description: 'Posts the review you approved as a comment on the member\'s Bitbucket PR, only after you confirm.' },
   evaluate: { title: 'Score', description: 'You score the result per criterion; closes the run.' },

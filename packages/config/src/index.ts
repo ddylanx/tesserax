@@ -62,6 +62,11 @@ export const envSchema = z.object({
   /** Base URL of the web app, for links in notifications. */
   WEB_BASE_URL: z.string().default('http://127.0.0.1:5180'),
 
+  /** GitHub personal access token (fine-grained; Issues + Pull requests read/write). If unset, gh auth token is tried at runtime. */
+  GITHUB_TOKEN: optional,
+  /** Override the GitHub REST API base URL (default https://api.github.com). Useful for fake-github in tests. */
+  GITHUB_API_URL: z.string().default('https://api.github.com'),
+
   TELEGRAM_BOT_TOKEN: optional,
   TELEGRAM_ALLOWED_USER_IDS: optional.transform(v =>
     (v ?? '')
@@ -95,6 +100,8 @@ export function loadConfig(): AppConfig {
 }
 
 export const jiraConfigured = (c: AppConfig) => Boolean(c.JIRA_BASE_URL && c.JIRA_EMAIL && c.JIRA_API_TOKEN);
+
+export const githubConfigured = (c: AppConfig) => Boolean(c.GITHUB_TOKEN);
 
 /** Runtime data: worktrees and run logs (gitignored). */
 export const dataDir = (c: AppConfig) => c.TESSERAX_DATA_DIR ?? join(findRepoRoot(), '.data');
