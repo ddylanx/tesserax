@@ -182,6 +182,9 @@ importers:
       '@tesserax/config':
         specifier: workspace:*
         version: link:../config
+      pg:
+        specifier: ^8.16.0
+        version: 8.23.1
       pg-boss:
         specifier: ^10.4.2
         version: 10.4.2
@@ -191,6 +194,10 @@ importers:
       pino-pretty:
         specifier: ^13.0.0
         version: 13.2.0
+    devDependencies:
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.23.1
 
   packages/db:
     dependencies:

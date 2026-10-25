@@ -59,6 +59,8 @@ export class PipelineModule implements OnModuleInit, OnApplicationBootstrap, OnM
   /** Fast pickup of finished agent runs: file checks every 5 s, the work itself goes through pg-boss jobs. */
   onApplicationBootstrap() {
     this.watcher = setInterval(() => {
+      // Agent processes live on the machine running the workers; another machine would see them all as dead.
+      if (!this.queue.isWorker) return;
       scanRunningPlaybooks(this.db, this.queue, this.config).catch(err => log.warn({ err }, 'watch scan failed'));
     }, 5000);
     this.watcher.unref();

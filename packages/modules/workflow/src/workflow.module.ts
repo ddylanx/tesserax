@@ -65,7 +65,10 @@ export class WorkflowModule implements OnModuleInit, OnApplicationBootstrap, OnM
   }
 
   onApplicationBootstrap() {
-    this.watcher = setInterval(() => scanAgentNodes(this.deps).catch(err => log.warn({ err }, 'agent scan failed')), 5000);
+    // Agent processes live on the machine running the workers; another machine would see them all as dead.
+    this.watcher = setInterval(() => {
+      if (this.deps.queue.isWorker) scanAgentNodes(this.deps).catch(err => log.warn({ err }, 'agent scan failed'));
+    }, 5000);
     this.watcher.unref();
   }
 

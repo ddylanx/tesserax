@@ -8,7 +8,7 @@
   },
   "scripts": {
     "init:data": "node scripts/init-data.mjs",
-    "dev": "node scripts/init-data.mjs && pnpm db:up && turbo run dev",
+    "dev": "node scripts/init-data.mjs && node scripts/db-up.mjs && turbo run dev",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "db:up": "docker compose -f infra/compose.dev.yml up -d --wait",
