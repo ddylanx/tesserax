@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Checks that relative markdown links in the public docs point to files (and headings) that exist.
 // Usage: node scripts/check-links.mjs   (exit 1 with a list when something is broken)
+import { fileURLToPath } from 'node:url';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 function markdownFiles(dir) {
   return readdirSync(dir).flatMap((name) => {

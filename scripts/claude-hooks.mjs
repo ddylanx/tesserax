@@ -7,11 +7,12 @@
 //   node scripts/claude-hooks.mjs uninstall --file <settings> | --user
 //
 // Existing hooks are kept; ours are recognised by the URL and added once.
+import { fileURLToPath } from 'node:url';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 
-const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 if (existsSync(join(root, '.env'))) process.loadEnvFile(join(root, '.env'));
 const host = process.env.API_HOST || '127.0.0.1';
 const port = process.env.API_PORT || '4400';

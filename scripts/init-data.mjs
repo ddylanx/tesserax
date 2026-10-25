@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 // Your workflows and skills live in workflows/ and skills/ (gitignored). On first run they start as a copy of examples/.
 // Never overwrites: a folder that already has files is left alone.
+import { fileURLToPath } from 'node:url';
 import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-const root = resolve(dirname(new URL(import.meta.url).pathname), '..');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 for (const name of ['workflows', 'skills']) {
   const target = join(root, name);
