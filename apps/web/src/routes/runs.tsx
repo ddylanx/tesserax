@@ -6,22 +6,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { OnboardingChecklist } from '@/components/onboarding-checklist';
 import { Page, QueryState } from '@/components/page';
 import { TaskDialog } from '@/components/task-dialog';
-import { Badge } from '@/components/ui/badge';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
 import { ProjectDot, useProjectScope } from '@/lib/project-context';
-import { timeAgo } from '@/lib/utils';
+import { StatusPill, toneClasses, type Tone } from '@/components/ui/status-pill';
+import { cn, timeAgo } from '@/lib/utils';
 
-export const RUN_STATUS: Record<string, { label: string; variant: 'green' | 'amber' | 'blue' | 'red' | 'outline' }> = {
-  waiting: { label: 'waiting for you', variant: 'amber' },
-  running: { label: 'running', variant: 'blue' },
-  failed: { label: 'failed', variant: 'red' },
-  done: { label: 'done', variant: 'green' },
-  cancelled: { label: 'cancelled', variant: 'outline' },
+export const RUN_STATUS: Record<string, { label: string; tone: Tone }> = {
+  waiting: { label: 'waiting for you', tone: 'warning' },
+  running: { label: 'running', tone: 'info' },
+  failed: { label: 'failed', tone: 'destructive' },
+  done: { label: 'done', tone: 'success' },
+  cancelled: { label: 'cancelled', tone: 'neutral' },
 };
+
+export const RunStatusPill = ({ status }: { status: string }) => (
+  <StatusPill tone={RUN_STATUS[status]?.tone ?? 'neutral'} pulse={status === 'running'}>{RUN_STATUS[status]?.label ?? status}</StatusPill>
+);
 
 const STATUSES = ['waiting', 'running', 'failed', 'done', 'cancelled'] as const;
 /** Shown when the URL names no status: everything not finished yet. */
@@ -126,18 +131,19 @@ export function RunsPage() {
     <Page title="Runs" description="Each ticket moves through the workflow's nodes; gates wait for you.">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex flex-wrap gap-1">
-          <Button size="sm" variant={isOpenPreset ? 'default' : 'outline'} onClick={() => setSearch({ status: undefined })} title="Waiting, running and failed">
-            Open <span className="opacity-60">{OPEN.reduce((a, s) => a + (counts[s] ?? 0), 0)}</span>
-          </Button>
+          <FilterChip active={isOpenPreset} onClick={() => setSearch({ status: undefined })} title="Waiting, running and failed">
+            Open <span className="tabular-nums opacity-70">{OPEN.reduce((a, s) => a + (counts[s] ?? 0), 0)}</span>
+          </FilterChip>
           <span className="mx-1 w-px self-stretch bg-border" />
           {STATUSES.map(s => (
-            <Button key={s} size="sm" variant={statuses.includes(s) ? 'default' : 'outline'} onClick={() => toggle(s)} aria-pressed={statuses.includes(s)}>
-              {RUN_STATUS[s]!.label} <span className="opacity-60">{counts[s] ?? 0}</span>
-            </Button>
+            <FilterChip key={s} active={statuses.includes(s)} onClick={() => toggle(s)}>
+              <span className={cn('size-1.5 rounded-full', toneClasses(RUN_STATUS[s]!.tone).dot)} />
+              {RUN_STATUS[s]!.label} <span className="tabular-nums opacity-70">{counts[s] ?? 0}</span>
+            </FilterChip>
           ))}
-          <Button size="sm" variant={statuses.length === 0 ? 'default' : 'outline'} onClick={() => setSearch({ status: 'all' })}>
-            All <span className="opacity-60">{totalRuns}</span>
-          </Button>
+          <FilterChip active={statuses.length === 0} onClick={() => setSearch({ status: 'all' })}>
+            All <span className="tabular-nums opacity-70">{totalRuns}</span>
+          </FilterChip>
         </div>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           <Select value={workflow} onChange={e => setSearch({ workflow: e.target.value || undefined })} aria-label="Workflow">
@@ -205,7 +211,7 @@ export function RunsPage() {
                     <Td className="text-xs whitespace-nowrap">
                       <button type="button" className="hover:underline" title="Show only this workflow" onClick={() => setSearch({ workflow: r.workflowId })}>{r.workflowId}</button>
                     </Td>
-                    <Td><Badge variant={RUN_STATUS[r.status]?.variant ?? 'outline'}>{RUN_STATUS[r.status]?.label ?? r.status}</Badge></Td>
+                    <Td><RunStatusPill status={r.status} /></Td>
                     <Td className="max-w-[14rem] text-xs">{r.currentNodeLabel ?? '–'}{r.error && <div className="truncate text-destructive" title={r.error}>{r.error}</div>}</Td>
                     <Td className="text-xs whitespace-nowrap text-muted-foreground">{timeAgo(r.updatedAt)}<div>${r.costUsd.toFixed(2)}</div></Td>
                     <Td>

@@ -9,6 +9,7 @@ import {
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
@@ -79,9 +80,9 @@ export function InboxPage() {
     <Page title="Inbox" description="Issue → AI classifies → you decide → AI runs a playbook → you verify.">
       <div className="flex flex-wrap gap-1">
         {GROUPS.map(g => (
-          <Button key={g.id} size="sm" variant={group === g.id ? 'default' : 'outline'} onClick={() => select({ group: g.id, run: undefined })}>
-            {g.label} <span className="opacity-60">{count(g.id)}</span>
-          </Button>
+          <FilterChip key={g.id} active={group === g.id} onClick={() => select({ group: g.id, run: undefined })}>
+            {g.label} <span className="tabular-nums opacity-70">{count(g.id)}</span>
+          </FilterChip>
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">

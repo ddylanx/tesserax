@@ -20,6 +20,7 @@ import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-sc
 import { cn } from '@/lib/utils';
 import { ProjectDot } from '@/lib/project-context';
 import { Button } from '@/components/ui/button';
+import { StatusPill } from '@/components/ui/status-pill';
 import { renderPriorityBadge, renderTypeBadge } from '@/components/task-badges';
 
 export interface TaskBoardProps {
@@ -115,10 +116,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info hover:bg-info/20 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-info animate-pulse" />
-              Running{run.currentNodeLabel ? ` · ${run.currentNodeLabel}` : ''} →
+              <StatusPill tone="info" pulse className="truncate">Running{run.currentNodeLabel ? ` · ${run.currentNodeLabel}` : ''} →</StatusPill>
             </Link>
           )}
           {run.status === 'waiting' && (
@@ -126,10 +126,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning hover:bg-warning/20 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-warning animate-pulse" />
-              Waiting for you →
+              <StatusPill tone="warning" pulse>Waiting for you →</StatusPill>
             </Link>
           )}
           {run.status === 'failed' && (
@@ -137,10 +136,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-destructive" />
-              Failed →
+              <StatusPill tone="destructive">Failed →</StatusPill>
             </Link>
           )}
         </div>

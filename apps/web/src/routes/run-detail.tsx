@@ -10,13 +10,12 @@ import { metaOf } from '@/components/flow/meta';
 import { agentOf, agentTitle, nodeTypes, type CardData, type NodeState } from '@/components/flow/node-card';
 import { MarkdownPanel } from '@/components/markdown';
 import { QueryState } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
 import { useTheme } from '@/lib/theme';
 import { cn, timeAgo } from '@/lib/utils';
-import { RUN_STATUS } from './runs';
+import { RunStatusPill } from './runs';
 import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker';
 
 
@@ -145,7 +144,7 @@ export function RunDetailPage() {
             {r.task.url ? (
               <a href={r.task.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-lg font-semibold hover:underline">{r.task.key}<ExternalLink className="size-3.5" /></a>
             ) : <span className="text-lg font-semibold">{r.task.key}</span>}
-            <Badge variant={RUN_STATUS[r.status]?.variant ?? 'outline'}>{RUN_STATUS[r.status]?.label ?? r.status}</Badge>
+            <RunStatusPill status={r.status} />
             {r.currentNodeLabel && <span className="text-sm text-muted-foreground">at “{r.currentNodeLabel}”</span>}
             <LiveStatus run={r} fetchedAt={q.dataUpdatedAt} failing={q.isRefetchError} />
           </div>
