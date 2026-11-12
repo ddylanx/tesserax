@@ -36,6 +36,11 @@ export const AI_MODEL_SUGGESTIONS: Record<AiEngine, string[]> = {
 
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
+/** A Team role `<department>/<role>`: fills the fields this node leaves unset (Team page). */
+export const ROLE_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/;
+const role = z.string().regex(ROLE_KEY_PATTERN, 'a role key like engineering/backend-dev').optional();
+/** Node types that can name a Team role. */
+export const ROLE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr', 'agent.run'] as const;
 
 export const nodeConfigSchemas = {
   'trigger.jira': z.object({}).default({}),
@@ -44,6 +49,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(180),
   }),
   'ai.step': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -61,6 +67,7 @@ export const nodeConfigSchemas = {
     editable: z.array(artifactName).default([]),
   }),
   'agent.run': z.object({
+    role,
     executor: z.enum(['ask', ...AGENT_EXECUTORS]).default('ask'),
     skill: z.string().optional(),
     prompt: z.string().min(1),
@@ -78,6 +85,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(900),
   }),
   'ai.review': z.object({
+    role,
     skills: z.array(z.string()).default([]),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -90,6 +98,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(900),
   }),
   'doc.write': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -105,6 +114,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(600),
   }),
   'jira.comment': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -117,6 +127,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(600),
   }),
   'git.pr': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),

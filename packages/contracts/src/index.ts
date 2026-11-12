@@ -8,3 +8,4 @@ export * from './repos';
 export * from './projects';
 export * from './board';
 export * from './project-scope';
+export * from './team';

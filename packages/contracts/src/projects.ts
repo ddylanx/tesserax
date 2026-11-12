@@ -23,6 +23,8 @@ export const projectSettingsSchema = z.object({
   workplaceIds: z.array(z.string()).max(50).default([]),
   workflows: z.array(z.string()).nullable().default(null),
   skills: z.array(z.string()).nullable().default(null),
+  /** Team roles (`<department>/<role>`) runs of this project may use. */
+  roles: z.array(z.string()).nullable().default(null),
   /** Which workflow a task of this project starts. */
   routing: routingSchema.default({ default: 'default', rules: [] }),
   engines: z.object({ default: z.string().nullable().default(null), allowed: z.array(z.string()).nullable().default(null) }).default({ default: null, allowed: null }),
