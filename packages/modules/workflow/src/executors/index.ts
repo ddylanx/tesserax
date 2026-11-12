@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import type { AgentExecutor, NodeType } from '@tesserax/contracts';
+import { reportInstruction, type AgentExecutor, type NodeType } from '@tesserax/contracts';
 import { cleanEnv, diffInfo, diffPatch, git } from '@tesserax/agent-runtime';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, relative } from 'node:path';
@@ -37,8 +37,9 @@ function stepSkills(ctx: NodeContext, nodeSkills: (string | undefined | null)[])
   return paths.map(p => ctx.skills.get(p));
 }
 
-/** Role first, then skills, then the task prompt. */
-const compose = (ctx: NodeContext, prompt: string, skills: { name: string; body: string }[]) => withRole(ctx.role, withSkills(prompt, skills));
+/** Role first, then skills, then the task prompt; a role-driven step is also told to end with the step report block. */
+const compose = (ctx: NodeContext, prompt: string, skills: { name: string; body: string }[]) =>
+  withRole(ctx.role, withSkills(ctx.role ? `${prompt}\n\n${reportInstruction(ctx.role.reportLanguage)}` : prompt, skills));
 const skillHashOf = (skills: { hash: string }[]) => skills.map(s => s.hash).join(',') || null;
 
 const triggerJira: NodeExecutor = async ctx => {
@@ -73,7 +74,7 @@ const aiReview: NodeExecutor = async ctx => {
   const skills = stepSkills(ctx, c.skills as string[]);
   const prompt = compose(
     ctx,
-    `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\nEnd your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL`,
+    `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\n${ctx.role ? 'Write exactly one line VERDICT: PASS or VERDICT: FAIL just before the report block.' : 'End your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL'}`,
     skills,
   );
   const mcpGrant = ctx.mcp

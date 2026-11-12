@@ -20,6 +20,12 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 
 
 
+const CONFIDENCE_CLASS: Record<NonNullable<NodeRunDto['confidence']>, string> = {
+  high: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  medium: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  low: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400',
+};
+
 /** The agent picked for a step in this run only (run vars `engine` / `executor`). */
 const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
@@ -319,6 +325,15 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>
+                  {n.summary && (
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      <div className="flex items-start gap-1.5">
+                        {n.confidence && <span className={`shrink-0 rounded border px-1 ${CONFIDENCE_CLASS[n.confidence]}`} title="Confidence the step reported">{n.confidence}</span>}
+                        <span className="whitespace-pre-line">{n.summary}</span>
+                      </div>
+                      {n.decisionNeeded && <div className="font-medium text-amber-700 dark:text-amber-400">Decision needed: <span className="whitespace-pre-line font-normal">{n.decisionNeeded}</span></div>}
+                    </div>
+                  )}
                   {typeof n.input.feedback === 'string' && <div className="text-amber-700 dark:text-amber-400">feedback: {n.input.feedback}</div>}
                   {n.output.skipped === true && <div className="text-muted-foreground">skipped: {String(n.output.reason)}</div>}
                   {n.error && <div className="text-red-600">{n.error}</div>}

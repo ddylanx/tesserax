@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type {
   ArtifactDto,
+  NodeRunDto,
   WorkflowDefinition,
   WorkflowRunDetail,
   WorkflowRunDto,
@@ -123,6 +124,9 @@ export class WorkflowQueryService {
         skillHash: n.skill_hash,
         role: n.role,
         roleHash: n.role_hash,
+        summary: n.summary,
+        confidence: (n.confidence as NodeRunDto['confidence']) ?? null,
+        decisionNeeded: n.decision_needed,
         agentSessionId: n.agent_session_id,
         startedAt: iso(n.started_at),
         endedAt: iso(n.ended_at),

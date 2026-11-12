@@ -1,5 +1,5 @@
 import type { AppConfig } from '@tesserax/config';
-import { nodeConfigSchemas, type NodeType, type RoleLookup } from '@tesserax/contracts';
+import { ROLE_NODE_TYPES, nodeConfigSchemas, parseStepReport, type NodeType, type RoleLookup } from '@tesserax/contracts';
 import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { diffInfo, isAlive, readOutcome, resultModel, stopProcess } from '@tesserax/agent-runtime';
@@ -18,6 +18,13 @@ import { join } from 'node:path';
 import type { McpService } from '@tesserax/mod-mcp';
 
 const log = createLogger('workflow.jobs');
+
+/** Summary, confidence and decision from the report an AI step ends with (summary falls back to the first lines). */
+export function reportPatch(nodeType: string, text: string | null | undefined) {
+  if (!text?.trim() || !(ROLE_NODE_TYPES as readonly string[]).includes(nodeType)) return {};
+  const r = parseStepReport(text);
+  return { summary: r.summary || null, confidence: r.confidence, decision_needed: r.decisionNeeded };
+}
 
 export interface JobDeps {
   db: Db;
@@ -109,11 +116,11 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if ('async' in result) return; // finishes later (agent runs)
     if ('wait' in result) {
       if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
+      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null, ...reportPatch(nr.node_type, result.artifact?.content) });
       return;
     }
     if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
+    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null, ...reportPatch(nr.node_type, result.artifact?.content) });
     await d.engine.complete(nr.id, result.port, result.output ?? {}, 'job', ['running']);
   } catch (err) {
     const message = String((err as Error)?.message ?? err).slice(0, 4000);
@@ -175,7 +182,7 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
   ].join('\n');
   await d.engine.saveArtifact(run.id, nr.id, output, content, 'ai');
   const usedModel = resultModel(r);
-  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}) });
+  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}), ...reportPatch(nr.node_type, r?.result) });
   log.info({ runId: run.id, signal: outcome.signal }, 'agent node finished');
   if (nr.run_dir) {
     const mcpFile = join(nr.run_dir, 'mcp.json');

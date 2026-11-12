@@ -359,6 +359,10 @@ export const nodeRunSchema = z.object({
   /** Team role key the step used and the hash of its prompt + config then; null when the node names none. */
   role: z.string().nullable(),
   roleHash: z.string().nullable(),
+  /** From the step report the output ends with (else its first lines); confidence and decision only from a report block. */
+  summary: z.string().nullable(),
+  confidence: z.enum(['high', 'medium', 'low']).nullable(),
+  decisionNeeded: z.string().nullable(),
   agentSessionId: z.string().nullable(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),

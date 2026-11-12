@@ -271,6 +271,10 @@ export interface NodeRunsTable {
   /** Team role key the step used, and sha256(prompt + config) of that role then (first 12 hex chars). */
   role: string | null;
   role_hash: string | null;
+  /** Parsed step report: summary (<= 5 lines), high | medium | low, what needs deciding (null = nothing). */
+  summary: string | null;
+  confidence: string | null;
+  decision_needed: string | null;
   agent_session_id: string | null;
   process_id: number | null;
   run_dir: string | null;

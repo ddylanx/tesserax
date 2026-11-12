@@ -9,3 +9,4 @@ export * from './projects';
 export * from './board';
 export * from './project-scope';
 export * from './team';
+export * from './report';
