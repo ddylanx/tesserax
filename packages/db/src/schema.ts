@@ -87,6 +87,41 @@ export interface McpPolicyTable {
   updated_at: Generated<Date>;
 }
 
+export interface TeamDepartmentsTable {
+  id: Generated<string>;
+  slug: string;
+  name: string;
+  color: Generated<string>;
+  description: Generated<string>;
+  position: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface TeamRolesTable {
+  id: Generated<string>;
+  department_id: string;
+  slug: string;
+  title: string;
+  prompt: Generated<string>;
+  config: ColumnType<unknown, unknown | undefined, unknown>;
+  enabled: Generated<boolean>;
+  position: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** Audit trail of role edits (create / update / delete). */
+export interface TeamRoleChangesTable {
+  id: Generated<string>;
+  role_id: string | null;
+  role_key: string;
+  old_hash: string | null;
+  new_hash: string | null;
+  action: string;
+  at: Generated<Date>;
+}
+
 export interface McpToolCacheTable {
   server: string;
   tools: Json; // { name: string; description?: string }[]
@@ -233,6 +268,9 @@ export interface NodeRunsTable {
   cost_usd: number | null;
   num_turns: number | null;
   model: string | null;
+  /** Team role key the step used, and sha256(prompt + config) of that role then (first 12 hex chars). */
+  role: string | null;
+  role_hash: string | null;
   agent_session_id: string | null;
   process_id: number | null;
   run_dir: string | null;
@@ -288,6 +326,9 @@ export interface Database {
   agent_events: AgentEventsTable;
   mcp_policy: McpPolicyTable;
   mcp_tool_cache: McpToolCacheTable;
+  team_departments: TeamDepartmentsTable;
+  team_roles: TeamRolesTable;
+  team_role_changes: TeamRoleChangesTable;
 }
 
 export type ProjectRow = Selectable<ProjectsTable>;
@@ -307,5 +348,8 @@ export type NodeRunUpdate = Updateable<NodeRunsTable>;
 export type McpPolicyRow = Selectable<McpPolicyTable>;
 export type NewMcpPolicy = Insertable<McpPolicyTable>;
 export type McpPolicyUpdate = Updateable<McpPolicyTable>;
+export type TeamDepartmentRow = Selectable<TeamDepartmentsTable>;
+export type TeamRoleRow = Selectable<TeamRolesTable>;
+export type TeamRoleChangeRow = Selectable<TeamRoleChangesTable>;
 export type McpToolCacheRow = Selectable<McpToolCacheTable>;
 export type NewMcpToolCache = Insertable<McpToolCacheTable>;
