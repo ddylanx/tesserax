@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { containsSecretToken } from './redact';
 import { AGENT_EXECUTORS, AI_ENGINES, ROLE_KEY_PATTERN } from './workflow';
 
 /**
@@ -21,9 +22,8 @@ export const roleKeySchema = z.string().regex(ROLE_KEY_PATTERN, 'a role key like
 export const roleKey = (departmentSlug: string, roleSlug: string) => `${departmentSlug}/${roleSlug}`;
 
 /** Things that look like credentials. Roles are stored in the database and shown in the UI, so they must never hold one. */
-const SECRET_PATTERNS = [/ghp_[A-Za-z0-9]/, /github_pat_/, /\bsk-[A-Za-z0-9_-]{8,}/, /xox[abp]-/, /AKIA[0-9A-Z]{16}/, /-----BEGIN/];
 export function containsSecret(text: string): boolean {
-  return SECRET_PATTERNS.some(p => p.test(text));
+  return containsSecretToken(text);
 }
 /** Every string anywhere inside a value (for the secret check on a role's config). */
 function strings(v: unknown): string[] {

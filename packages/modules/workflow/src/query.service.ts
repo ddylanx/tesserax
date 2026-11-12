@@ -8,6 +8,7 @@ import type {
   WorkflowRunDto,
   WorkflowRunList,
 } from '@tesserax/contracts';
+import { redact } from '@tesserax/contracts';
 import { DB } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { repoRegistry } from '@tesserax/mod-repos';
@@ -138,7 +139,7 @@ export class WorkflowQueryService {
           name: a.name,
           version: a.version,
           author: a.author,
-          content: a.content,
+          content: redact(a.content, process.env),
           nodeRunId: a.node_run_id,
           createdAt: a.created_at.toISOString(),
         }),

@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { AppConfig } from '@tesserax/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
-  roleProblems, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
+  redact, roleProblems, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
 import { CONFIG, DB, ROLE_LOOKUP } from '@tesserax/core';
 import type { RoleLookup } from '@tesserax/contracts';
@@ -260,7 +260,7 @@ export class WorkflowController {
     const nr = await this.db.selectFrom('node_runs').select(['status']).where('id', '=', nodeRunId).where('run_id', '=', id).executeTakeFirst();
     if (!nr) throw new NotFoundException();
     const r = readLiveLog(nodeRunDir(this.config, id, nodeRunId), Math.max(0, Number(from) || 0));
-    return { ...r, live: nr.status === 'running' || nr.status === 'queued' };
+    return { ...r, text: redact(r.text, process.env), live: nr.status === 'running' || nr.status === 'queued' };
   }
 
   @Get('workflow-runs/:id/diff')
