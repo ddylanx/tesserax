@@ -1,21 +1,27 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Play } from 'lucide-react';
 import { useState } from 'react';
-import type { TaskList } from '@tesserax/contracts';
+import { skillInScope, type TaskList } from '@tesserax/contracts';
 import { SkillsClientProvider, SkillsWorkspace, type SkillsClient } from '@tesserax/mod-skills/web';
 import { Page } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { useProjectScope } from '@/lib/project-context';
 
 const client: SkillsClient = { fetchJson: (path, init) => api(`/api${path}`, init) };
 
 export function SkillsPage() {
+  const scope = useProjectScope();
   return (
     <Page title="Skills" description="skills/<name>/SKILL.md (Claude Code skill format), plus packages installed from git into skills/_packages/. Workflow nodes reference them; each run records the version used.">
       <SkillsClientProvider client={client}>
-        <SkillsWorkspace renderLocalExtras={({ name, dirty }) => <TrySkill name={name} dirty={dirty} />} />
+        <SkillsWorkspace
+          renderLocalExtras={({ name, dirty }) => <TrySkill name={name} dirty={dirty} />}
+          filter={s => skillInScope(scope.current, s.path)}
+          hiddenNote={n => <>{n} more not enabled in {scope.current?.name}. Choose All projects to see them.</>}
+        />
       </SkillsClientProvider>
     </Page>
   );
