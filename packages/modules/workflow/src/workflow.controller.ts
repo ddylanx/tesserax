@@ -127,9 +127,9 @@ export class WorkflowController {
   }
 
   @Get('metrics')
-  metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string) {
+  metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string, @Query('project') project?: string) {
     const d = Math.min(365, Math.max(1, Number(days) || 30));
-    return computeMetrics(this.db, this.skills, { days: d, workflowId: workflowId || undefined });
+    return computeMetrics(this.db, this.skills, { days: d, workflowId: workflowId || undefined, project: project || undefined });
   }
 
   @Get('node-types')

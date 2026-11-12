@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { api } from '@/lib/api';
+import { useProjectScope } from '@/lib/project-context';
 import { timeAgo } from '@/lib/utils';
 
 const fmt = (x: number | null | undefined, unit = '') => (x == null ? '–' : `${x}${unit}`);
@@ -41,7 +42,8 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 
 export function MetricsPage() {
   const [days, setDays] = useState(30);
-  const q = useQuery({ queryKey: ['metrics', days], queryFn: () => api<MetricsReport>(`/api/metrics?days=${days}`), refetchInterval: 30_000 });
+  const { scopeParam, selected } = useProjectScope();
+  const q = useQuery({ queryKey: ['metrics', days, selected], queryFn: () => api<MetricsReport>(`/api/metrics?days=${days}${scopeParam ? `&${scopeParam}` : ''}`), refetchInterval: 30_000 });
   const m = q.data;
   return (
     <Page
