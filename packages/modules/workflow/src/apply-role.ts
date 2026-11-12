@@ -1,5 +1,6 @@
 import {
-  ENGINE_NODE_TYPES, MODEL_NODE_TYPES, ROLE_NODE_TYPES, ROLE_TOOL_ALLOWLIST, roleConfigSchema, roleInScope, rolePromptSchema,
+  ENGINE_NODE_TYPES, MODEL_NODE_TYPES, ROLE_NODE_TYPES, ROLE_TOOL_ALLOWLIST, roleBrief, roleConfigSchema, roleInScope, rolePromptSchema,
+  type ReportLanguage,
   type Role, type RoleLookup, type WorkflowNode,
 } from '@tesserax/contracts';
 import { FatalNodeError } from './executors/types';
@@ -11,6 +12,9 @@ export interface AppliedRole {
   prompt: string;
   hash: string;
   skills: string[];
+  /** "## Your role" section (mission, when to use, not for, inputs needed); '' when the role has no descriptor. */
+  brief: string;
+  reportLanguage: ReportLanguage;
 }
 
 const has = (list: readonly string[], v: string) => list.includes(v);
@@ -47,7 +51,10 @@ export function applyRole(raw: Record<string, unknown>, role: Role, nodeType: st
     const roleTools = rc.allowedTools as string[];
     config.allowedTools = Array.isArray(raw.allowedTools) ? (raw.allowedTools as unknown[]).filter((t): t is string => typeof t === 'string' && roleTools.includes(t)) : [...roleTools];
   }
-  return { config, role: { key: role.key, title: role.title, prompt: prompt.data, hash: role.hash, skills: rc.skills } };
+  return {
+    config,
+    role: { key: role.key, title: role.title, prompt: prompt.data, hash: role.hash, skills: rc.skills, brief: roleBrief(rc), reportLanguage: rc.reportLanguage },
+  };
 }
 
 /** The node's config with its role applied (unchanged when it names none). Fails the step when the role cannot be used. */

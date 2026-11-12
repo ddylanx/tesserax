@@ -14,7 +14,7 @@ export const ROLE_TOOL_ALLOWLIST = [
 ] as const;
 export type RoleTool = (typeof ROLE_TOOL_ALLOWLIST)[number];
 
-export const ROLE_LIMITS = { maxBudgetUsd: 20, timeoutSeconds: 7200, prompt: 20_000, skills: 20, tools: 50, mcpServers: 20 } as const;
+export const ROLE_LIMITS = { maxBudgetUsd: 20, timeoutSeconds: 7200, prompt: 20_000, skills: 20, tools: 50, mcpServers: 20, mission: 300, briefItems: 10, briefItem: 200 } as const;
 
 export const teamSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/, 'lowercase letters, digits and -, at most 40');
 export const roleKeySchema = z.string().regex(ROLE_KEY_PATTERN, 'a role key like engineering/backend-dev');
@@ -37,6 +37,10 @@ const noSecret = (label: string) => (v: unknown, ctx: z.RefinementCtx) => {
 };
 
 const nameList = (max: number) => z.array(z.string().min(1).max(200)).max(max);
+const briefList = z.array(z.string().trim().min(1).max(ROLE_LIMITS.briefItem)).max(ROLE_LIMITS.briefItems).optional();
+
+export const REPORT_LANGUAGES = ['en', 'vi'] as const;
+export type ReportLanguage = (typeof REPORT_LANGUAGES)[number];
 
 export const roleConfigSchema = z
   .object({
@@ -50,10 +54,30 @@ export const roleConfigSchema = z
     mcp: z.object({ servers: nameList(ROLE_LIMITS.mcpServers).optional(), tools: nameList(ROLE_LIMITS.tools).optional() }).strict().optional(),
     maxBudgetUsd: z.number().positive().max(ROLE_LIMITS.maxBudgetUsd).optional(),
     timeoutSeconds: z.number().int().positive().max(ROLE_LIMITS.timeoutSeconds).optional(),
+    /** What the role is for, in one or two sentences (shown on the Team page, told to the agent). */
+    mission: z.string().trim().max(ROLE_LIMITS.mission).optional(),
+    whenToUse: briefList,
+    notFor: briefList,
+    /** What the step must be given to do the work well (documents, access, decisions). */
+    inputsNeeded: briefList,
+    /** Language of the step's report (its headings and text). */
+    reportLanguage: z.enum(REPORT_LANGUAGES).default('en'),
   })
   .strict()
   .superRefine(noSecret('The config'));
 export type RoleConfig = z.infer<typeof roleConfigSchema>;
+
+/** The role's descriptor as a short section the agent reads after the role prompt; '' when the role has none. */
+export function roleBrief(c: Pick<RoleConfig, 'mission' | 'whenToUse' | 'notFor' | 'inputsNeeded'>): string {
+  const list = (title: string, items?: string[]) => (items?.length ? [`${title}:`, ...items.map(i => `- ${i}`)] : []);
+  const lines = [
+    ...(c.mission ? [`Mission: ${c.mission}`] : []),
+    ...list('Use this role for', c.whenToUse),
+    ...list('Not for', c.notFor),
+    ...list('Inputs you need', c.inputsNeeded),
+  ];
+  return lines.length ? ['## Your role', ...lines].join('\n') : '';
+}
 
 export const rolePromptSchema = z.string().max(ROLE_LIMITS.prompt).superRefine(noSecret('The prompt'));
 
@@ -102,7 +126,7 @@ export const saveRoleSchema = z.object({
   title: z.string().trim().min(1).max(100).superRefine(noSecret('The title')),
   enabled: z.boolean().default(true),
   prompt: rolePromptSchema.default(''),
-  config: roleConfigSchema.default({ skills: [] }),
+  config: roleConfigSchema.default({ skills: [], reportLanguage: 'en' }),
   position: z.number().int().min(0).max(10_000).optional(),
 });
 export type SaveRole = z.infer<typeof saveRoleSchema>;

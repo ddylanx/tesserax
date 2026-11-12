@@ -3,7 +3,7 @@ import { History, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
   AI_ENGINES, AI_ENGINE_TITLES, AI_MODEL_SUGGESTIONS, ROLE_LIMITS, ROLE_TOOL_ALLOWLIST,
-  type AiEngine, type Department, type McpServerPolicyDto, type Role, type RoleChange, type RoleConfig, type TeamList,
+  type AiEngine, type Department, type McpServerPolicyDto, type ReportLanguage, type Role, type RoleChange, type RoleConfig, type TeamList,
 } from '@tesserax/contracts';
 import { MarkdownPanel } from '@/components/markdown';
 import { Page, QueryState } from '@/components/page';
@@ -82,7 +82,12 @@ function RoleCard({ role, onEdit, onDelete }: { role: Role; onEdit: () => void; 
         </div>
       </CardHeader>
       <CardContent className="flex flex-col gap-2 text-xs">
+        {c.mission && <p className="text-sm">{c.mission}</p>}
+        {(c.whenToUse?.length ?? 0) > 0 && <p className="text-muted-foreground"><b className="font-medium text-foreground">Use for:</b> {c.whenToUse!.join(' · ')}</p>}
+        {(c.notFor?.length ?? 0) > 0 && <p className="text-muted-foreground"><b className="font-medium text-foreground">Not for:</b> {c.notFor!.join(' · ')}</p>}
+        {(c.inputsNeeded?.length ?? 0) > 0 && <p className="text-muted-foreground"><b className="font-medium text-foreground">Needs:</b> {c.inputsNeeded!.join(' · ')}</p>}
         <div className="flex flex-wrap gap-1">
+          {c.reportLanguage === 'vi' && <Badge variant="outline" title="Reports in Vietnamese">vi</Badge>}
           {!role.enabled && <Badge variant="slate">disabled</Badge>}
           {c.engine && <Badge variant="indigo">{AI_ENGINE_TITLES[c.engine as AiEngine] ?? c.engine}</Badge>}
           {c.model && <Badge variant="blue">{c.model}</Badge>}
@@ -153,7 +158,11 @@ function DepartmentDialog({ department, onClose, onSaved }: { department?: Depar
 interface RoleForm {
   departmentId: string; slug: string; title: string; enabled: boolean; prompt: string;
   engine: string; model: string; executor: string; skills: string[]; allowedTools: string[] | null; mcpServers: string[]; maxBudgetUsd: string; timeoutSeconds: string;
+  /** Descriptor; the three lists are edited one item per line. */
+  mission: string; whenToUse: string; notFor: string; inputsNeeded: string; reportLanguage: ReportLanguage;
 }
+
+const lines = (s: string) => s.split('\n').map(l => l.trim()).filter(Boolean);
 
 const toForm = (role: Role | undefined, departmentId: string): RoleForm => {
   const c = (role?.config ?? {}) as Partial<RoleConfig>;
@@ -161,6 +170,8 @@ const toForm = (role: Role | undefined, departmentId: string): RoleForm => {
     departmentId: role?.departmentId ?? departmentId, slug: role?.slug ?? '', title: role?.title ?? '', enabled: role?.enabled ?? true, prompt: role?.prompt ?? '',
     engine: c.engine ?? '', model: c.model ?? '', executor: c.executor ?? '', skills: c.skills ?? [], allowedTools: c.allowedTools ?? null,
     mcpServers: c.mcp?.servers ?? [], maxBudgetUsd: c.maxBudgetUsd?.toString() ?? '', timeoutSeconds: c.timeoutSeconds?.toString() ?? '',
+    mission: c.mission ?? '', whenToUse: (c.whenToUse ?? []).join('\n'), notFor: (c.notFor ?? []).join('\n'), inputsNeeded: (c.inputsNeeded ?? []).join('\n'),
+    reportLanguage: c.reportLanguage ?? 'en',
   };
 };
 
@@ -174,6 +185,9 @@ function toBody(f: RoleForm, keep: Record<string, unknown>) {
   if (f.mcpServers.length || keep.mcp) config.mcp = { ...(keep.mcp as object), servers: f.mcpServers };
   if (f.maxBudgetUsd.trim()) config.maxBudgetUsd = Number(f.maxBudgetUsd);
   if (f.timeoutSeconds.trim()) config.timeoutSeconds = Number(f.timeoutSeconds);
+  if (f.mission.trim()) config.mission = f.mission.trim();
+  for (const k of ['whenToUse', 'notFor', 'inputsNeeded'] as const) if (lines(f[k]).length) config[k] = lines(f[k]);
+  config.reportLanguage = f.reportLanguage;
   return { departmentId: f.departmentId, slug: f.slug.trim(), title: f.title.trim(), enabled: f.enabled, prompt: f.prompt, config };
 }
 
@@ -218,6 +232,23 @@ function RoleDialog({ role, departmentId, departments, onClose, onSaved }: { rol
         </label>
         <label className="flex flex-col gap-1 text-xs">Max budget (USD, at most {ROLE_LIMITS.maxBudgetUsd})<Input type="number" min={0} max={ROLE_LIMITS.maxBudgetUsd} step="0.5" value={f.maxBudgetUsd} onChange={e => set('maxBudgetUsd', e.target.value)} /></label>
         <label className="flex flex-col gap-1 text-xs">Timeout (seconds, at most {ROLE_LIMITS.timeoutSeconds})<Input type="number" min={1} max={ROLE_LIMITS.timeoutSeconds} value={f.timeoutSeconds} onChange={e => set('timeoutSeconds', e.target.value)} /></label>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="flex flex-col gap-1 text-xs sm:col-span-2">Mission (what this role is for, at most {ROLE_LIMITS.mission} characters)
+          <Input value={f.mission} maxLength={ROLE_LIMITS.mission} onChange={e => set('mission', e.target.value)} placeholder="Implement a well-specified change with tests, as small local commits." />
+        </label>
+        {([['whenToUse', 'Use this role for'], ['notFor', 'Not for'], ['inputsNeeded', 'Inputs it needs']] as const).map(([k, label]) => (
+          <label key={k} className="flex flex-col gap-1 text-xs">{label} <span className="text-muted-foreground">(one per line, at most {ROLE_LIMITS.briefItems})</span>
+            <textarea className="min-h-16 rounded-md border bg-background p-2 text-xs" value={f[k]} onChange={e => set(k, e.target.value)} />
+          </label>
+        ))}
+        <label className="flex flex-col gap-1 text-xs">Report language
+          <Select value={f.reportLanguage} onChange={e => set('reportLanguage', e.target.value as ReportLanguage)}>
+            <option value="en">English</option>
+            <option value="vi">Tiếng Việt</option>
+          </Select>
+        </label>
       </div>
 
       <fieldset className="flex flex-col gap-1 text-xs">

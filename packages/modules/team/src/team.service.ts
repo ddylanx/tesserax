@@ -42,7 +42,14 @@ const SEED: { department: SaveDepartment; roles: { slug: string; title: string; 
         '- Add or update tests for the behaviour you change.',
         '- Commit locally with a clear message. Never push, never merge, never touch secrets or credentials.',
       ].join('\n'),
-      config: { engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Edit', 'MultiEdit', 'Write', 'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git add:*)', 'Bash(git commit:*)'] },
+      config: {
+        engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Edit', 'MultiEdit', 'Write', 'Bash(git status:*)', 'Bash(git diff:*)', 'Bash(git add:*)', 'Bash(git commit:*)'],
+        mission: 'Implement a well-specified change in an existing codebase, with tests, as small local commits.',
+        whenToUse: ['A ticket with a clear requirement or an approved spec', 'Bug fixes with a known reproduction', 'Small refactors needed by the change'],
+        notFor: ['Deciding product scope or priorities', 'Pushing, merging or deploying', 'Changing credentials or infrastructure'],
+        inputsNeeded: ['The requirement or approved spec', 'How to run the tests', 'Any constraints (APIs to keep, files not to touch)'],
+        reportLanguage: 'en',
+      },
     }],
   },
   {
@@ -55,7 +62,14 @@ const SEED: { department: SaveDepartment; roles: { slug: string; title: string; 
         '- Point to exact files and lines; say what is wrong and how to fix it.',
         '- Separate blocking problems from suggestions.',
       ].join('\n'),
-      config: { engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)'] },
+      config: {
+        engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)'],
+        mission: 'Review a change against its requirement and say clearly whether it is ready, and what blocks it.',
+        whenToUse: ['Before a pull request is opened', 'After an agent run, to check the diff', 'Reviewing a teammate\'s branch'],
+        notFor: ['Writing or fixing the code', 'Approving on behalf of a person'],
+        inputsNeeded: ['The requirement or spec', 'The diff (base branch to compare with)', 'Test results if available'],
+        reportLanguage: 'en',
+      },
     }],
   },
   {
@@ -67,10 +81,21 @@ const SEED: { department: SaveDepartment; roles: { slug: string; title: string; 
         '- Say what changed and why; leave out what the reader can see in the diff.',
         '- Use headings and lists only when they help; no marketing words.',
       ].join('\n'),
-      config: { engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)'] },
+      config: {
+        engine: 'claude', skills: [], allowedTools: ['Read', 'Grep', 'Glob', 'Bash(git diff:*)', 'Bash(git log:*)', 'Bash(git show:*)'],
+        mission: 'Explain a change or a decision in short, accurate text that the reader can act on.',
+        whenToUse: ['Ticket documents and release notes', 'Pull request descriptions', 'Comments that answer a stakeholder'],
+        notFor: ['Changing code', 'Posting anything without a person confirming it'],
+        inputsNeeded: ['Who will read it and what they need to decide', 'The change (diff or summary)', 'Facts that must be included'],
+        reportLanguage: 'en',
+      },
     }],
   },
 ];
+
+const DESCRIPTOR_KEYS = ['mission', 'whenToUse', 'notFor', 'inputsNeeded', 'reportLanguage'];
+/** The starter config as first shipped, before roles had descriptors. */
+const withoutDescriptors = (c: object) => Object.fromEntries(Object.entries(c).filter(([k]) => !DESCRIPTOR_KEYS.includes(k)));
 
 export class TeamService implements RoleLookup, OnModuleInit {
   constructor(
@@ -80,7 +105,29 @@ export class TeamService implements RoleLookup, OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    await this.seed();
+    if (!(await this.seed())) await this.upgradeSeed();
+  }
+
+  /**
+   * Starter roles that nobody has edited since they were created get the descriptors (mission, when to use…) added later.
+   * A role you changed (prompt or config) is left alone.
+   */
+  async upgradeSeed(): Promise<number> {
+    const { roles } = await this.load();
+    let changed = 0;
+    for (const s of SEED) {
+      for (const r of s.roles) {
+        const row = roles.find(x => x.key === roleKey(s.department.slug, r.slug));
+        if (!row || row.prompt !== r.prompt || canonical(row.config) !== canonical(withoutDescriptors(r.config))) continue;
+        await this.repo.transaction(async repo => {
+          const updated = await repo.updateRole(row.id, { config: r.config });
+          if (updated) await repo.addChange({ role_id: row.id, role_key: row.key, old_hash: row.hash, new_hash: roleHash(updated.prompt, updated.config), action: 'update' });
+        });
+        changed++;
+      }
+    }
+    if (changed) log.info({ changed }, 'starter roles got their descriptors');
+    return changed;
   }
 
   /** Inserts the starter departments and roles when the Team page has never been used. */

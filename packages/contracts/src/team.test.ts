@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { containsSecret, nodeConfigSchemas, projectSettingsSchema, roleConfigSchema, roleInScope, roleProblems, saveRoleSchema } from './index';
+import { containsSecret, nodeConfigSchemas, projectSettingsSchema, roleConfigSchema, roleBrief, roleInScope, roleProblems, saveRoleSchema } from './index';
 
 const ok = (v: unknown) => roleConfigSchema.safeParse(v).success;
 
@@ -73,4 +73,23 @@ test('workflow nodes naming an unknown role are reported', () => {
     { id: 'c', type: 'human.gate', label: 'Gate', config: {} },
   ] as never;
   assert.deepEqual(roleProblems({ nodes }, ['qa/reviewer']), ['Node "Build" uses unknown role "engineering/ghost"']);
+});
+
+test('role descriptor: capped, strict, defaults to an English report; roleBrief renders it', () => {
+  const parsed = roleConfigSchema.parse({ mission: 'Review changes for DEMO.', whenToUse: ['Before a PR'], notFor: ['Writing code'], inputsNeeded: ['The spec'] });
+  assert.equal(parsed.reportLanguage, 'en');
+  assert.equal(ok({ reportLanguage: 'vi' }), true);
+  assert.equal(ok({ reportLanguage: 'fr' }), false);
+  assert.equal(ok({ mission: 'x'.repeat(301) }), false);
+  assert.equal(ok({ whenToUse: Array.from({ length: 11 }, (_, i) => `case ${i}`) }), false);
+  assert.equal(ok({ notFor: ['x'.repeat(201)] }), false);
+  assert.equal(ok({ inputsNeeded: [''] }), false);
+  assert.equal(ok({ mission: 'token ghp_abcdefABCDEF123456' }), false);
+  assert.equal(ok({ descriptor: {} }), false);
+  const brief = roleBrief(parsed);
+  assert.ok(brief.startsWith('## Your role\nMission: Review changes for DEMO.'));
+  assert.ok(brief.includes('Use this role for:\n- Before a PR'));
+  assert.ok(brief.includes('Not for:\n- Writing code'));
+  assert.ok(brief.includes('Inputs you need:\n- The spec'));
+  assert.equal(roleBrief({}), '');
 });

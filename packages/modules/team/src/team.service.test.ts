@@ -130,3 +130,19 @@ test('the project filter keeps only the roles a project allows', async () => {
   assert.equal((await svc.list({ projectSlug: 'open' })).roles.length, 3);
   await assert.rejects(svc.list({ projectSlug: 'missing' }), /Project not found/);
 });
+
+test('starter roles nobody edited get their descriptors; edited ones are left alone', async () => {
+  const { svc, mem } = setup();
+  await svc.seed();
+  for (const r of mem.state().roles) {
+    const { mission: _m, whenToUse: _w, notFor: _n, inputsNeeded: _i, reportLanguage: _l, ...old } = r.config as Record<string, unknown>;
+    r.config = old;
+  }
+  const reviewer = mem.state().roles.find(r => r.slug === 'reviewer')!;
+  reviewer.prompt = 'My own reviewer prompt.';
+  assert.equal(await svc.upgradeSeed(), 2);
+  const roles = (await svc.list()).roles;
+  assert.ok((roles.find(r => r.key === 'engineering/backend-dev')!.config as { mission?: string }).mission);
+  assert.equal((roles.find(r => r.key === 'qa/reviewer')!.config as { mission?: string }).mission, undefined);
+  assert.equal(await svc.upgradeSeed(), 0);
+});

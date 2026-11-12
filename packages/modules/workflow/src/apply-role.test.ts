@@ -101,3 +101,13 @@ test('a role asking for an MCP server only requests it: a server whose policy is
   const own = applyRole({ prompt: 'x', mcp: { servers: [] } }, role({ config: { mcp: { servers: ['search'] } } }), 'ai.step').config;
   assert.deepEqual((await mcp.grantFor({ engine: 'claude', node: own as never, projectDirs: [] })).servers, []);
 });
+
+test('the role descriptor is told to the agent as a "## Your role" section after the role prompt', () => {
+  const { role: applied } = applyRole({}, role({ config: { mission: 'Review DEMO changes.', notFor: ['Writing code'], reportLanguage: 'vi' } }), 'ai.review');
+  assert.equal(applied.reportLanguage, 'vi');
+  const prompt = withRole(applied, 'Task text');
+  assert.ok(prompt.indexOf('Follow the conventions.') < prompt.indexOf('## Your role'));
+  assert.ok(prompt.includes('Mission: Review DEMO changes.\nNot for:\n- Writing code'));
+  assert.ok(prompt.indexOf('## Your role') < prompt.indexOf('Task text'));
+  assert.equal(withRole({ title: 'Brief only', prompt: '', brief: '## Your role\nMission: x' }, 'T'), '# Role: Brief only\n\n## Your role\nMission: x\n\n---\n\nT');
+});
