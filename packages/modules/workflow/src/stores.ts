@@ -47,6 +47,22 @@ export class WorkflowStore {
       .map(f => f.replace(/\.workflow\.json$/, ''));
   }
 
+  /** Workflow ids with a node whose config names the Team role `key`. Used as the Team module's WORKFLOW_USAGE port. */
+  usingRole(key: string): string[] {
+    if (!existsSync(this.dir)) return [];
+    return readdirSync(this.dir)
+      .filter(f => f.endsWith('.workflow.json'))
+      .filter(f => {
+        try {
+          const nodes = (JSON.parse(readFileSync(join(this.dir, f), 'utf8')) as { nodes?: { config?: { role?: unknown } }[] }).nodes;
+          return Array.isArray(nodes) && nodes.some(n => n?.config?.role === key);
+        } catch {
+          return false;
+        }
+      })
+      .map(f => f.replace(/\.workflow\.json$/, ''));
+  }
+
   /** Validates, then writes the file (pretty JSON, atomic). */
   save(def: WorkflowDefinition): { hash: string; problems: string[] } {
     const parsed = workflowSchema.parse(def);

@@ -8,6 +8,7 @@ import { ProjectsModule } from '@tesserax/mod-projects';
 import { ReposModule } from '@tesserax/mod-repos';
 import { SkillsModule } from '@tesserax/mod-skills';
 import { TasksModule } from '@tesserax/mod-tasks';
+import { TeamModule } from '@tesserax/mod-team';
 import { TelegramModule } from '@tesserax/mod-telegram';
 import { WorkflowModule, WorkflowStore } from '@tesserax/mod-workflow';
 import { InfraModule } from './infra/infra.module';
@@ -26,6 +27,7 @@ const root = findRepoRoot();
     WorkflowModule,
     ReposModule,
     ProjectsModule,
+    TeamModule.forRoot({ workflowUsage: { usedBy: key => new WorkflowStore().usingRole(key) } }),
     TelegramModule,
   ],
   controllers: [SystemController],

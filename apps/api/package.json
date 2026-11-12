@@ -24,6 +24,7 @@
     "@tesserax/mod-pipeline": "workspace:*",
     "@tesserax/mod-skills": "workspace:*",
     "@tesserax/mod-tasks": "workspace:*",
+    "@tesserax/mod-team": "workspace:*",
     "@tesserax/mod-workflow": "workspace:*",
     "@tesserax/mod-telegram": "workspace:*",
     "kysely": "^0.28.17",
