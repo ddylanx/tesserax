@@ -7,6 +7,7 @@ import { MetricsPage } from './routes/metrics';
 import { RunDetailPage } from './routes/run-detail';
 import { RunsPage } from './routes/runs';
 import { SkillsPage } from './routes/skills';
+import { TeamPage } from './routes/team';
 import { WorkflowEditorPage } from './routes/workflow-editor';
 import { WorkflowsPage } from './routes/workflows';
 import { SystemPage } from './routes/system';
@@ -42,6 +43,7 @@ const workflowsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wo
 const workflowEditorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workflows/$workflowId', component: WorkflowEditorPage });
 const reposRoute = createRoute({ getParentRoute: () => rootRoute, path: '/repos', component: ReposPage });
 const skillsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/skills', component: SkillsPage });
+const teamRoute = createRoute({ getParentRoute: () => rootRoute, path: '/team', component: TeamPage });
 const metricsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/metrics', component: MetricsPage });
 const tasksRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tasks', component: TasksPage });
 const agentsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/agents', component: AgentsPage });
@@ -51,7 +53,7 @@ const projectDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: 
 const systemRoute = createRoute({ getParentRoute: () => rootRoute, path: '/system', component: SystemPage });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, metricsRoute, inboxRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, teamRoute, metricsRoute, inboxRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
 });
 
 declare module '@tanstack/react-router' {
