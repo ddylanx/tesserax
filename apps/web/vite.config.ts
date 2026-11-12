@@ -17,6 +17,7 @@ export default defineConfig({
     host: '127.0.0.1',
     port: Number(process.env.WEB_PORT ?? 5180),
     strictPort: true,
+    allowedHosts: ['tesserax.local'],
     proxy: { '/api': target, '/health': target },
   },
 });
