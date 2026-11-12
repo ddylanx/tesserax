@@ -100,9 +100,9 @@ export function MetricsPage() {
                     <Td>{s.uses}</Td>
                     <Td>
                       <Split parts={[
-                        { n: s.acceptedAsIs, className: 'bg-emerald-500', label: 'as-is' },
-                        { n: s.edited, className: 'bg-amber-500', label: 'edited' },
-                        { n: s.sentBack, className: 'bg-red-500', label: 'sent back' },
+                        { n: s.acceptedAsIs, className: 'bg-success', label: 'as-is' },
+                        { n: s.edited, className: 'bg-warning', label: 'edited' },
+                        { n: s.sentBack, className: 'bg-destructive', label: 'sent back' },
                       ]} />
                     </Td>
                     <Td>{usd(s.avgCostUsd)}</Td>
@@ -123,17 +123,17 @@ export function MetricsPage() {
                     <Td>{n.runs}</Td>
                     <Td>{n.skipped || '–'}</Td>
                     <Td>{n.retries || '–'}</Td>
-                    <Td className={n.failed ? 'text-red-600' : ''}>{n.failed || '–'}</Td>
+                    <Td className={n.failed ? 'text-destructive' : ''}>{n.failed || '–'}</Td>
                     <Td>
                       {n.gate && (
                         <Split parts={[
-                          { n: n.gate.approved, className: 'bg-emerald-500', label: 'approved' },
-                          { n: n.gate.edited, className: 'bg-amber-500', label: 'edited' },
+                          { n: n.gate.approved, className: 'bg-success', label: 'approved' },
+                          { n: n.gate.edited, className: 'bg-warning', label: 'edited' },
                           { n: n.gate.changes, className: 'bg-red-400', label: 'sent back' },
                           { n: n.gate.rejected, className: 'bg-red-700', label: 'rejected' },
                         ]} />
                       )}
-                      {n.review && <Split parts={[{ n: n.review.pass, className: 'bg-emerald-500', label: 'pass' }, { n: n.review.fail, className: 'bg-red-500', label: 'fail' }]} />}
+                      {n.review && <Split parts={[{ n: n.review.pass, className: 'bg-success', label: 'pass' }, { n: n.review.fail, className: 'bg-destructive', label: 'fail' }]} />}
                       {n.gate?.avgWaitMinutes != null && <div className="text-[11px] text-muted-foreground">you took {n.gate.avgWaitMinutes} min on average</div>}
                     </Td>
                     <Td>{fmt(n.avgSeconds, 's')}</Td>

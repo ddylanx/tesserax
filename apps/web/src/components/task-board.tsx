@@ -115,9 +115,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info hover:bg-info/20 transition-colors"
             >
-              <span className="size-1.5 rounded-full bg-sky-500 animate-pulse" />
+              <span className="size-1.5 rounded-full bg-info animate-pulse" />
               Running{run.currentNodeLabel ? ` · ${run.currentNodeLabel}` : ''} →
             </Link>
           )}
@@ -126,9 +126,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-300 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border border-warning/30 bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning hover:bg-warning/20 transition-colors"
             >
-              <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
+              <span className="size-1.5 rounded-full bg-warning animate-pulse" />
               Waiting for you →
             </Link>
           )}
@@ -137,9 +137,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-500/20 dark:text-red-300 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive hover:bg-destructive/20 transition-colors"
             >
-              <span className="size-1.5 rounded-full bg-red-500" />
+              <span className="size-1.5 rounded-full bg-destructive" />
               Failed →
             </Link>
           )}
@@ -336,13 +336,13 @@ export function TaskBoard({
   return (
     <div>
       {error && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+        <div className="mb-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <span>{error}</span>
           {onDismissError && (
             <button
               type="button"
               onClick={onDismissError}
-              className="ml-2 rounded p-0.5 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer"
+              className="ml-2 rounded p-0.5 hover:bg-destructive/20 text-destructive cursor-pointer"
             >
               <X className="size-3.5" />
             </button>

@@ -42,7 +42,7 @@ export function SkillsWorkspace({ renderLocalExtras }: { renderLocalExtras?: (s:
           <Input className="h-7 text-xs" placeholder="new-skill-name" value={newName} onChange={e => setNewName(e.target.value.toLowerCase())} />
           <Button size="sm" disabled={!newName || create.isPending} onClick={() => create.mutate()}><Plus className="size-3" /></Button>
         </div>
-        {create.error && <p className="p-2 text-xs text-red-600">{(create.error as Error).message}</p>}
+        {create.error && <p className="p-2 text-xs text-destructive">{(create.error as Error).message}</p>}
         <PackageList current={pkgSkill} onSelect={setPkgSkill} />
       </Card>
       {pkgSkill ? <PackageSkillView key={`${pkgSkill.id}/${pkgSkill.skill}`} current={pkgSkill} onRemoved={() => setPkgSkill(null)} /> : current ? <SkillEditor key={current} name={current} extras={renderLocalExtras} /> : null}

@@ -166,7 +166,7 @@ export function RunsPage() {
           <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>Clear</Button>
         </div>
       )}
-      {actionError && <p className="whitespace-pre-line text-sm text-red-600">{actionError}</p>}
+      {actionError && <p className="whitespace-pre-line text-sm text-destructive">{actionError}</p>}
 
       {showOnboarding ? (
         <OnboardingChecklist totalRuns={totalRuns} onClose={() => setSearch({})} />
@@ -198,7 +198,7 @@ export function RunsPage() {
                       <span className="inline-flex items-center gap-1.5">
                         {!scopeSelected && <ProjectDot color={r.task.projectColor} name={r.task.projectSlug} />}
                         <Link to="/runs/$runId" params={{ runId: r.id }} className="font-medium hover:underline">{r.task.key}</Link>
-                        {r.task.statusCategory === 'done' && <span className="text-xs text-green-600" title={`Task status: ${r.task.status ?? 'done'}`}>task done</span>}
+                        {r.task.statusCategory === 'done' && <span className="text-xs text-success" title={`Task status: ${r.task.status ?? 'done'}`}>task done</span>}
                       </span>
                       <div className="max-w-xs truncate text-xs text-muted-foreground" title={r.task.title}>{r.task.title}</div>
                     </Td>
@@ -206,7 +206,7 @@ export function RunsPage() {
                       <button type="button" className="hover:underline" title="Show only this workflow" onClick={() => setSearch({ workflow: r.workflowId })}>{r.workflowId}</button>
                     </Td>
                     <Td><Badge variant={RUN_STATUS[r.status]?.variant ?? 'outline'}>{RUN_STATUS[r.status]?.label ?? r.status}</Badge></Td>
-                    <Td className="max-w-[14rem] text-xs">{r.currentNodeLabel ?? '–'}{r.error && <div className="truncate text-red-600" title={r.error}>{r.error}</div>}</Td>
+                    <Td className="max-w-[14rem] text-xs">{r.currentNodeLabel ?? '–'}{r.error && <div className="truncate text-destructive" title={r.error}>{r.error}</div>}</Td>
                     <Td className="text-xs whitespace-nowrap text-muted-foreground">{timeAgo(r.updatedAt)}<div>${r.costUsd.toFixed(2)}</div></Td>
                     <Td>
                       <div className="flex justify-end gap-1 whitespace-nowrap">

@@ -41,14 +41,14 @@ export function WorkplaceSelect({ view, value, onChange, auto, required }: {
 
 /** One line under a picker: where the work really happens. */
 export function WorkplaceInfo({ view, w }: { view: RepoRegistryView | undefined; w: WorkplaceView | null }) {
-  if (!w) return <span className="text-amber-600">No workplace: register the repo on the Repos page, or the run cannot create a worktree.</span>;
+  if (!w) return <span className="text-warning">No workplace: register the repo on the Repos page, or the run cannot create a worktree.</span>;
   const repo = repoOf(view, w);
   return (
     <span className="text-muted-foreground">
       <b className="text-foreground">{w.brand}</b> · {repo?.name} · <code>{w.path}</code>
       {repo?.origin && <> · origin <code>{repo.origin}</code></>}
-      {!w.status.exists && <span className="text-red-600"> · folder missing</span>}
-      {w.status.originMatches === false && <span className="text-red-600"> · this checkout's origin is {w.status.origin}</span>}
+      {!w.status.exists && <span className="text-destructive"> · folder missing</span>}
+      {w.status.originMatches === false && <span className="text-destructive"> · this checkout's origin is {w.status.origin}</span>}
     </span>
   );
 }

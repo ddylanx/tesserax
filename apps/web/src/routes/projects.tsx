@@ -58,7 +58,7 @@ export function ProjectsPage() {
           New project:
           <Input className="w-56" placeholder="name, e.g. Tesserax" value={name} onChange={e => setName(e.target.value)} />
           <Button size="sm" disabled={!slugify(name) || create.isPending} onClick={() => create.mutate()}><Plus className="size-3.5" />Create</Button>
-          {create.error && <span className="text-red-600">{(create.error as Error).message}</span>}
+          {create.error && <span className="text-destructive">{(create.error as Error).message}</span>}
         </CardContent>
       </Card>
     </Page>

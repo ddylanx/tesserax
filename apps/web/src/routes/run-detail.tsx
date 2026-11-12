@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { api } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 import { cn, timeAgo } from '@/lib/utils';
 import { RUN_STATUS } from './runs';
 import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker';
@@ -67,8 +68,8 @@ function LiveStatus({ run, fetchedAt, failing }: { run: WorkflowRunDetail; fetch
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground" title="This page checks the server every 3 seconds">
       <span className="relative flex size-2">
-        {!stale && <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-500 opacity-75" />}
-        <span className={cn('relative inline-flex size-2 rounded-full', stale ? 'bg-red-500' : 'bg-green-500')} />
+        {!stale && <span className="absolute inline-flex size-full animate-ping rounded-full bg-success opacity-75" />}
+        <span className={cn('relative inline-flex size-2 rounded-full', stale ? 'bg-destructive' : 'bg-success')} />
       </span>
       {stale
         ? `No answer from the server for ${mmss(now - fetchedAt)}: the API may be stopped, so this run is not being updated`
@@ -89,6 +90,7 @@ export function RunDetailPage() {
   const { runId } = useParams({ strict: false }) as { runId: string };
   const q = useQuery({ queryKey: ['wf', 'run', runId], queryFn: () => api<WorkflowRunDetail>(`/api/workflow-runs/${runId}`), refetchInterval: 3000 });
   const [selected, setSelected] = useState<string | null>(null);
+  const { theme } = useTheme();
   const r = q.data;
   const [followed, setFollowed] = useState<string | null>(null);
   useEffect(() => {
@@ -157,7 +159,7 @@ export function RunDetailPage() {
             {r.workplace
               ? <span title={`${r.workplace.path}${r.workplace.origin ? `\norigin ${r.workplace.origin}` : ''}`}>workplace: <b>{r.workplace.brand ?? r.task.project}</b> · {r.workplace.repository ?? r.workplace.path.split('/').filter(Boolean).at(-1)}{r.workplace.origin ? <> · <code>{r.workplace.origin.replace(/^.*[:/]([^/:]+\/[^/]+?)(\.git)?$/, '$1')}</code></> : null}</span>
               : r.mappedRepo && <span title={r.mappedRepo}>repo: <b>{r.mappedRepo.split('/').filter(Boolean).at(-1)}</b> ({r.task.project})</span>}
-            {!r.mappedRepo && <span className="text-amber-600">project {r.task.project} has no workplace (Repos page)</span>}
+            {!r.mappedRepo && <span className="text-warning">project {r.task.project} has no workplace (Repos page)</span>}
             {!canChangeWorkflow(r) && <span>workflow {r.workflowId}@{r.workflowHash.slice(0, 7)}</span>}
             <span>cost ${r.costUsd.toFixed(2)}</span>
           </div>
@@ -168,14 +170,14 @@ export function RunDetailPage() {
         </div>
       </div>
       <ChangeWorkflow run={r} />
-      {r.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-700 dark:text-red-400">{r.error}</p>}
-      {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
+      {r.error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">{r.error}</p>}
+      {action.error && <p className="text-sm text-destructive">{(action.error as Error).message}</p>}
 
       <div className="grid min-h-0 flex-1 gap-3 lg:grid-cols-[minmax(0,3fr)_minmax(340px,2fr)]">
         <Card className="h-[420px] overflow-hidden lg:h-auto">
           <ReactFlow
             nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} fitView nodesDraggable={false} nodesConnectable={false} elementsSelectable
-            onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} colorMode="system" minZoom={0.15}
+            onNodeClick={(_, n) => setSelected(n.id)} proOptions={{ hideAttribution: true }} colorMode={theme} minZoom={0.15}
           >
             <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} />
             <Controls showInteractive={false} />
@@ -270,7 +272,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
   const cfg = node.config as { output?: string; show?: string[]; editable?: string[]; instructions?: string; criteria?: string[]; commands?: string[]; skill?: string; skills?: string[] };
   const waiting = last?.status === 'waiting';
   return (
-    <Card className={waiting ? 'border-amber-500/50' : undefined}>
+    <Card className={waiting ? 'border-warning/50' : undefined}>
       <CardHeader>
         <CardTitle>{node.label} <span className="text-xs font-normal text-muted-foreground">({metaOf(node.type).title})</span></CardTitle>
         {(cfg.skill || cfg.skills?.length) && <p className="text-xs text-muted-foreground">skills: {[cfg.skill, ...(cfg.skills ?? [])].filter(Boolean).join(', ')}</p>}
@@ -286,11 +288,11 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
         {waiting && node.type === 'agent.run' && last?.output.choose === true && <ExecutorPicker run={run} error={last.error} />}
         {waiting && node.type === 'pr.comment' && last && <PrCommentPanel run={run} nodeRun={last} />}
         {!waiting && last?.status === 'done' && node.type === 'pr.comment' && typeof last.output.prUrl === 'string' && last.port === 'posted' && (
-          <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Review posted on the PR →</a>
+          <a className="text-sm text-info hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Review posted on the PR →</a>
         )}
         {waiting && node.type === 'agent.run' && typeof last?.output.handoff === 'string' && <HandoffPanel run={run} nodeRun={last} />}
         {!waiting && last?.status === 'done' && typeof last.output.prUrl === 'string' && (
-          <a className="text-sm text-sky-600 hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Pull request #{String(last.output.prId)}{last.output.existingPr ? ' (already open)' : ''} →</a>
+          <a className="text-sm text-info hover:underline" href={last.output.prUrl} target="_blank" rel="noreferrer">Pull request #{String(last.output.prId)}{last.output.existingPr ? ' (already open)' : ''} →</a>
         )}
         {!waiting && last?.status === 'done' && typeof last.output.commentId === 'string' && <p className="text-xs text-muted-foreground">Posted to {String(last.output.issueKey)} (comment {last.output.commentId}).</p>}
         {node.type === 'doc.write' && typeof last?.output.path === 'string' && (
@@ -318,9 +320,9 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>
-                  {typeof n.input.feedback === 'string' && <div className="text-amber-700 dark:text-amber-400">feedback: {n.input.feedback}</div>}
+                  {typeof n.input.feedback === 'string' && <div className="text-warning">feedback: {n.input.feedback}</div>}
                   {n.output.skipped === true && <div className="text-muted-foreground">skipped: {String(n.output.reason)}</div>}
-                  {n.error && <div className="text-red-600">{n.error}</div>}
+                  {n.error && <div className="text-destructive">{n.error}</div>}
                 </li>
               ))}
             </ul>
@@ -341,7 +343,7 @@ function GatePanel({ run, cfg }: { run: WorkflowRunDetail; cfg: { show?: string[
   const changed = Object.fromEntries(Object.entries(edits).filter(([n, c]) => c !== (artifactsOf(run, n)[0]?.content ?? '')));
   return (
     <div className="flex flex-col gap-3">
-      {cfg.instructions && <p className="rounded-md bg-amber-500/10 p-2 text-xs">{cfg.instructions}</p>}
+      {cfg.instructions && <p className="rounded-md bg-warning/10 p-2 text-xs">{cfg.instructions}</p>}
       {(cfg.show ?? []).filter(n => !editable.includes(n)).map(n => <ArtifactView key={n} run={run} name={n} />)}
       {editable.map(n => (
         <MarkdownPanel
@@ -363,7 +365,7 @@ function GatePanel({ run, cfg }: { run: WorkflowRunDetail; cfg: { show?: string[
         </Button>
         <Button variant="ghost" onClick={() => confirm('Reject and close this run?') && action.mutate({ path: 'gate', body: { action: 'rejected', feedback: feedback || undefined } })}>Reject</Button>
       </div>
-      {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
+      {action.error && <p className="text-sm text-destructive">{(action.error as Error).message}</p>}
     </div>
   );
 }
@@ -382,12 +384,12 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
   const isPr = type === 'git.pr';
   return (
     <div className="flex flex-col gap-2">
-      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+      <p className="rounded-md bg-warning/10 p-2 text-xs">
         {isPr
           ? <>After you confirm, branch <code>{o.source}</code> is pushed to the remote and a Bitbucket pull request into <code>{target || o.target}</code> is opened with this title and description. Nothing is merged.</>
           : <>After you confirm, exactly this text is posted as a comment on <b>{run.task.key}</b>. Status, fields and assignee are not changed.</>}
       </p>
-      {nodeRun.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{nodeRun.error}</p>}
+      {nodeRun.error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">{nodeRun.error}</p>}
       {isPr && (
         <>
           <label className="flex flex-col gap-1 text-xs">Title<input className="h-8 rounded-md border bg-background px-2 text-sm" value={title} onChange={e => setTitle(e.target.value)} /></label>
@@ -395,7 +397,7 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
           <div className="text-xs">
             <div className="font-medium">Commits to push ({o.commits?.length ?? 0})</div>
             <ul className="max-h-32 overflow-auto font-mono text-[11px]">{(o.commits ?? []).map(c => <li key={c}>{c}</li>)}</ul>
-            {!!o.uncommitted?.length && <p className="mt-1 text-amber-700 dark:text-amber-400">Not committed, will not be pushed: {o.uncommitted.join(', ')}</p>}
+            {!!o.uncommitted?.length && <p className="mt-1 text-warning">Not committed, will not be pushed: {o.uncommitted.join(', ')}</p>}
           </div>
           <DiffToggle runId={run.id} />
         </>
@@ -413,7 +415,7 @@ function ConfirmPanel({ run, nodeRun, type, output }: { run: WorkflowRunDetail; 
         </Button>
         <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
       </div>
-      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
+      {act.error && <p className="text-sm text-destructive">{(act.error as Error).message}</p>}
     </div>
   );
 }
@@ -430,18 +432,18 @@ function PrCommentPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: Nod
   });
   return (
     <div className="flex flex-col gap-2">
-      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+      <p className="rounded-md bg-warning/10 p-2 text-xs">
         After you confirm, this text is posted as a comment on the pull request {o.prUrl ? <a className="underline" href={o.prUrl} target="_blank" rel="noreferrer">{o.prUrl}</a> : <>for branch <code>{o.source}</code></>}
         {' '}(into <code>{o.target}</code>). Nothing else changes on the PR. Needs BITBUCKET_API_TOKEN in .env; otherwise Skip.
       </p>
-      {nodeRun.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{nodeRun.error}</p>}
+      {nodeRun.error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">{nodeRun.error}</p>}
       <MarkdownPanel title="Text to post" text={text} onChange={setText} maxHeight="max-h-[32rem]" />
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={sure} onChange={e => setSure(e.target.checked)} />Post this review on the PR</label>
       <div className="flex gap-2">
         <Button disabled={!sure || !text.trim() || act.isPending} onClick={() => act.mutate({ action: 'confirm', confirm: true, text })}>Post comment</Button>
         <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ action: 'skip' })}>Skip</Button>
       </div>
-      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
+      {act.error && <p className="text-sm text-destructive">{(act.error as Error).message}</p>}
     </div>
   );
 }
@@ -459,10 +461,10 @@ function ExecutorPicker({ run, error }: { run: WorkflowRunDetail; error: string 
   const group = (kind: 'cli' | 'editor') => (opts.data ?? []).filter(o => o.kind === kind);
   return (
     <div className="flex flex-col gap-3">
-      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+      <p className="rounded-md bg-warning/10 p-2 text-xs">
         Who implements the approved spec? A CLI agent works in the background in the worktree <code>{run.branch}</code>. An editor opens that worktree with the prompt ready, you work with its agent, then click Done here.
       </p>
-      {error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-xs text-red-700 dark:text-red-400">{error}</p>}
+      {error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">{error}</p>}
       {(['cli', 'editor'] as const).map(kind => (
         <div key={kind} className="flex flex-col gap-1.5">
           <div className="text-xs font-medium">{kind === 'cli' ? 'Run in the background (CLI)' : 'Work in an editor'}</div>
@@ -480,7 +482,7 @@ function ExecutorPicker({ run, error }: { run: WorkflowRunDetail; error: string 
         </div>
       ))}
       {pick.isPending && <p className="text-xs text-muted-foreground">Starting…</p>}
-      {pick.error && <p className="text-sm text-red-600">{(pick.error as Error).message}</p>}
+      {pick.error && <p className="text-sm text-destructive">{(pick.error as Error).message}</p>}
       <p className="text-[11px] text-muted-foreground">If the work loops back here (tests or review failed), the same choice is reused.</p>
     </div>
   );
@@ -502,7 +504,7 @@ function RunFrom({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }) 
           Run again from here
         </Button>
       </div>
-      {action.error && <p className="text-xs text-red-600">{(action.error as Error).message}</p>}
+      {action.error && <p className="text-xs text-destructive">{(action.error as Error).message}</p>}
     </div>
   );
 }
@@ -541,8 +543,8 @@ function AgentPicker({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode
       <p className="text-[11px] text-muted-foreground">
         Only this run changes; the workflow keeps {agentTitle(fromWorkflow)}. Used the next time this step starts (also a retry or a loop back).
       </p>
-      {set.error && <p className="text-xs text-red-600">{(set.error as Error).message}</p>}
-      {action.error && <p className="text-xs text-red-600">{(action.error as Error).message}</p>}
+      {set.error && <p className="text-xs text-destructive">{(set.error as Error).message}</p>}
+      {action.error && <p className="text-xs text-destructive">{(action.error as Error).message}</p>}
     </div>
   );
 }
@@ -578,7 +580,7 @@ function ModelPicker({ run, node, cli, sameAgent }: { run: WorkflowRunDetail; no
         <datalist id={listId}>{AI_MODEL_SUGGESTIONS[cli].map(m => <option key={m} value={m} />)}</datalist>
         {override && <Button size="sm" variant="ghost" disabled={set.isPending} onClick={() => set.mutate(null)}>Reset</Button>}
       </label>
-      {set.error && <p className="text-xs text-red-600">{(set.error as Error).message}</p>}
+      {set.error && <p className="text-xs text-destructive">{(set.error as Error).message}</p>}
     </div>
   );
 }
@@ -596,7 +598,7 @@ function HandoffPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: NodeR
   const copy = () => navigator.clipboard.writeText(o.prompt ?? '').then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); });
   return (
     <div className="flex flex-col gap-2">
-      <p className="rounded-md bg-amber-500/10 p-2 text-xs">
+      <p className="rounded-md bg-warning/10 p-2 text-xs">
         Opened in <b>{o.handoff.replace('editor:', '')}</b>: <code className="break-all">{o.worktree}</code> (branch <code>{run.branch}</code>).
         Paste the prompt into its agent, work until it is done, commit on this branch if you can, then click <b>Done</b>.
       </p>
@@ -612,7 +614,7 @@ function HandoffPanel({ run, nodeRun }: { run: WorkflowRunDetail; nodeRun: NodeR
         <Button variant="outline" disabled={act.isPending} onClick={() => act.mutate({ path: 'reopen' })}>Open again</Button>
         <Button variant="ghost" disabled={act.isPending} onClick={() => act.mutate({ path: 'finish', body: { outcome: 'failed', note: note || undefined } })}>Couldn't finish</Button>
       </div>
-      {act.error && <p className="text-sm text-red-600">{(act.error as Error).message}</p>}
+      {act.error && <p className="text-sm text-destructive">{(act.error as Error).message}</p>}
     </div>
   );
 }
@@ -636,7 +638,7 @@ function EvaluatePanel({ run, criteria }: { run: WorkflowRunDetail; criteria: st
       ))}
       <textarea className="min-h-16 rounded-md border bg-background p-2 text-sm" placeholder="Note (what worked, what to improve in the skills/workflow)" value={note} onChange={e => setNote(e.target.value)} />
       <Button disabled={!complete || action.isPending} onClick={() => action.mutate({ path: 'evaluate', body: { scores, note: note || undefined } })}>Save score and finish</Button>
-      {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
+      {action.error && <p className="text-sm text-destructive">{(action.error as Error).message}</p>}
     </div>
   );
 }
@@ -650,7 +652,7 @@ function DiffToggle({ runId }: { runId: string }) {
       {open && (
         <pre className="mt-2 max-h-96 overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-4">
           {q.isLoading ? 'Loading…' : !q.data?.patch ? 'No changes.' : q.data.patch.split('\n').map((l, i) => (
-            <div key={i} className={l.startsWith('+') && !l.startsWith('+++') ? 'text-emerald-700 dark:text-emerald-400' : l.startsWith('-') && !l.startsWith('---') ? 'text-red-700 dark:text-red-400' : l.startsWith('@@') ? 'text-sky-600' : ''}>{l || ' '}</div>
+            <div key={i} className={l.startsWith('+') && !l.startsWith('+++') ? 'text-success' : l.startsWith('-') && !l.startsWith('---') ? 'text-destructive' : l.startsWith('@@') ? 'text-info' : ''}>{l || ' '}</div>
           ))}
         </pre>
       )}

@@ -1,5 +1,6 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { BarChart3, Bot, Boxes, FolderGit2, Layers, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
+import { ThemeToggle } from '@/components/theme-toggle';
 import { Select } from '@/components/ui/input';
 import { ProjectDot, ProjectProvider, useProjectScope } from '@/lib/project-context';
 
@@ -40,20 +41,21 @@ export function Layout() {
 function Shell() {
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <aside className="flex shrink-0 items-center gap-1 border-b bg-card px-3 py-2 md:w-52 md:flex-col md:items-stretch md:border-r md:border-b-0 md:py-4">
+      <aside className="flex shrink-0 items-center gap-1 border-b border-sidebar-border bg-sidebar px-3 py-2 text-sidebar-foreground md:w-52 md:flex-col md:items-stretch md:border-r md:border-b-0 md:py-4">
         <div className="mr-3 px-2 text-sm font-semibold md:mr-0 md:mb-2">Tesserax</div>
         <ProjectPicker />
         {nav.map(({ to, label, icon: Icon }) => (
           <Link
             key={to}
             to={to}
-            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-            activeProps={{ className: 'bg-accent !text-foreground font-medium' }}
+            className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-foreground"
+            activeProps={{ className: 'bg-sidebar-accent !text-foreground font-medium' }}
           >
             <Icon className="size-4" />
             <span className="hidden sm:inline">{label}</span>
           </Link>
         ))}
+        <ThemeToggle className="ml-auto md:mt-auto md:ml-0 md:self-start" />
       </aside>
       <main className="min-w-0 flex-1">
         <Outlet />

@@ -90,7 +90,7 @@ function renderStatusBadge(statusCategory: 'todo' | 'in_progress' | 'done', stat
   if (statusCategory === 'in_progress') {
     return (
       <Badge variant="blue" className="font-semibold gap-1.5 text-xs py-0.5">
-        <span className="size-1.5 rounded-full bg-sky-500 animate-pulse" />
+        <span className="size-1.5 rounded-full bg-info animate-pulse" />
         {statusName ?? 'In progress'}
       </Badge>
     );
@@ -98,7 +98,7 @@ function renderStatusBadge(statusCategory: 'todo' | 'in_progress' | 'done', stat
   if (statusCategory === 'done') {
     return (
       <Badge variant="green" className="font-semibold gap-1.5 text-xs py-0.5">
-        <span className="size-1.5 rounded-full bg-emerald-500" />
+        <span className="size-1.5 rounded-full bg-success" />
         {statusName ?? 'Done'}
       </Badge>
     );
@@ -400,7 +400,7 @@ export function TasksPage() {
           ? d.sources.map(s => (
               <span key={s.id} className="mr-3">
                 {s.kind} · {s.name} ({s.projectSlug}): {s.taskCount} open, synced {timeAgo(s.lastSyncedAt)}
-                {s.lastError && <span className="text-red-600"> · last error: {s.lastError}</span>}
+                {s.lastError && <span className="text-destructive"> · last error: {s.lastError}</span>}
               </span>
             ))
           : 'Read-only tasks from Jira Cloud.'
@@ -484,10 +484,10 @@ export function TasksPage() {
                 onClick={() => set('source')('jira')}
                 className={cn(
                   'flex items-center gap-1.5 rounded px-2.5 py-1 font-medium transition-all cursor-pointer',
-                  f.source === 'jira' ? 'bg-sky-500/15 text-sky-700 dark:text-sky-300 shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
+                  f.source === 'jira' ? 'bg-info/15 text-info shadow-2xs font-semibold' : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <Building2 className="size-3.5 text-sky-600 dark:text-sky-400" />
+                <Building2 className="size-3.5 text-info" />
                 Office (Jira)
               </button>
               <button
@@ -667,7 +667,7 @@ export function TasksPage() {
                     <div className="flex flex-col gap-1 items-start">
                       {t.url ? (
                         <a
-                          className="inline-flex items-center gap-1 font-mono font-medium text-sky-600 dark:text-sky-400 hover:underline"
+                          className="inline-flex items-center gap-1 font-mono font-medium text-info hover:underline"
                           href={t.url}
                           target="_blank"
                           rel="noreferrer"
@@ -704,7 +704,7 @@ export function TasksPage() {
                     <div>
                       <span className="font-medium text-foreground">{t.title}</span>
                       {t.archived && (
-                        <Badge variant="outline" className="ml-2 text-[10px] text-amber-600 border-amber-500/30 bg-amber-500/5">
+                        <Badge variant="outline" className="ml-2 text-[10px] text-warning border-warning/30 bg-warning/5">
                           archived
                         </Badge>
                       )}
@@ -734,9 +734,9 @@ export function TasksPage() {
                         <Link
                           to="/runs/$runId"
                           params={{ runId: r.id }}
-                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 transition-colors"
+                          className="mt-1.5 inline-flex items-center gap-1.5 rounded-md border border-info/30 bg-info/10 px-2 py-0.5 text-xs font-medium text-info hover:bg-info/20 transition-colors"
                         >
-                          <span className="size-1.5 rounded-full bg-sky-500 animate-ping" />
+                          <span className="size-1.5 rounded-full bg-info animate-ping" />
                           run: <span className="font-semibold">{r.workflowId}</span> · {r.status}
                           {r.currentNodeLabel ? ` · ${r.currentNodeLabel}` : ''} →
                         </Link>
@@ -755,8 +755,8 @@ export function TasksPage() {
                             onChange={e => updateStatus.mutate({ id: t.id, statusCategory: e.target.value as 'todo' | 'in_progress' | 'done' })}
                             className={cn(
                               'appearance-none cursor-pointer rounded-md border text-xs font-semibold py-0.5 pl-5 pr-5 outline-none transition-colors shadow-2xs',
-                              t.statusCategory === 'in_progress' && 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400 hover:bg-sky-500/20',
-                              t.statusCategory === 'done' && 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-500/20',
+                              t.statusCategory === 'in_progress' && 'border-info/30 bg-info/10 text-info hover:bg-info/20',
+                              t.statusCategory === 'done' && 'border-success/30 bg-success/10 text-success hover:bg-success/20',
                               t.statusCategory === 'todo' && 'border-border bg-muted/70 text-foreground hover:bg-muted'
                             )}
                             title="Click to update local task status"
@@ -768,8 +768,8 @@ export function TasksPage() {
                           <span
                             className={cn(
                               'pointer-events-none absolute left-2 size-1.5 rounded-full',
-                              t.statusCategory === 'in_progress' && 'bg-sky-500 animate-pulse',
-                              t.statusCategory === 'done' && 'bg-emerald-500',
+                              t.statusCategory === 'in_progress' && 'bg-info animate-pulse',
+                              t.statusCategory === 'done' && 'bg-success',
                               t.statusCategory === 'todo' && 'bg-muted-foreground/60'
                             )}
                           />

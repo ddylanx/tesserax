@@ -109,10 +109,10 @@ export function OnboardingChecklist({
 
       <div className="grid gap-4">
         {/* Step 1: Environment */}
-        <Card className={step1Done ? 'border-emerald-500/40 bg-emerald-500/5' : ''}>
+        <Card className={step1Done ? 'border-success/40 bg-success/5' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
-              {step1Done ? <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+              {step1Done ? <CheckCircle2 className="h-5 w-5 text-success" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
               <CardTitle>1. Environment check</CardTitle>
             </div>
             {step1Done && <Badge variant="green">Ready</Badge>}
@@ -147,10 +147,10 @@ export function OnboardingChecklist({
         </Card>
 
         {/* Step 2: Repository */}
-        <Card className={step2Done ? 'border-emerald-500/40 bg-emerald-500/5' : ''}>
+        <Card className={step2Done ? 'border-success/40 bg-success/5' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
-              {step2Done ? <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+              {step2Done ? <CheckCircle2 className="h-5 w-5 text-success" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
               <CardTitle>2. Add a repository</CardTitle>
             </div>
             {step2Done && <Badge variant="green">Ready</Badge>}
@@ -174,16 +174,16 @@ export function OnboardingChecklist({
               </Link>
             </div>
             {demoRepoMutation.error && (
-              <p className="text-xs text-red-600">Failed to create demo repo: {(demoRepoMutation.error as Error).message}</p>
+              <p className="text-xs text-destructive">Failed to create demo repo: {(demoRepoMutation.error as Error).message}</p>
             )}
           </CardContent>
         </Card>
 
         {/* Step 3: First Task */}
-        <Card className={step3Done ? 'border-emerald-500/40 bg-emerald-500/5' : ''}>
+        <Card className={step3Done ? 'border-success/40 bg-success/5' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
-              {step3Done ? <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+              {step3Done ? <CheckCircle2 className="h-5 w-5 text-success" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
               <CardTitle>3. Create your first task</CardTitle>
             </div>
             {step3Done && <Badge variant="green">Ready</Badge>}
@@ -216,16 +216,16 @@ export function OnboardingChecklist({
               </Button>
             </div>
             {createTaskMutation.error && (
-              <p className="text-xs text-red-600">Failed to create task: {(createTaskMutation.error as Error).message}</p>
+              <p className="text-xs text-destructive">Failed to create task: {(createTaskMutation.error as Error).message}</p>
             )}
           </CardContent>
         </Card>
 
         {/* Step 4: Run default workflow */}
-        <Card className={step4Done ? 'border-emerald-500/40 bg-emerald-500/5' : ''}>
+        <Card className={step4Done ? 'border-success/40 bg-success/5' : ''}>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <div className="flex items-center gap-2">
-              {step4Done ? <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
+              {step4Done ? <CheckCircle2 className="h-5 w-5 text-success" /> : <Circle className="h-5 w-5 text-muted-foreground" />}
               <CardTitle>4. Run default workflow</CardTitle>
             </div>
             {step4Done && <Badge variant="green">Ready</Badge>}
@@ -248,7 +248,7 @@ export function OnboardingChecklist({
               )}
             </div>
             {runWorkflowMutation.error && (
-              <p className="text-xs text-red-600">Failed to start workflow: {(runWorkflowMutation.error as Error).message}</p>
+              <p className="text-xs text-destructive">Failed to start workflow: {(runWorkflowMutation.error as Error).message}</p>
             )}
           </CardContent>
         </Card>

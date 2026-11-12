@@ -69,7 +69,7 @@ function InstallForm() {
       <Button size="sm" disabled={!source.trim() || install.isPending} onClick={() => install.mutate()}>
         <Download className="size-3" />{install.isPending ? 'Installing…' : 'Install package'}
       </Button>
-      {install.error && <p className="text-xs text-red-600">{(install.error as Error).message}</p>}
+      {install.error && <p className="text-xs text-destructive">{(install.error as Error).message}</p>}
     </div>
   );
 }
@@ -128,7 +128,7 @@ export function PackageSkillView({ current, onRemoved }: { current: PackageSkill
           <div>Source <a className="underline" href={pkg.source.replace(/\.git$/, '')} target="_blank" rel="noreferrer">{pkg.source}</a>{pkg.ref ? ` @ ${pkg.ref}` : ''} · commit <code>{pkg.commit.slice(0, 7)}</code> · updated {new Date(pkg.updatedAt).toLocaleString()}</div>
           <div>{pkg.usedBy.length ? <>Used by workflow {pkg.usedBy.join(', ')}</> : 'Not used by any workflow yet. Pick its skills in a node (e.g. AI review) in the workflow editor.'}</div>
           {update.data && <div className="text-foreground">{update.data.changed ? `Updated to ${update.data.commit.slice(0, 7)}.` : 'Already up to date.'}</div>}
-          {error && <p className="text-red-600">{(error as Error).message}</p>}
+          {error && <p className="text-destructive">{(error as Error).message}</p>}
         </CardContent>
       </Card>
       <Card>

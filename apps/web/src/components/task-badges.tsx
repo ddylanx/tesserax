@@ -46,7 +46,7 @@ export function renderPriorityBadge(priority: string | null) {
   if (p.includes('med')) {
     return (
       <Badge variant="amber" className="text-[11px] font-medium gap-1 px-1.5 py-0.5">
-        <AlertCircle className="size-3 text-amber-500" />
+        <AlertCircle className="size-3 text-warning" />
         {priority}
       </Badge>
     );

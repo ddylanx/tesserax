@@ -186,7 +186,7 @@ function Settings({ project }: { project: Project }) {
           />
           <PickList title="Workflows" hint="enabled here" value={s.workflows} options={(workflows.data ?? []).map(w => ({ id: w.id, label: w.name }))} onChange={v => setS({ ...s, workflows: v })} />
           <PickList title="Skills" hint="enabled here" value={s.skills} options={(skills.data ?? []).map(k => ({ id: k.path, label: k.name }))} onChange={v => setS({ ...s, skills: v })} />
-          {missing.length > 0 && <p className="text-xs text-red-600 md:col-span-3">Workplaces removed from Repos: {missing.join(', ')}. New runs of this project will not start until you fix this.</p>}
+          {missing.length > 0 && <p className="text-xs text-destructive md:col-span-3">Workplaces removed from Repos: {missing.join(', ')}. New runs of this project will not start until you fix this.</p>}
           <p className="text-xs text-muted-foreground md:col-span-3">Which workflow a task starts is set on the Workflows page, for the project picked in the top bar.</p>
         </CardContent>
       </Card>
@@ -218,7 +218,7 @@ function Settings({ project }: { project: Project }) {
         </CardHeader>
         <CardContent className="flex flex-col gap-2 text-sm">
           {suggestMsg && (
-            <p className={`text-xs ${suggestMsg.isError ? 'text-destructive text-red-600' : 'text-emerald-600'}`}>
+            <p className={`text-xs ${suggestMsg.isError ? 'text-destructive' : 'text-success'}`}>
               {suggestMsg.text}
             </p>
           )}
@@ -237,8 +237,8 @@ function Settings({ project }: { project: Project }) {
         {!project.isDefault && (
           <Button size="sm" variant="outline" disabled={remove.isPending} onClick={() => confirm(`Delete "${project.name}"? Its tasks move to the default project.`) && remove.mutate()}><Trash2 className="size-3.5" />Delete</Button>
         )}
-        {save.isSuccess && <span className="text-xs text-emerald-600">Saved.</span>}
-        {(save.error || remove.error) && <span className="text-sm text-red-600">{String(((save.error ?? remove.error) as Error).message)}</span>}
+        {save.isSuccess && <span className="text-xs text-success">Saved.</span>}
+        {(save.error || remove.error) && <span className="text-sm text-destructive">{String(((save.error ?? remove.error) as Error).message)}</span>}
       </div>
     </div>
   );

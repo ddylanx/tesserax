@@ -43,7 +43,7 @@ export function WorkflowsPage() {
           New workflow (copy of default):
           <Input className="w-56" placeholder="id, e.g. bugfix" value={id} onChange={e => setId(e.target.value.toLowerCase())} />
           <Button size="sm" disabled={!id || create.isPending} onClick={() => create.mutate()}><Plus className="size-3.5" />Create</Button>
-          {create.error && <span className="text-red-600">{(create.error as Error).message}</span>}
+          {create.error && <span className="text-destructive">{(create.error as Error).message}</span>}
         </CardContent>
       </Card>
       {q.data && <RoutingEditor key={scope.selected} project={scope.selected} workflows={q.data.map(w => ({ id: w.id, name: w.name }))} />}
@@ -94,7 +94,7 @@ function RoutingEditor({ workflows, project }: { workflows: { id: string; name: 
           </Button>
           <Button size="sm" disabled={!draft || save.isPending} onClick={() => save.mutate()}><Save className="size-3" />Save</Button>
         </div>
-        {save.error && <p className="text-sm text-red-600">{(save.error as Error).message}</p>}
+        {save.error && <p className="text-sm text-destructive">{(save.error as Error).message}</p>}
         <p className="text-xs text-muted-foreground">Saved to workflows/routing.json. The AI type is not known yet when a run starts; use a Classify node and skip rules inside a workflow for that.</p>
       </CardContent>
     </Card>

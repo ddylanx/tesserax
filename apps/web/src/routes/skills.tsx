@@ -39,9 +39,9 @@ function TrySkill({ name, dirty }: { name: string; dirty: boolean }) {
         <textarea className="min-h-20 rounded-md border bg-background p-2 font-mono text-xs" value={prompt} onChange={e => setPrompt(e.target.value)} />
         <div className="flex items-center gap-2">
           <Button size="sm" disabled={!taskId || run.isPending} onClick={() => run.mutate()}><Play className="size-3.5" />{run.isPending ? 'Running… (can take a minute)' : 'Run'}</Button>
-          {dirty && <span className="text-xs text-amber-600">Save first: the saved version is what runs.</span>}
+          {dirty && <span className="text-xs text-warning">Save first: the saved version is what runs.</span>}
         </div>
-        {run.error && <p className="text-sm text-red-600">{(run.error as Error).message}</p>}
+        {run.error && <p className="text-sm text-destructive">{(run.error as Error).message}</p>}
         {run.data && (
           <>
             <p className="text-xs text-muted-foreground">{run.data.seconds}s · {run.data.costUsd != null ? `$${run.data.costUsd.toFixed(3)}` : ''} · ran in {run.data.cwd}</p>
