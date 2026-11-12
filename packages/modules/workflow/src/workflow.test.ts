@@ -7,6 +7,9 @@ import { buildShellEnv, renderShellTemplate, renderTemplate, withSkills } from '
 import { WorkflowStore } from './stores';
 import { LocalSkillStore } from '@tesserax/mod-skills';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const root = join(__dirname, '../../../..');
 
 test('the shipped default workflow is valid and its skills exist', () => {
@@ -79,7 +82,7 @@ test('renderShellTemplate parameterizes shell commands into TX_* environment var
   assert.equal(env.TX_ISSUE_TITLE, 'Fix bug; drop db');
 });
 
-test('checkCommand throws FatalNodeError when project.test_command is missing or empty', async () => {
+test('checkCommand throws FatalNodeError when project.test_command is missing or empty', { skip: onWindows('runs shell commands through /bin/sh') }, async () => {
   const { EXECUTORS } = await import('./executors');
   const { FatalNodeError } = await import('./executors/types');
   const checkExecutor = EXECUTORS['check.command']!;

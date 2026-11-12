@@ -2,7 +2,10 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { defaultOnPath, detectEnvironment } from './system.controller';
 
-test('detectEnvironment: Case 1 - Postgres ok, git on PATH, claude binary and ~/.claude.json exist', () => {
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
+test('detectEnvironment: Case 1 - Postgres ok, git on PATH, claude binary and ~/.claude.json exist', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, () => {
   const env = detectEnvironment('ok', {
     home: '/mock/home',
     path: '/usr/bin:/bin',

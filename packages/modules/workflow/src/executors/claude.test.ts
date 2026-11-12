@@ -5,9 +5,12 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { askClaude } from './claude';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const FAKE = join(__dirname, '../../../../../scripts/fake-claude.mjs');
 
-test('askClaude creates ephemeral mcp.json with mode 0600 and cleans it up after run', async () => {
+test('askClaude creates ephemeral mcp.json with mode 0600 and cleans it up after run', { skip: onWindows('checks POSIX file mode 0600 on a spawned fake CLI') }, async () => {
   const r = await askClaude({
     bin: FAKE,
     cwd: __dirname,

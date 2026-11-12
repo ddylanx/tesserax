@@ -5,6 +5,9 @@ import type { TaskDetailDto } from '@tesserax/contracts';
 import { ClaudeCliClassifier, buildClassifyPrompt, extractJson } from './claude-cli.classifier';
 import { cleanEnv, detectSignal, runClaude } from '@tesserax/agent-runtime';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const FAKE = join(__dirname, '../../../../scripts/fake-claude.mjs');
 const task: TaskDetailDto = {
   id: '1', projectSlug: 'company', source: 'jira', key: 'DEMO-1', title: 'Login fails on Safari', status: 'To Do', statusCategory: 'todo',
@@ -49,13 +52,13 @@ test('extractJson tolerates code fences', () => {
   assert.deepEqual(extractJson('Sure:\n```json\n{"a":1}\n```'), { a: 1 });
 });
 
-test('classifier parses and validates the CLI reply', async () => {
+test('classifier parses and validates the CLI reply', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   const c = await new ClaudeCliClassifier({ bin: FAKE }).classify(ctx);
   assert.equal(c.type, 'bug');
   assert.equal(c.playbook, 'investigate-bug');
 });
 
-test('classifier rejects an invalid reply (falls back upstream)', async () => {
+test('classifier rejects an invalid reply (falls back upstream)', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   process.env.FAKE_CLAUDE_MODE = 'invalid';
   try {
     await assert.rejects(new ClaudeCliClassifier({ bin: FAKE }).classify(ctx), /No JSON object/);
@@ -65,13 +68,13 @@ test('classifier rejects an invalid reply (falls back upstream)', async () => {
 });
 
 for (const [mode, signal] of [['auth', 'auth'], ['quota', 'quota'], ['crash', 'no_output']] as const) {
-  test(`signal: ${mode}`, async () => {
+  test(`signal: ${mode}`, { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
     const r = await runClaude({ bin: FAKE, args: ['-p'], cwd: __dirname, stdin: 'x', timeoutMs: 10_000, env: { FAKE_CLAUDE_MODE: mode } });
     assert.equal(r.signal, signal);
   });
 }
 
-test('a CLI that prints its result but never exits is stopped, not a timeout', async () => {
+test('a CLI that prints its result but never exits is stopped, not a timeout', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   const r = await runClaude({ bin: FAKE, args: ['-p'], cwd: __dirname, stdin: 'Classify the issue below', timeoutMs: 20_000, env: { FAKE_CLAUDE_MODE: 'hang' } });
   assert.equal(r.signal, 'ok');
   assert.equal(r.timedOut, false);

@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { test } from 'node:test';
 import { RepoRegistryStore, detectRepoStack, normalizeOrigin } from './store';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 // checkouts must live in the home folder (same rule as the app), so the fixtures go there
 const sandbox = () => {
   const root = mkdtempSync(join(homedir(), '.ot-repos-test-'));
@@ -37,7 +40,7 @@ test('legacy config/repos.json becomes one repository with a workplace per proje
   assert.equal(store.resolve({ project: 'TC' })?.path, b);
 });
 
-test('a task resolves to its picked workplace, else the one for its project; status checks the origin', async t => {
+test('a task resolves to its picked workplace, else the one for its project; status checks the origin', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async t => {
   const { root, checkout, store } = sandbox();
   t.after(() => execFileSync('rm', ['-rf', root]));
   const main = checkout('shop', 'git@bitbucket.org:acme/shop-core.git');
@@ -63,7 +66,7 @@ test('a task resolves to its picked workplace, else the one for its project; sta
   assert.throws(() => store.saveWorkplace({ id: 'y', repositoryId: 'nope', brand: 'Y', path: main }), /Unknown repository/);
 });
 
-test('detectRepoStack identifies stack from repository manifest files', () => {
+test('detectRepoStack identifies stack from repository manifest files', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, () => {
   const root = mkdtempSync(join(homedir(), '.ot-repos-stack-test-'));
   const store = new RepoRegistryStore(join(root, 'workplaces.json'), join(root, 'repos.json'));
   try {
@@ -155,7 +158,7 @@ test('detectRepoStack identifies stack from repository manifest files', () => {
   }
 });
 
-test('createDemoRepo creates repository and workplace in workplaces.json and is idempotent', async t => {
+test('createDemoRepo creates repository and workplace in workplaces.json and is idempotent', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async t => {
   const { root, checkout, store } = sandbox();
   t.after(() => execFileSync('rm', ['-rf', root]));
   const demoPath = checkout('demo-repo', 'https://github.com/example/demo');
