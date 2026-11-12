@@ -283,6 +283,14 @@ export function validateWorkflow(w: WorkflowDefinition): string[] {
   return problems;
 }
 
+/** Nodes naming a Team role that does not exist (shown as problems; runs of such a node fail). */
+export function roleProblems(w: Pick<WorkflowDefinition, 'nodes'>, knownRoles: readonly string[]): string[] {
+  return w.nodes.flatMap(n => {
+    const role = (n.config as { role?: unknown } | undefined)?.role;
+    return typeof role === 'string' && role && !knownRoles.includes(role) ? [`Node "${n.label}" uses unknown role "${role}"`] : [];
+  });
+}
+
 // ---------- routing: which workflow a ticket starts ----------
 
 export const routingSchema = z.object({

@@ -125,6 +125,8 @@ export type RoleChange = z.infer<typeof roleChangeSchema>;
 export interface RoleLookup {
   /** null when no role has that key. */
   getByKey(key: string): Promise<Role | null>;
+  /** Keys of every role (enabled or not). */
+  keys(): Promise<string[]>;
 }
 
 /** What the team module asks of the workflow module (bound to the token WORKFLOW_USAGE). */

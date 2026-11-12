@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { containsSecret, nodeConfigSchemas, projectSettingsSchema, roleConfigSchema, roleInScope, saveRoleSchema } from './index';
+import { containsSecret, nodeConfigSchemas, projectSettingsSchema, roleConfigSchema, roleInScope, roleProblems, saveRoleSchema } from './index';
 
 const ok = (v: unknown) => roleConfigSchema.safeParse(v).success;
 
@@ -64,4 +64,13 @@ test('nodes can name a role; projects can limit roles', () => {
   const some = { settings: projectSettingsSchema.parse({ roles: ['qa/reviewer'] }) };
   assert.equal(roleInScope(some, 'qa/reviewer'), true);
   assert.equal(roleInScope(some, 'docs/tech-writer'), false);
+});
+
+test('workflow nodes naming an unknown role are reported', () => {
+  const nodes = [
+    { id: 'a', type: 'ai.step', label: 'Plan', config: { role: 'qa/reviewer' } },
+    { id: 'b', type: 'agent.run', label: 'Build', config: { role: 'engineering/ghost' } },
+    { id: 'c', type: 'human.gate', label: 'Gate', config: {} },
+  ] as never;
+  assert.deepEqual(roleProblems({ nodes }, ['qa/reviewer']), ['Node "Build" uses unknown role "engineering/ghost"']);
 });

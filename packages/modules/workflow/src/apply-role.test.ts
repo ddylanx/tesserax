@@ -12,7 +12,7 @@ const role = (over: Partial<Role> = {}): Role => ({
   prompt: 'Follow the conventions.', config: { engine: 'claude', model: 'sonnet', skills: ['skills/tdd/SKILL.md'], maxBudgetUsd: 3, timeoutSeconds: 1200 },
   position: 0, hash: 'abc123abc123', problems: [], usedBy: [], ...over,
 });
-const lookup = (r: Role | null) => ({ getByKey: async (key: string) => (r && r.key === key ? r : null) });
+const lookup = (r: Role | null) => ({ getByKey: async (key: string) => (r && r.key === key ? r : null), keys: async () => (r ? [r.key] : []) });
 const step = (config: Record<string, unknown>) => ({ type: 'ai.step' as const, config: { prompt: 'Do it', output: 'analysis', role: 'engineering/backend-dev', ...config } });
 
 test('the role fills what the node leaves unset; a field set in the node wins', async () => {

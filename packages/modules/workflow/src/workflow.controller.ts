@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { AppConfig } from '@tesserax/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
-  routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
+  roleProblems, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
 import { CONFIG, DB, ROLE_LOOKUP } from '@tesserax/core';
 import type { RoleLookup } from '@tesserax/contracts';
@@ -46,7 +46,7 @@ export class WorkflowController {
     @Inject(DB) private readonly db: Db,
     classifier: ClassificationService,
     @Optional() private readonly mcp?: McpService,
-    @Optional() @Inject(ROLE_LOOKUP) roles?: RoleLookup,
+    @Optional() @Inject(ROLE_LOOKUP) private readonly roles?: RoleLookup,
   ) {
     this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp, roles);
   }
@@ -215,14 +215,31 @@ export class WorkflowController {
     });
   }
 
+  /** Role keys the workflows can name; null when the Team module is not loaded (then role problems are not reported). */
+  private async roleKeys(): Promise<string[] | null> {
+    return this.roles ? this.roles.keys() : null;
+  }
+
   @Get('workflows')
-  workflows() {
-    return this.engine.workflows.list();
+  async workflows() {
+    const keys = await this.roleKeys();
+    return this.engine.workflows.list().map(w => {
+      if (!keys || !w.hash) return w;
+      try {
+        return { ...w, problems: [...w.problems, ...roleProblems(this.engine.workflows.load(w.id).def, keys)] };
+      } catch {
+        return w;
+      }
+    });
   }
 
   @Get('workflows/:id')
   workflow(@Param('id') id: string) {
-    return guard(async () => this.engine.workflows.load(id));
+    return guard(async () => {
+      const w = this.engine.workflows.load(id);
+      const keys = await this.roleKeys();
+      return keys ? { ...w, problems: [...w.problems, ...roleProblems(w.def, keys)] } : w;
+    });
   }
 
   @Get('workflow-runs')

@@ -132,6 +132,10 @@ export class TeamService implements RoleLookup, OnModuleInit {
     return (await this.load()).roles.find(r => r.key === key) ?? null;
   }
 
+  async keys(): Promise<string[]> {
+    return (await this.load()).roles.map(r => r.key);
+  }
+
   async getRole(id: string): Promise<Role> {
     const role = (await this.load()).roles.find(r => r.id === id);
     if (!role) throw new NotFoundException('Role not found');
