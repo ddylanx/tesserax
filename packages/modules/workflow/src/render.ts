@@ -114,6 +114,12 @@ export function renderTemplate(template: string, c: RenderContext): string {
   });
 }
 
+/** The Team role's instructions go first, before the skills and the task prompt. */
+export function withRole(role: { title: string; prompt: string } | null | undefined, prompt: string): string {
+  if (!role?.prompt.trim()) return prompt;
+  return [`# Role: ${role.title}\n\n${role.prompt.trim()}`, prompt].join('\n\n---\n\n');
+}
+
 /** Skill instructions first, then the task-specific prompt. */
 export function withSkills(prompt: string, skills: { name: string; body: string }[]): string {
   if (!skills.length) return prompt;

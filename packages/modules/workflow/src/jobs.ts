@@ -1,5 +1,5 @@
 import type { AppConfig } from '@tesserax/config';
-import { MODEL_NODE_TYPES, nodeConfigSchemas, type NodeType } from '@tesserax/contracts';
+import { nodeConfigSchemas, type NodeType, type RoleLookup } from '@tesserax/contracts';
 import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { diffInfo, isAlive, readOutcome, resultModel, stopProcess } from '@tesserax/agent-runtime';
@@ -11,6 +11,7 @@ import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
 import { projectSkills } from './project-skills';
+import { applyRunOverrides, resolveRole } from './apply-role';
 import type { SkillCatalog } from '@tesserax/mod-skills';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -27,6 +28,8 @@ export interface JobDeps {
   config: AppConfig;
   queue: Queue;
   mcp?: McpService;
+  /** Team roles (ROLE_LOOKUP); without it a node that names a role fails. */
+  roles?: RoleLookup;
 }
 
 /** Node runs executing in this process right now (to tell them apart from ones orphaned by a restart). */
@@ -65,8 +68,6 @@ export async function runNodeJob(d: JobDeps, data: { nodeRunId: string }, meta: 
   }
 }
 
-const hasModel = (type: string) => (MODEL_NODE_TYPES as readonly string[]).includes(type);
-
 async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string }, meta: JobMeta) {
   const nr = await d.db
     .updateTable('node_runs')
@@ -84,18 +85,12 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if (!executor) throw new FatalNodeError(`No executor for node type ${node.type}`);
     const task = await d.tasks.getTask(run.task_id);
     if (!task) throw new FatalNodeError('The task no longer exists');
-    const config = nodeConfigSchemas[node.type].parse(node.config);
-    // the agent picked on the run page for this run only wins over the workflow's engine
-    const runVars = (run.vars ?? {}) as { engine?: Record<string, string>; model?: Record<string, string> };
-    const engineOverride = runVars.engine?.[node.id];
-    if (engineOverride && 'engine' in config && engineOverride !== (config as { engine?: string }).engine) {
-      // a model the workflow named is for its own engine (an Antigravity model id means nothing to Claude Code)
-      Object.assign(config, { engine: engineOverride, model: undefined });
-    }
-    // the model picked on the run page for this run only wins over the workflow's model
-    const modelOverride = runVars.model?.[node.id];
-    if (modelOverride && hasModel(node.type)) Object.assign(config, { model: modelOverride });
     const project = run.project_id ? await d.engine.projects.get(run.project_id) : null;
+    // run override > field set in the node > its Team role > the node type's default; the project's engines are enforced last
+    const { config: raw, role } = await resolveRole(d.roles, node, project);
+    if (role) await d.engine.patchNode(nr.id, { role: role.key, role_hash: role.hash });
+    const config = nodeConfigSchemas[node.type].parse(raw);
+    const { modelOverride } = applyRunOverrides(config as Record<string, unknown>, node, run.vars);
     if (project && 'engine' in config) {
       const allowed = project.settings.engines.allowed;
       const current = String((config as { engine?: string }).engine ?? '');
@@ -108,8 +103,8 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     const input = (nr.input ?? {}) as { feedback?: string };
     const projectVars = ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {};
     const result = await executor({
-      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr, node, config, task,
-      artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
+      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr,
+      node: { ...node, config: raw }, config, task, role, artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
     });
     if ('async' in result) return; // finishes later (agent runs)
     if ('wait' in result) {
@@ -143,7 +138,8 @@ export async function scanAgentNodes(d: JobDeps) {
     .execute();
   for (const r of rows) {
     const node = d.engine.node(r, r.node_id);
-    const timeoutSeconds = nodeConfigSchemas['agent.run'].parse(node.config).timeoutSeconds;
+    const raw = await resolveRole(d.roles, node, null).then(x => x.config, () => node.config);
+    const timeoutSeconds = nodeConfigSchemas['agent.run'].parse(raw).timeoutSeconds;
     const tooLong = Date.now() - new Date(r.started_at ?? Date.now()).getTime() > timeoutSeconds * 1000;
     const done = !isAlive(r.process_id) || readOutcome(r.run_dir!, r.process_id, false).exitCode !== null;
     if (!done && !tooLong) continue;

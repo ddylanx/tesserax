@@ -1,5 +1,5 @@
 import type { AppConfig } from '@tesserax/config';
-import { nodeConfigSchemas, type AgentExecutor } from '@tesserax/contracts';
+import { nodeConfigSchemas, type AgentExecutor, type RoleLookup } from '@tesserax/contracts';
 import type { Db } from '@tesserax/db';
 import { diffInfo } from '@tesserax/agent-runtime';
 import { ClassificationService } from '@tesserax/mod-classify';
@@ -8,6 +8,7 @@ import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';
 import { prepareAgent } from './executors';
 import { projectSkills } from './project-skills';
+import { resolveRole } from './apply-role';
 import type { NodeContext } from './executors/types';
 import { SkillCatalog } from '@tesserax/mod-skills';
 import type { McpService } from '@tesserax/mod-mcp';
@@ -22,6 +23,7 @@ export class HandoffService {
     private readonly skills: SkillCatalog,
     private readonly classifier: ClassificationService,
     private readonly mcp?: McpService,
+    private readonly roles?: RoleLookup,
   ) {}
 
   executors() {
@@ -53,10 +55,13 @@ export class HandoffService {
       const node = this.engine.node(run, nr.node_id);
       const task = await this.tasks.getTask(run.task_id);
       if (!task) throw new Error('Task not found');
+      const project = run.project_id ? await this.engine.projects.get(run.project_id) : null;
+      const { config: raw, role } = await resolveRole(this.roles, node, project);
+      if (role) await this.engine.patchNode(nr.id, { role: role.key, role_hash: role.hash });
       const ctx: NodeContext = {
-        engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: projectSkills(this.skills, run.project_id ? await this.engine.projects.get(run.project_id) : null), appConfig: this.config,
+        engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: projectSkills(this.skills, project), appConfig: this.config,
         projectVars: ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {},
-        run, nodeRun: nr, node, config: nodeConfigSchemas['agent.run'].parse(node.config), task,
+        run, nodeRun: nr, node: { ...node, config: raw }, config: nodeConfigSchemas['agent.run'].parse(raw), task, role,
         artifacts: await this.engine.latestArtifacts(runId), feedback: ((nr.input ?? {}) as { feedback?: string }).feedback ?? null,
         mcp: this.mcp,
       };

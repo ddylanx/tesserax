@@ -9,7 +9,8 @@ import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
   routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
-import { CONFIG, DB } from '@tesserax/core';
+import { CONFIG, DB, ROLE_LOOKUP } from '@tesserax/core';
+import type { RoleLookup } from '@tesserax/contracts';
 import type { Db } from '@tesserax/db';
 import { diffInfo, diffPatch } from '@tesserax/agent-runtime';
 import { ClassificationService } from '@tesserax/mod-classify';
@@ -45,8 +46,9 @@ export class WorkflowController {
     @Inject(DB) private readonly db: Db,
     classifier: ClassificationService,
     @Optional() private readonly mcp?: McpService,
+    @Optional() @Inject(ROLE_LOOKUP) roles?: RoleLookup,
   ) {
-    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp);
+    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp, roles);
   }
 
   private readonly handoff: HandoffService;
