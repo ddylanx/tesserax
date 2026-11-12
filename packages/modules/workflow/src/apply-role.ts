@@ -1,7 +1,7 @@
 import {
   ENGINE_NODE_TYPES, MODEL_NODE_TYPES, ROLE_NODE_TYPES, ROLE_TOOL_ALLOWLIST, roleBrief, roleConfigSchema, roleInScope, rolePromptSchema,
   type ReportLanguage,
-  type Role, type RoleLookup, type WorkflowNode,
+  type Role, type RoleLookup, type WorkflowDefinition, type WorkflowNode,
 } from '@tesserax/contracts';
 import { FatalNodeError } from './executors/types';
 
@@ -54,6 +54,45 @@ export function applyRole(raw: Record<string, unknown>, role: Role, nodeType: st
   return {
     config,
     role: { key: role.key, title: role.title, prompt: prompt.data, hash: role.hash, skills: rc.skills, brief: roleBrief(rc), reportLanguage: rc.reportLanguage },
+  };
+}
+
+/** A role as it was when the run started (workflow_runs.vars.roles[key]). */
+export interface RoleSnapshot {
+  title: string;
+  enabled: boolean;
+  hash: string;
+  prompt: string;
+  config: Record<string, unknown>;
+}
+
+/**
+ * Every role the workflow names, as it is now; stored on the run when it starts so later edits on the Team page do not change
+ * a run half way (retries and "run again from here" keep it; a new run takes the latest). Unknown keys are left out (the
+ * node then fails with "not found").
+ */
+export async function snapshotRoles(lookup: RoleLookup | undefined, def: Pick<WorkflowDefinition, 'nodes'>): Promise<Record<string, RoleSnapshot>> {
+  const keys = [...new Set(def.nodes.filter(n => has(ROLE_NODE_TYPES, n.type)).map(n => (n.config as { role?: unknown })?.role).filter((k): k is string => typeof k === 'string' && !!k))];
+  const out: Record<string, RoleSnapshot> = {};
+  for (const key of keys) {
+    const r = lookup ? await lookup.getByKey(key) : null;
+    if (r) out[key] = { title: r.title, enabled: r.enabled, hash: r.hash, prompt: r.prompt, config: r.config };
+  }
+  return out;
+}
+
+/** The roles a run uses: its snapshot when it has one, else (runs started before snapshots existed) the live Team rows. */
+export function runRoleLookup(runVars: unknown, live: RoleLookup | undefined): RoleLookup | undefined {
+  const snap = (runVars as { roles?: Record<string, RoleSnapshot> } | null)?.roles;
+  if (!snap || typeof snap !== 'object') return live;
+  return {
+    getByKey: async key => {
+      const s = snap[key];
+      if (!s) return null;
+      const [dept = '', slug = ''] = key.split('/');
+      return { id: `snapshot:${key}`, key, departmentId: dept, slug, title: s.title, enabled: s.enabled, prompt: s.prompt, config: s.config, position: 0, hash: s.hash, problems: [], usedBy: [] };
+    },
+    keys: async () => Object.keys(snap),
   };
 }
 

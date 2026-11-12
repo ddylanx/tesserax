@@ -11,7 +11,7 @@ import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
 import { projectSkills } from './project-skills';
-import { applyRunOverrides, resolveRole } from './apply-role';
+import { applyRunOverrides, resolveRole, runRoleLookup } from './apply-role';
 import type { SkillCatalog } from '@tesserax/mod-skills';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -94,7 +94,7 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if (!task) throw new FatalNodeError('The task no longer exists');
     const project = run.project_id ? await d.engine.projects.get(run.project_id) : null;
     // run override > field set in the node > its Team role > the node type's default; the project's engines are enforced last
-    const { config: raw, role } = await resolveRole(d.roles, node, project);
+    const { config: raw, role } = await resolveRole(runRoleLookup(run.vars, d.roles), node, project);
     if (role) await d.engine.patchNode(nr.id, { role: role.key, role_hash: role.hash });
     const config = nodeConfigSchemas[node.type].parse(raw);
     const { modelOverride } = applyRunOverrides(config as Record<string, unknown>, node, run.vars);
@@ -138,14 +138,14 @@ export async function scanAgentNodes(d: JobDeps) {
   const rows = await d.db
     .selectFrom('node_runs as n')
     .innerJoin('workflow_runs as r', 'r.id', 'n.run_id')
-    .select(['n.id', 'n.node_id', 'n.process_id', 'n.run_dir', 'n.started_at', 'r.workflow_snapshot'])
+    .select(['n.id', 'n.node_id', 'n.process_id', 'n.run_dir', 'n.started_at', 'r.workflow_snapshot', 'r.vars'])
     .where('n.status', '=', 'running')
     .where('n.node_type', '=', 'agent.run')
     .where('n.process_id', 'is not', null)
     .execute();
   for (const r of rows) {
     const node = d.engine.node(r, r.node_id);
-    const raw = await resolveRole(d.roles, node, null).then(x => x.config, () => node.config);
+    const raw = await resolveRole(runRoleLookup(r.vars, d.roles), node, null).then(x => x.config, () => node.config);
     const timeoutSeconds = nodeConfigSchemas['agent.run'].parse(raw).timeoutSeconds;
     const tooLong = Date.now() - new Date(r.started_at ?? Date.now()).getTime() > timeoutSeconds * 1000;
     const done = !isAlive(r.process_id) || readOutcome(r.run_dir!, r.process_id, false).exitCode !== null;

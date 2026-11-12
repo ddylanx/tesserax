@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { nodeConfigSchemas, projectSettingsSchema, type Role } from '@tesserax/contracts';
 import type { Db } from '@tesserax/db';
 import { McpService } from '@tesserax/mod-mcp';
-import { applyRole, applyRunOverrides, resolveRole } from './apply-role';
+import { applyRole, applyRunOverrides, resolveRole, runRoleLookup, snapshotRoles } from './apply-role';
 import { FatalNodeError } from './executors/types';
 import { withRole, withSkills } from './render';
 
@@ -110,4 +110,32 @@ test('the role descriptor is told to the agent as a "## Your role" section after
   assert.ok(prompt.includes('Mission: Review DEMO changes.\nNot for:\n- Writing code'));
   assert.ok(prompt.indexOf('## Your role') < prompt.indexOf('Task text'));
   assert.equal(withRole({ title: 'Brief only', prompt: '', brief: '## Your role\nMission: x' }, 'T'), '# Role: Brief only\n\n## Your role\nMission: x\n\n---\n\nT');
+});
+
+test('a run uses the roles as they were when it started; older runs without a snapshot use the live rows', async () => {
+  let current = role();
+  const live = { getByKey: async (key: string) => (key === current.key ? current : null), keys: async () => [current.key] };
+  const def = { nodes: [
+    { id: 'plan', type: 'ai.step', config: { role: 'engineering/backend-dev' } },
+    { id: 'build', type: 'agent.run', config: { role: 'engineering/backend-dev' } },
+    { id: 'gate', type: 'human.gate', config: { role: 'ignored/here' } },
+    { id: 'ghost', type: 'ai.step', config: { role: 'qa/ghost' } },
+  ] } as never;
+  const vars = { roles: await snapshotRoles(live, def) };
+  assert.deepEqual(Object.keys(vars.roles), ['engineering/backend-dev']);
+
+  const first = await resolveRole(runRoleLookup(vars, live), step({}), null);
+  assert.equal(first.role?.hash, 'abc123abc123');
+  // the role is edited on the Team page between the two nodes
+  current = role({ prompt: 'New prompt.', hash: 'def456def456', config: { engine: 'gemini' } });
+  const second = await resolveRole(runRoleLookup(vars, live), { type: 'agent.run', config: { prompt: 'x', role: 'engineering/backend-dev' } }, null);
+  assert.equal(second.role?.hash, 'abc123abc123');
+  assert.equal(second.role?.prompt, 'Follow the conventions.');
+  // a new run takes the latest
+  const fresh = { roles: await snapshotRoles(live, def) };
+  assert.equal((await resolveRole(runRoleLookup(fresh, live), step({}), null)).role?.hash, 'def456def456');
+  // a run started before snapshots existed reads the live row
+  assert.equal((await resolveRole(runRoleLookup({ project: {} }, live), step({}), null)).role?.hash, 'def456def456');
+  // a role missing when the run started stays missing
+  await assert.rejects(resolveRole(runRoleLookup(vars, live), step({ role: 'qa/ghost' }), null), /not found or disabled/);
 });

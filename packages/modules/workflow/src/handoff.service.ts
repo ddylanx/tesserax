@@ -8,7 +8,7 @@ import { RunConflict, WorkflowEngine } from './engine.service';
 import { availableExecutors, openInEditor, startAgent } from './executors/agent';
 import { prepareAgent } from './executors';
 import { projectSkills } from './project-skills';
-import { resolveRole } from './apply-role';
+import { resolveRole, runRoleLookup } from './apply-role';
 import type { NodeContext } from './executors/types';
 import { SkillCatalog } from '@tesserax/mod-skills';
 import type { McpService } from '@tesserax/mod-mcp';
@@ -56,7 +56,7 @@ export class HandoffService {
       const task = await this.tasks.getTask(run.task_id);
       if (!task) throw new Error('Task not found');
       const project = run.project_id ? await this.engine.projects.get(run.project_id) : null;
-      const { config: raw, role } = await resolveRole(this.roles, node, project);
+      const { config: raw, role } = await resolveRole(runRoleLookup(run.vars, this.roles), node, project);
       if (role) await this.engine.patchNode(nr.id, { role: role.key, role_hash: role.hash });
       const ctx: NodeContext = {
         engine: this.engine, tasks: this.tasks, classifier: this.classifier, skills: projectSkills(this.skills, project), appConfig: this.config,
