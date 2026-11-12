@@ -218,7 +218,7 @@ function BoardColumnView({
     <div
       ref={columnRef}
       className={cn(
-        'flex flex-col rounded-lg bg-muted/40 p-2.5 max-h-[calc(100vh-260px)] transition-all',
+        'flex flex-col rounded-lg bg-muted/40 p-2.5 max-h-[calc(100dvh-308px)] transition-all',
         over && 'ring-2 ring-primary/50',
       )}
     >
