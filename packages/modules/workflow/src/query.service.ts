@@ -121,6 +121,8 @@ export class WorkflowQueryService {
         numTurns: n.num_turns,
         model: n.model,
         skillHash: n.skill_hash,
+        role: n.role,
+        roleHash: n.role_hash,
         agentSessionId: n.agent_session_id,
         startedAt: iso(n.started_at),
         endedAt: iso(n.ended_at),

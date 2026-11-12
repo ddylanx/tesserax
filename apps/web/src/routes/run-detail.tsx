@@ -315,6 +315,7 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {(MODEL_NODE_TYPES as readonly string[]).includes(n.nodeType) && (n.model
                       ? <span title="Model this run used (reported by Claude Code, else the one asked for)">model {n.model}</span>
                       : n.status === 'done' && <span className="text-muted-foreground" title="No model was passed and the CLI did not report one">CLI default model</span>)}
+                    {n.role && <span className="rounded border border-indigo-500/30 bg-indigo-500/10 px-1 text-indigo-700 dark:text-indigo-400" title="Team role this step used, and the version of its prompt + config">role {n.role}{n.roleHash ? ` #${n.roleHash}` : ''}</span>}
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>

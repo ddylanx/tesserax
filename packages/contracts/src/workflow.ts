@@ -356,6 +356,9 @@ export const nodeRunSchema = z.object({
   /** Model the step used: reported by Claude Code, else the one asked for; null = the CLI's default (not reported). */
   model: z.string().nullable(),
   skillHash: z.string().nullable(),
+  /** Team role key the step used and the hash of its prompt + config then; null when the node names none. */
+  role: z.string().nullable(),
+  roleHash: z.string().nullable(),
   agentSessionId: z.string().nullable(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),
