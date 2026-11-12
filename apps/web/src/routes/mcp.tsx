@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Loader2, RefreshCw, Wrench, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { McpEngine, McpPolicyMode, McpServerPolicyDto, McpToolCache, McpToolItem, UpdateMcpPolicyDto } from '@tesserax/contracts';
+import { mcpServerInScope, type McpEngine, type McpPolicyMode, type McpServerPolicyDto, type McpToolCache, type McpToolItem, type UpdateMcpPolicyDto } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
+import { useRepoRegistry } from '@/components/workplace';
 import { api } from '@/lib/api';
+import { useProjectScope } from '@/lib/project-context';
 
 const ALL_ENGINES: { id: McpEngine; label: string }[] = [
   { id: 'claude', label: 'Claude Code' },
@@ -40,7 +42,11 @@ export function McpPage() {
   const [toolSearch, setToolSearch] = useState('');
   const [refreshingServer, setRefreshingServer] = useState<string | null>(null);
 
-  const servers = q.data ?? [];
+  const scope = useProjectScope();
+  const repos = useRepoRegistry();
+  const all = q.data ?? [];
+  // user-wide servers, the selected project's folders, and folders no other project claims
+  const servers = all.filter(s => mcpServerInScope(scope.current, scope.projects, repos.data?.workplaces ?? [], s));
   const clients = useMemo(() => [...new Set(servers.map(s => s.client))].sort(), [servers]);
   const rows = servers.filter(
     s =>
@@ -137,6 +143,7 @@ export function McpPage() {
         q.data ? (
           <>
             {activeInRunsCount} active in runs / {servers.length} configured on this machine
+            {all.length > servers.length && ` (${all.length - servers.length} in other projects' folders hidden)`}
           </>
         ) : (
           'Configure MCP permissions and engine access for workflow runs.'
