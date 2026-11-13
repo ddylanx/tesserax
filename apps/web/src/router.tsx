@@ -43,7 +43,12 @@ const workflowsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/wo
 const workflowEditorRoute = createRoute({ getParentRoute: () => rootRoute, path: '/workflows/$workflowId', component: WorkflowEditorPage });
 const reposRoute = createRoute({ getParentRoute: () => rootRoute, path: '/repos', component: ReposPage });
 const skillsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/skills', component: SkillsPage });
-const teamRoute = createRoute({ getParentRoute: () => rootRoute, path: '/team', component: TeamPage });
+const teamRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/team',
+  validateSearch: (s: Record<string, unknown>): { view?: 'live' } => ({ view: s.view === 'live' ? 'live' : undefined }),
+  component: TeamPage,
+});
 const metricsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/metrics', component: MetricsPage });
 const tasksRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tasks', component: TasksPage });
 const agentsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/agents', component: AgentsPage });
