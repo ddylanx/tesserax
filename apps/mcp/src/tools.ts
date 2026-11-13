@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOCAL_TASK_TYPES, type MetricsReport, type Project, type ProjectCard, type TaskDetailDto, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
+import { LOCAL_TASK_TYPES, type MetricsReport, type Project, type ProjectCard, type Role, type TaskDetailDto, type TeamList, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
 import type { Api } from './api';
 import { clip, runDetail, runSummary, tail, taskDetail, taskSummary } from './summaries';
 
@@ -52,6 +52,27 @@ export async function resolveRunId(api: Api, ref: string): Promise<string> {
 }
 
 const getRun = (api: Api, id: string) => api.get<WorkflowRunDetail>(`/workflow-runs/${id}`);
+
+/** What the manager needs to pick a role; tools, MCP grants and budgets stay on the Team page. */
+function roleCard(r: Role, department: string | undefined) {
+  const c = r.config as { engine?: string; model?: string; skills?: string[]; mission?: string; whenToUse?: string[]; notFor?: string[]; inputsNeeded?: string[]; reportLanguage?: string };
+  return {
+    key: r.key,
+    title: r.title,
+    department: department ?? null,
+    enabled: r.enabled,
+    mission: c.mission ?? null,
+    whenToUse: c.whenToUse ?? [],
+    notFor: c.notFor ?? [],
+    inputsNeeded: c.inputsNeeded ?? [],
+    reportLanguage: c.reportLanguage ?? 'en',
+    engine: c.engine ?? null,
+    model: c.model ?? null,
+    skills: c.skills ?? [],
+    usedByWorkflows: r.usedBy,
+    problems: r.problems,
+  };
+}
 
 export const TOOLS: ToolDef[] = [
   // ---------- read ----------
@@ -211,6 +232,41 @@ export const TOOLS: ToolDef[] = [
     input: { days: z.number().int().min(1).max(365).optional().describe('Default 30.'), workflow: z.string().optional() },
     async run({ api }, a) {
       return api.get<MetricsReport>('/metrics', { days: (a.days as number | undefined) ?? 30, workflowId: a.workflow as string | undefined });
+    },
+  },
+
+  {
+    name: 'list_team',
+    title: 'List the team',
+    kind: 'read',
+    description: 'Departments and their roles (sub agents): what each role is for, when to use it, what it needs, its engine. A workflow step names a role by its key, e.g. "qa/reviewer". Roles are edited only by the person on the Team page.',
+    input: { project: z.string().optional().describe('Project slug: only the roles that project allows.') },
+    async run({ api, web }, a) {
+      const t = await api.get<TeamList>('/team', { project: a.project as string | undefined });
+      return {
+        departments: t.departments.map(d => ({
+          slug: d.slug,
+          name: d.name,
+          description: d.description,
+          roles: t.roles.filter(r => r.departmentId === d.id).map(r => roleCard(r, d.slug)),
+        })),
+        link: `${web}/team`,
+      };
+    },
+  },
+  {
+    name: 'get_role',
+    title: 'Get a role',
+    kind: 'read',
+    description: 'One role by key (e.g. "qa/reviewer"): its card from list_team plus the persona prompt the agent receives and its version hash.',
+    input: { role: z.string().min(3).max(81).describe('Role key "<department>/<role>".'), maxChars: z.number().int().min(500).max(20_000).optional().describe('Prompt length, default 8000.') },
+    async run({ api, web }, a) {
+      const key = (a.role as string).trim().toLowerCase();
+      const t = await api.get<TeamList>('/team');
+      const r = t.roles.find(x => x.key === key);
+      if (!r) throw new Error(`No role "${key}". Roles: ${t.roles.map(x => x.key).join(', ') || 'none'}.`);
+      const d = t.departments.find(x => x.id === r.departmentId);
+      return { ...roleCard(r, d?.slug), hash: r.hash, prompt: clip(r.prompt, (a.maxChars as number | undefined) ?? 8000), link: `${web}/team` };
     },
   },
 
