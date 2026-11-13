@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOCAL_TASK_TYPES, type MetricsReport, type Project, type ProjectCard, type Role, type TaskDetailDto, type TeamList, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
+import { LOCAL_TASK_TYPES, type MetricsReport, type Project, type ProjectCard, type Role, type TaskDetailDto, type TeamActivity, type TeamList, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
 import type { Api } from './api';
 import { clip, runDetail, runSummary, tail, taskDetail, taskSummary } from './summaries';
 
@@ -267,6 +267,40 @@ export const TOOLS: ToolDef[] = [
       if (!r) throw new Error(`No role "${key}". Roles: ${t.roles.map(x => x.key).join(', ') || 'none'}.`);
       const d = t.departments.find(x => x.id === r.departmentId);
       return { ...roleCard(r, d?.slug), hash: r.hash, prompt: clip(r.prompt, (a.maxChars as number | undefined) ?? 8000), link: `${web}/team` };
+    },
+  },
+
+  {
+    name: 'team_activity',
+    title: 'What the team is doing',
+    kind: 'read',
+    description: 'Each role (sub agent) with its state (running, queued, waiting, failed, idle), the task and step it is on, and its last finished step with the short report. Also steps without a role and review gates waiting for the person.',
+    input: { project: z.string().optional().describe('Project slug.'), hours: z.number().int().min(1).max(168).optional().describe('Window for last steps and counts, default 24.') },
+    async run({ api, web }, a) {
+      const [team, act] = await Promise.all([
+        api.get<TeamList>('/team', { project: a.project as string | undefined }),
+        api.get<TeamActivity>('/team/activity', { project: a.project as string | undefined, hours: a.hours as number | undefined }),
+      ]);
+      const byKey = new Map(act.agents.map(x => [x.roleKey, x]));
+      const brief = (s: TeamActivity['agents'][number]['current'][number]) => ({
+        task: s.taskKey ?? s.taskTitle, title: s.taskTitle, step: s.stepLabel, status: s.status, attempt: s.attempt, engine: s.engine, model: s.model,
+        startedAt: s.startedAt, endedAt: s.endedAt, costUsd: s.costUsd, summary: s.summary, decisionNeeded: s.decisionNeeded, error: s.error, link: `${web}/runs/${s.runId}`,
+      });
+      const lane = (key: string | null, title: string, department: string | null) => {
+        const x = byKey.get(key);
+        return { role: key, title, department, state: x?.state ?? 'idle', current: (x?.current ?? []).map(brief), last: x?.last ? brief(x.last) : null, stats: x?.stats ?? { done: 0, failed: 0, costUsd: 0 } };
+      };
+      const dept = new Map(team.departments.map(d => [d.id, d.slug]));
+      const roles = team.roles.map(r => lane(r.key, r.title, dept.get(r.departmentId) ?? null));
+      const known = new Set(team.roles.map(r => r.key));
+      const other = act.agents.filter(x => x.roleKey !== null && !known.has(x.roleKey)).map(x => lane(x.roleKey, x.roleKey!, null));
+      return {
+        windowHours: act.windowHours,
+        roles: [...roles, ...other],
+        noRole: byKey.has(null) ? lane(null, 'Steps without a role', null) : null,
+        waitingForYou: act.waitingForYou.map(brief),
+        link: `${web}/team?view=live`,
+      };
     },
   },
 

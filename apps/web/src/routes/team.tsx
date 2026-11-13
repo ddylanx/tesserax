@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { History, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { Activity, History, LayoutGrid, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import {
   AI_ENGINES, AI_ENGINE_TITLES, AI_MODEL_SUGGESTIONS, ROLE_LIMITS, ROLE_TOOL_ALLOWLIST,
   type AiEngine, type Department, type McpServerPolicyDto, type ReportLanguage, type Role, type RoleChange, type RoleConfig, type TeamList,
 } from '@tesserax/contracts';
 import { MarkdownPanel } from '@/components/markdown';
+import { TeamLive } from '@/components/team-live';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -28,11 +30,32 @@ export function TeamPage() {
 
   const departments = team.data?.departments ?? [];
   const roles = team.data?.roles ?? [];
+  const { view } = useSearch({ from: '/team' });
+  const navigate = useNavigate({ from: '/team' });
+  const live = view === 'live';
+  const toggle = (
+    <div className="flex rounded-md border p-0.5">
+      <Button size="sm" variant={live ? 'ghost' : 'default'} onClick={() => navigate({ search: {} })}><LayoutGrid className="size-3.5" />Roles</Button>
+      <Button size="sm" variant={live ? 'default' : 'ghost'} onClick={() => navigate({ search: { view: 'live' } })}><Activity className="size-3.5" />Live</Button>
+    </div>
+  );
+  if (live) {
+    return (
+      <Page
+        title="Team"
+        description={<>What each role is doing right now: the task and step it is on, how long it has run, its last lines of output and its last report. Refreshes every few seconds; click a step to open its run.{scope.current && <> Only {scope.current.name}.</>}</>}
+        actions={toggle}
+      >
+        <QueryState isLoading={team.isLoading} error={team.error} />
+        {team.data && <TeamLive departments={departments} roles={roles} scopeParam={scope.scopeParam} />}
+      </Page>
+    );
+  }
   return (
     <Page
       title="Team"
       description={<>Departments and the roles in them. A workflow node names a role (<code>department/role</code>) to take its prompt, engine, model, skills, tools and MCP servers; anything the node sets itself wins.{scope.current && <> Showing the roles {scope.current.name} allows.</>}</>}
-      actions={<Button onClick={() => setEditDept('new')}><Plus className="size-3.5" />Department</Button>}
+      actions={<div className="flex gap-2">{toggle}<Button onClick={() => setEditDept('new')}><Plus className="size-3.5" />Department</Button></div>}
     >
       <QueryState isLoading={team.isLoading} error={team.error} empty={!departments.length} emptyText="No departments yet." />
       {departments.map(d => {

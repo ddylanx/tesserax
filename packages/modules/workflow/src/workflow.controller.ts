@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import type { AppConfig } from '@tesserax/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
-  redact, roleProblems, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
+  redact, roleProblems, teamActivityQuerySchema, type TeamActivity, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
 import { CONFIG, DB, ROLE_LOOKUP } from '@tesserax/core';
 import type { RoleLookup } from '@tesserax/contracts';
@@ -20,6 +20,7 @@ import type { McpService } from '@tesserax/mod-mcp';
 import { askClaude } from './executors/claude';
 import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
+import { buildTeamActivity, queryActivityRows } from './team-activity';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
 import { postReviewComment } from './review';
@@ -245,6 +246,15 @@ export class WorkflowController {
   @Get('workflow-runs')
   runs(@Query('status') status?: string, @Query('project') project?: string, @Query('workflow') workflow?: string, @Query('q') q?: string): Promise<WorkflowRunList> {
     return this.engine.listRuns({ status, project, workflow, q });
+  }
+
+  /** What each Team role is doing now and did lately (Team page → Live). Read only. */
+  @Get('team/activity')
+  async teamActivity(@Query() query: Record<string, string>): Promise<TeamActivity> {
+    const q = teamActivityQuerySchema.safeParse(query);
+    if (!q.success) throw new BadRequestException(q.error.issues.map(i => i.message).join('; '));
+    const rows = await queryActivityRows(this.db, { project: q.data.project || undefined, hours: q.data.hours });
+    return buildTeamActivity(rows, { windowHours: q.data.hours, env: process.env });
   }
 
   @Get('workflow-runs/:id')
