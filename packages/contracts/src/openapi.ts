@@ -5,6 +5,7 @@ import { decisionSchema, feedbackStatsSchema, pipelineListSchema, pipelineRunDet
 import { moveTaskSchema, projectCardSchema, projectSchema, saveProjectSchema } from './projects';
 import { demoRepoResponseSchema, repoRegistrySchema, setTaskWorkplaceSchema } from './repos';
 import { environmentStatusSchema, healthSchema, systemInfoSchema } from './system';
+import { teamActivityQuerySchema, teamActivitySchema } from './team-activity';
 import { departmentSchema, roleChangeSchema, roleSchema, saveDepartmentSchema, saveRoleSchema, teamListSchema } from './team';
 import { createLocalTaskSchema, taskDetailSchema, taskListSchema, taskQuerySchema, updateLocalTaskSchema, updateTaskStatusSchema } from './tasks';
 import {
@@ -129,6 +130,7 @@ export const API_ROUTES: ApiRoute[] = [
   { method: 'patch', path: '/team/roles/{id}', tag: 'team', summary: 'Edit a role.', body: saveRoleSchema.partial(), response: roleSchema },
   { method: 'delete', path: '/team/roles/{id}', tag: 'team', summary: 'Delete a role no workflow uses.', response: ok },
   { method: 'get', path: '/team/roles/{id}/changes', tag: 'team', summary: 'Audit trail of a role (hash before and after each change).', response: z.object({ changes: z.array(roleChangeSchema) }) },
+  { method: 'get', path: '/team/activity', tag: 'team', summary: 'What each role is doing now and did in the last hours: active steps, last step, counts; steps waiting for the person.', query: teamActivityQuerySchema, response: teamActivitySchema },
 
   // repos
   { method: 'get', path: '/repos', tag: 'repos', summary: 'Repositories and workplaces.', response: repoRegistrySchema },
