@@ -1,6 +1,7 @@
 import { Link, Outlet } from '@tanstack/react-router';
 import { BarChart3, Bot, Boxes, FolderGit2, Layers, ListChecks, Network, Server, Sparkles, Users, Workflow } from 'lucide-react';
 import { Select } from '@/components/ui/input';
+import { groupByWorkType } from '@tesserax/contracts';
 import { ProjectDot, ProjectProvider, useProjectScope } from '@/lib/project-context';
 
 const nav = [
@@ -24,7 +25,9 @@ function ProjectPicker() {
       <ProjectDot color={current?.color ?? '#94a3b8'} name={current?.name ?? 'All projects'} />
       <Select className="h-7 min-w-0 flex-1 text-xs" value={selected} onChange={e => setSelected(e.target.value)} title="Show one project, or all of them">
         <option value="">All projects</option>
-        {projects.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}
+        {groupByWorkType(projects).map(([type, list]) => (
+          <optgroup key={type} label={type}>{list.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}</optgroup>
+        ))}
       </Select>
     </div>
   );

@@ -32,6 +32,8 @@ export const projectSettingsSchema = z.object({
   vars: z.record(z.string().regex(/^[a-z][a-z0-9_]*$/, 'lowercase letters, digits, _'), z.string().max(2000)).default({}),
   /** Prefix of the keys of tasks created here (C-12). */
   keyPrefix: z.string().regex(/^[A-Z][A-Z0-9]{0,5}$/).optional(),
+  /** The one kind of work this project's board holds (dev, business…); the board never mixes projects. */
+  workType: z.string().regex(/^[a-z][a-z0-9-]{0,29}$/, 'lowercase letters, digits, -').optional(),
 });
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
 
@@ -91,6 +93,16 @@ export type ProjectSummary = z.infer<typeof projectSummarySchema>;
 
 export const projectCardSchema = projectSchema.extend({ summary: projectSummarySchema });
 export type ProjectCard = z.infer<typeof projectCardSchema>;
+
+/** Projects grouped by their kind of work, in project order; projects without one go last under "other". */
+export function groupByWorkType<P extends { settings: { workType?: string | undefined } }>(projects: P[]): [string, P[]][] {
+  const groups = new Map<string, P[]>();
+  for (const p of projects) {
+    const type = p.settings.workType ?? 'other';
+    groups.set(type, [...(groups.get(type) ?? []), p]);
+  }
+  return [...groups].sort(([a], [b]) => Number(a === 'other') - Number(b === 'other'));
+}
 
 /** Keys of tasks created in a project: C-12, P-3, or the project's own prefix. */
 export function keyPrefixOf(p: { slug: string; settings: { keyPrefix?: string | undefined } }): string {
