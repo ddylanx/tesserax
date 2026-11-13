@@ -89,7 +89,7 @@ export function NodeForm({ node, info, skills, team, onChange, onDelete }: {
                   ))}
                   {roleKey && !role && <option value={roleKey}>{roleKey} (unknown)</option>}
                 </Select>
-                {roleKey && !role && team && <span className="text-[11px] text-red-600">Unknown role: runs of this node will fail. Create it on the Team page or pick another.</span>}
+                {roleKey && !role && team && <span className="text-[11px] text-destructive">Unknown role: runs of this node will fail. Create it on the Team page or pick another.</span>}
                 {role && <span className="text-[11px] text-muted-foreground">Empty fields below take the role's value; set a field to override it.{(role.config as { skills?: string[] }).skills?.length ? ` Adds skills: ${(role.config as { skills: string[] }).skills.join(', ')}.` : ''}</span>}
               </label>
             );

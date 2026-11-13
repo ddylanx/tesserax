@@ -23,9 +23,9 @@ function inline(text: string, key = ''): ReactNode[] {
       const [, label, url] = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(tok)!;
       const href = safeHref(url!);
       out.push(href
-        ? <a key={k} href={href} target="_blank" rel="noreferrer" className="text-sky-600 underline-offset-2 hover:underline">{inline(label!, `${k}l`)}</a>
+        ? <a key={k} href={href} target="_blank" rel="noreferrer" className="text-info underline-offset-2 hover:underline">{inline(label!, `${k}l`)}</a>
         : <span key={k}>{inline(label!, `${k}l`)}</span>); // file:// and other schemes: text only
-    } else if (m[5]) out.push(<a key={k} href={tok} target="_blank" rel="noreferrer" className="break-all text-sky-600 hover:underline">{tok}</a>);
+    } else if (m[5]) out.push(<a key={k} href={tok} target="_blank" rel="noreferrer" className="break-all text-info hover:underline">{tok}</a>);
     else out.push(<em key={k}>{inline(tok.slice(1, -1), `${k}i`)}</em>);
     last = m.index + tok.length;
   }
@@ -182,7 +182,7 @@ export function CopyButton({ text, label = 'Copy' }: { text: string; label?: str
   };
   return (
     <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={copy} title="Copy the markdown text">
-      {done ? <Check className="size-3.5 text-green-600" /> : <Copy className="size-3.5" />}{done ? 'Copied' : label}
+      {done ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}{done ? 'Copied' : label}
     </Button>
   );
 }

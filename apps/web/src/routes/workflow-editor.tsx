@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
+import { useTheme } from '@/lib/theme';
 
 type FlowNode = Node<CardData>;
 type FlowEdge = Edge<InsertEdgeData>;
@@ -45,6 +46,7 @@ function Editor() {
   const { workflowId } = useParams({ strict: false }) as { workflowId: string };
   const qc = useQueryClient();
   const flow = useReactFlow<FlowNode, FlowEdge>();
+  const { theme } = useTheme();
   const wf = useQuery({ queryKey: ['wf', 'def', workflowId], queryFn: () => api<{ def: WorkflowDefinition; hash: string }>(`/api/workflows/${workflowId}`) });
   const types = useQuery({ queryKey: ['wf', 'node-types'], queryFn: () => api<NodeTypeInfo[]>('/api/node-types') });
   const skills = useQuery({ queryKey: ['skills'], queryFn: () => api<SkillInfo[]>('/api/skills') });
@@ -321,7 +323,7 @@ function Editor() {
   };
 
   return (
-    <div className="flex h-screen flex-col">
+    <div className="flex h-full flex-col">
       <div className="flex flex-wrap items-center gap-2 border-b bg-card px-4 py-2">
         <Link to="/workflows" className="text-sm text-muted-foreground hover:underline">Workflows</Link>
         <span className="text-muted-foreground">/</span>
@@ -337,7 +339,7 @@ function Editor() {
         {dirty && <Badge variant="amber">unsaved</Badge>}
         <Button size="sm" disabled={!dirty || problems.length > 0 || save.isPending} onClick={() => save.mutate()} title="Save (Cmd+S)"><Save className="size-3.5" />Save</Button>
       </div>
-      {save.error && <p className="border-b bg-red-500/10 px-4 py-1 text-sm text-red-600">{(save.error as Error).message}</p>}
+      {save.error && <p className="border-b bg-destructive/10 px-4 py-1 text-sm text-destructive">{(save.error as Error).message}</p>}
 
       <div className="relative flex min-h-0 flex-1">
         <aside className="hidden w-60 shrink-0 flex-col gap-2 overflow-hidden border-r bg-card p-3 md:flex">
@@ -352,7 +354,7 @@ function Editor() {
 
         <div className="relative min-w-0 flex-1" onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }} onDrop={onDrop}>
           <ReactFlow
-            nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode="system" minZoom={0.15} maxZoom={1.5} fitView fitViewOptions={{ padding: 0.15 }}
+            nodes={nodes} edges={edges} nodeTypes={nodeTypes} edgeTypes={edgeTypes} colorMode={theme} minZoom={0.15} maxZoom={1.5} fitView fitViewOptions={{ padding: 0.15 }}
             proOptions={{ hideAttribution: true }} defaultEdgeOptions={{ type: 'insert', markerEnd: MARKER }}
             deleteKeyCode={['Backspace', 'Delete']} multiSelectionKeyCode={['Shift', 'Meta']} snapToGrid snapGrid={[10, 10]}
             onNodesChange={ch => {
@@ -384,8 +386,8 @@ function Editor() {
               Drag a port to empty space or right-click to add a node · “+” on a connection inserts one · Cmd+Z / Shift+Cmd+Z · Cmd+C / V · Cmd+D · Del · Cmd+S
             </Panel>
             {showProblems && problems.length > 0 && (
-              <Panel position="top-left" className="max-w-md rounded-md border border-red-500/40 bg-card p-2 text-xs shadow">
-                <ul className="list-disc pl-4 text-red-700 dark:text-red-400">{problems.map(p => <li key={p}>{p}</li>)}</ul>
+              <Panel position="top-left" className="max-w-md rounded-md border border-destructive/40 bg-card p-2 text-xs shadow">
+                <ul className="list-disc pl-4 text-destructive">{problems.map(p => <li key={p}>{p}</li>)}</ul>
               </Panel>
             )}
           </ReactFlow>

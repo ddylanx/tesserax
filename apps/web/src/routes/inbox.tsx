@@ -9,6 +9,7 @@ import {
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FilterChip } from '@/components/ui/filter-chip';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
@@ -79,9 +80,9 @@ export function InboxPage() {
     <Page title="Inbox" description="Issue → AI classifies → you decide → AI runs a playbook → you verify.">
       <div className="flex flex-wrap gap-1">
         {GROUPS.map(g => (
-          <Button key={g.id} size="sm" variant={group === g.id ? 'default' : 'outline'} onClick={() => select({ group: g.id, run: undefined })}>
-            {g.label} <span className="opacity-60">{count(g.id)}</span>
-          </Button>
+          <FilterChip key={g.id} active={group === g.id} onClick={() => select({ group: g.id, run: undefined })}>
+            {g.label} <span className="tabular-nums opacity-70">{count(g.id)}</span>
+          </FilterChip>
         ))}
       </div>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -147,7 +148,7 @@ function RunDetail({ id }: { id: string }) {
             <span className="text-xs text-muted-foreground">{[t.type, t.status, t.priority, t.project].filter(Boolean).join(' · ')}</span>
           </div>
           <h2 className="text-base font-semibold">{t.title}</h2>
-          {r.error && <p className="rounded-md border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-700 dark:text-red-400">Failed at {r.errorStep}: {r.error}</p>}
+          {r.error && <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2 text-sm text-destructive">Failed at {r.errorStep}: {r.error}</p>}
           <div className="flex flex-wrap gap-2">
             {r.state === 'failed' && <Button size="sm" onClick={() => action.mutate({ action: 'retry' })}>Retry</Button>}
             {r.state === 'awaiting_verify' && <Button size="sm" variant="outline" onClick={() => action.mutate({ action: 'rerun' })}>Run playbook again</Button>}
@@ -156,7 +157,7 @@ function RunDetail({ id }: { id: string }) {
               <Button size="sm" variant="ghost" onClick={() => confirm('Cancel this run?') && action.mutate({ action: 'cancel' })}>Cancel run</Button>
             )}
           </div>
-          {action.error && <p className="text-sm text-red-600">{(action.error as Error).message}</p>}
+          {action.error && <p className="text-sm text-destructive">{(action.error as Error).message}</p>}
         </CardContent>
       </Card>
 
@@ -231,7 +232,7 @@ function DecisionPanel({ run }: { run: PipelineRunDetail }) {
   const pb = playbooks.data?.find(p => p.id === d.playbookId);
 
   return (
-    <Section title="Your decision" className="border-amber-500/40">
+    <Section title="Your decision" className="border-warning/40">
       <div className="grid gap-2 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-xs">Type
           <Select value={d.type} onChange={e => setD({ ...d, type: e.target.value as DecisionInput['type'] })}>
@@ -258,7 +259,7 @@ function DecisionPanel({ run }: { run: PipelineRunDetail }) {
           Repo {run.mappedRepo ? <span className="text-muted-foreground">(mapped for {run.task.project}: {run.mappedRepo})</span> : null}
           {needsRepo ? (
             <>
-              <span className="text-amber-700 dark:text-amber-400">No local repo is mapped for project {run.task.project ?? '(none)'}. Enter its path; it is saved to config/repos.json.</span>
+              <span className="text-warning">No local repo is mapped for project {run.task.project ?? '(none)'}. Enter its path; it is saved to config/repos.json.</span>
               <Input placeholder="/Users/you/code/repo" value={repo} onChange={e => setRepo(e.target.value)} />
             </>
           ) : null}
@@ -279,7 +280,7 @@ function DecisionPanel({ run }: { run: PipelineRunDetail }) {
         <Button variant="outline" onClick={() => action.mutate({ action: 'reclassify' })}>Classify again</Button>
         <Button variant="ghost" onClick={() => { const note = prompt('Reject: optional note'); if (note !== null) action.mutate({ action: 'reject', body: { note } }); }}>Reject</Button>
       </div>
-      {action.error && <p className="mt-2 text-sm text-red-600">{(action.error as Error).message}</p>}
+      {action.error && <p className="mt-2 text-sm text-destructive">{(action.error as Error).message}</p>}
     </Section>
   );
 }

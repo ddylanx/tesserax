@@ -40,13 +40,13 @@ export function agentTitle(id: string): string {
 
 const STATE: Record<NodeState, { ring: string; badge: string; label: string }> = {
   idle: { ring: '', badge: '', label: '' },
-  queued: { ring: 'ring-2 ring-sky-400/50', badge: 'bg-sky-500/15 text-sky-600', label: 'queued' },
-  running: { ring: 'ring-2 ring-sky-500 animate-pulse', badge: 'bg-sky-500/15 text-sky-600', label: 'running' },
-  waiting: { ring: 'ring-2 ring-amber-500', badge: 'bg-amber-500/20 text-amber-700 dark:text-amber-300', label: 'waiting for you' },
-  done: { ring: 'ring-1 ring-emerald-500/60', badge: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300', label: 'done' },
+  queued: { ring: 'ring-2 ring-info/50', badge: 'bg-info/15 text-info', label: 'queued' },
+  running: { ring: 'ring-2 ring-info animate-pulse', badge: 'bg-info/15 text-info', label: 'running' },
+  waiting: { ring: 'ring-2 ring-warning', badge: 'bg-warning/20 text-warning', label: 'waiting for you' },
+  done: { ring: 'ring-1 ring-success/60', badge: 'bg-success/15 text-success', label: 'done' },
   /** finished, but through its failed / fail port: the run moved on along that edge */
-  ended_failed: { ring: 'ring-2 ring-red-500/60', badge: 'bg-red-500/15 text-red-600', label: 'done → failed' },
-  failed: { ring: 'ring-2 ring-red-500', badge: 'bg-red-500/15 text-red-600', label: 'failed' },
+  ended_failed: { ring: 'ring-2 ring-destructive/60', badge: 'bg-destructive/15 text-destructive', label: 'done → failed' },
+  failed: { ring: 'ring-2 ring-destructive', badge: 'bg-destructive/15 text-destructive', label: 'failed' },
   cancelled: { ring: 'opacity-60', badge: 'bg-muted text-muted-foreground', label: 'cancelled' },
   skipped: { ring: 'opacity-50 border-dashed', badge: 'bg-muted text-muted-foreground', label: 'skipped' },
 };
@@ -71,7 +71,7 @@ export function NodeCard({ id, data, selected }: NodeProps<Node<CardData>>) {
           'w-60 rounded-xl border border-l-4 bg-card shadow-sm transition-shadow',
           meta.accent, st.ring,
           selected && 'shadow-lg outline outline-2 outline-offset-2 outline-primary/70',
-          data.invalid && 'border-red-500',
+          data.invalid && 'border-destructive',
         )}
       >
         {data.node.type !== 'trigger.jira' && (
@@ -86,13 +86,13 @@ export function NodeCard({ id, data, selected }: NodeProps<Node<CardData>>) {
         </div>
         <div className="flex flex-wrap gap-1 px-3 pt-1.5">
           {agent && (
-            <Pill className={data.agentOverride ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}>
+            <Pill className={data.agentOverride ? 'bg-warning/20 text-warning' : 'bg-violet-500/15 text-violet-700 dark:text-violet-300'}>
               <Bot className="size-2.5" />{agentTitle(agent)}{data.model ? ` · ${data.model}` : ''}{data.agentOverride ? ' · this run' : ''}
             </Pill>
           )}
           {!!data.node.skipIf?.length && <Pill className="bg-muted text-muted-foreground"><EyeOff className="size-2.5" />skippable</Pill>}
           {st.label && <Pill className={st.badge}>{st.label}{data.runs && data.runs > 1 ? ` · ${data.runs}×` : ''}</Pill>}
-          {data.invalid && <Pill className="bg-red-500/15 text-red-600">needs attention</Pill>}
+          {data.invalid && <Pill className="bg-destructive/15 text-destructive">needs attention</Pill>}
         </div>
         <div className="mt-1.5 flex flex-col gap-0.5 border-t pt-1 pb-1.5">
           {data.ports.map(p => (

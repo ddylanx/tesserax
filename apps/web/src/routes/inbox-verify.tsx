@@ -23,7 +23,7 @@ function CopyText({ text }: { text: string }) {
 function DiffView({ runId }: { runId: string }) {
   const q = useQuery({ queryKey: ['pipeline', 'diff', runId], queryFn: () => api<RunDiff>(`/api/pipeline/runs/${runId}/diff`) });
   if (q.isLoading) return <p className="text-xs text-muted-foreground">Loading diff…</p>;
-  if (q.error) return <p className="text-xs text-red-600">{(q.error as Error).message}</p>;
+  if (q.error) return <p className="text-xs text-destructive">{(q.error as Error).message}</p>;
   if (!q.data?.patch) return <p className="text-xs text-muted-foreground">No changes in the worktree.</p>;
   return (
     <pre className="max-h-[32rem] overflow-auto rounded-md bg-muted/50 p-2 text-[11px] leading-4">
@@ -31,15 +31,15 @@ function DiffView({ runId }: { runId: string }) {
         <div
           key={i}
           className={
-            l.startsWith('+') && !l.startsWith('+++') ? 'text-emerald-700 dark:text-emerald-400'
-              : l.startsWith('-') && !l.startsWith('---') ? 'text-red-700 dark:text-red-400'
-              : l.startsWith('@@') ? 'text-sky-700 dark:text-sky-400' : ''
+            l.startsWith('+') && !l.startsWith('+++') ? 'text-success'
+              : l.startsWith('-') && !l.startsWith('---') ? 'text-destructive'
+              : l.startsWith('@@') ? 'text-info' : ''
           }
         >
           {l || ' '}
         </div>
       ))}
-      {q.data.truncated && <div className="text-amber-600">… diff truncated</div>}
+      {q.data.truncated && <div className="text-warning">… diff truncated</div>}
     </pre>
   );
 }
@@ -71,7 +71,7 @@ function JiraCommentDialog({ run, onClose }: { run: PipelineRunDetail; onClose: 
           <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />
           I want to post this comment to {run.task.key}
         </label>
-        {post.error && <p className="text-sm text-red-600">{(post.error as Error).message}</p>}
+        {post.error && <p className="text-sm text-destructive">{(post.error as Error).message}</p>}
         <div className="flex justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
           <Button disabled={!confirmed || !text.trim() || post.isPending} onClick={() => post.mutate()}>
@@ -96,7 +96,7 @@ export function VerifyPanel({ run }: { run: PipelineRunDetail }) {
   const pending = run.state === 'awaiting_verify';
 
   return (
-    <Card className={pending ? 'border-amber-500/40' : undefined}>
+    <Card className={pending ? 'border-warning/40' : undefined}>
       <CardHeader><CardTitle>{pending ? 'Verify the result' : 'Result'}</CardTitle></CardHeader>
       <CardContent className="flex flex-col gap-3 text-sm">
         <div className="flex flex-col gap-1 text-xs">
@@ -132,7 +132,7 @@ export function VerifyPanel({ run }: { run: PipelineRunDetail }) {
               <Button disabled={verify.isPending} onClick={() => verify.mutate(true)}><Check className="size-4" />Correct (true)</Button>
               <Button variant="outline" disabled={verify.isPending} onClick={() => verify.mutate(false)}><X className="size-4" />Not correct (false)</Button>
             </div>
-            {verify.error && <p className="text-sm text-red-600">{(verify.error as Error).message}</p>}
+            {verify.error && <p className="text-sm text-destructive">{(verify.error as Error).message}</p>}
           </div>
         ) : (
           <div className="flex flex-wrap items-center gap-2 border-t pt-3 text-sm">

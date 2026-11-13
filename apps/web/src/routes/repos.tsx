@@ -40,7 +40,7 @@ export function ReposPage() {
       actions={<Button size="sm" onClick={() => setEditing({ kind: 'repository' })}><Plus className="size-3.5" />Add repository</Button>}
     >
       <QueryState isLoading={q.isLoading} error={q.error} empty={!!v && !v.repositories.length} emptyText="No repository yet. Add one from a local checkout." />
-      {remove.error && <p className="text-sm text-red-600">{(remove.error as Error).message}</p>}
+      {remove.error && <p className="text-sm text-destructive">{(remove.error as Error).message}</p>}
       {hidden > 0 && <p className="text-xs text-muted-foreground">Showing the workplaces of {scope.current?.name} and their repositories ({hidden} more hidden). Choose All projects to see them.</p>}
       {shown?.repositories.map(r => {
         const wps = shown.workplaces.filter(w => w.repositoryId === r.id);
@@ -97,12 +97,12 @@ export function ReposPage() {
 
 function StatusCell({ w }: { w: WorkplaceView }) {
   const s = w.status;
-  if (s.error) return <span className="inline-flex items-center gap-1 text-xs text-red-600"><TriangleAlert className="size-3" />{s.error}</span>;
+  if (s.error) return <span className="inline-flex items-center gap-1 text-xs text-destructive"><TriangleAlert className="size-3" />{s.error}</span>;
   return (
     <div className="flex flex-col gap-0.5 text-xs">
       {s.originMatches === false
-        ? <span className="inline-flex items-center gap-1 text-red-600" title={s.origin ?? ''}><TriangleAlert className="size-3" />other origin: {s.origin}</span>
-        : <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-400"><CheckCircle2 className="size-3" />{s.originMatches ? 'origin matches' : 'git checkout'}</span>}
+        ? <span className="inline-flex items-center gap-1 text-destructive" title={s.origin ?? ''}><TriangleAlert className="size-3" />other origin: {s.origin}</span>
+        : <span className="inline-flex items-center gap-1 text-success"><CheckCircle2 className="size-3" />{s.originMatches ? 'origin matches' : 'git checkout'}</span>}
       <span className="inline-flex items-center gap-1 text-muted-foreground"><GitBranch className="size-3" />{s.branch ?? 'detached'}</span>
     </div>
   );
@@ -171,11 +171,11 @@ function RepositoryForm({ view, value, onClose }: { view: RepoRegistryView | und
             <Input className="flex-1" autoFocus value={path} onChange={e => setPath(e.target.value)} placeholder="/Users/you/Workplace/shop-core" onKeyDown={e => e.key === 'Enter' && path && inspect.mutate()} />
             <Button size="sm" variant="outline" disabled={!path.trim() || inspect.isPending} onClick={() => inspect.mutate()}><Search className="size-3.5" />Read</Button>
           </div>
-          {inspect.error && <span className="text-red-600">{(inspect.error as Error).message}</span>}
+          {inspect.error && <span className="text-destructive">{(inspect.error as Error).message}</span>}
           {inspect.data && <span className="text-muted-foreground">branch {inspect.data.branch ?? 'detached'} · origin {inspect.data.origin ?? '(none)'}</span>}
         </Field>
       )}
-      {existing && <p className="rounded-md bg-sky-500/10 p-2 text-xs">This checkout belongs to the registered repository <b>{existing.name}</b> (same origin). It is added as another workplace of it.</p>}
+      {existing && <p className="rounded-md bg-info/10 p-2 text-xs">This checkout belongs to the registered repository <b>{existing.name}</b> (same origin). It is added as another workplace of it.</p>}
       {(value || (inspect.data && !existing)) && (
         <div className="grid gap-2 sm:grid-cols-2">
           <Field label="Name"><Input value={f.name} onChange={set('name')} /></Field>
@@ -193,7 +193,7 @@ function RepositoryForm({ view, value, onClose }: { view: RepoRegistryView | und
           <Field label="Jira projects" hint="Tasks of these projects default here."><Input value={projects} onChange={e => setProjects(e.target.value)} placeholder="COL" /></Field>
         </div>
       )}
-      {(run.error || save.error) && <p className="text-sm text-red-600">{((run.error ?? save.error) as Error).message}</p>}
+      {(run.error || save.error) && <p className="text-sm text-destructive">{((run.error ?? save.error) as Error).message}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button disabled={run.isPending || (!value && !inspect.data) || (!existing && (!f.name.trim() || !f.id))} onClick={() => run.mutate()}>{value ? 'Save' : existing ? 'Add workplace' : 'Add repository'}</Button>
@@ -222,15 +222,15 @@ function WorkplaceForm({ view, repositoryId, value, onClose }: { view: RepoRegis
               <Input className="flex-1" value={f.path} onChange={set('path')} onBlur={() => f.path.trim() && inspect.mutate()} placeholder="/Users/you/Workplace/shop-core-brand2" />
               <Button size="sm" variant="outline" disabled={!f.path.trim() || inspect.isPending} onClick={() => inspect.mutate()}><Search className="size-3.5" />Check</Button>
             </div>
-            {inspect.error && <span className="text-red-600">{(inspect.error as Error).message}</span>}
-            {inspect.data && <span className={otherOrigin ? 'text-red-600' : 'text-muted-foreground'}>{otherOrigin ? `Its origin is ${inspect.data.origin}, not this repository's.` : `OK · branch ${inspect.data.branch ?? 'detached'} · origin ${inspect.data.origin ?? '(none)'}`}</span>}
+            {inspect.error && <span className="text-destructive">{(inspect.error as Error).message}</span>}
+            {inspect.data && <span className={otherOrigin ? 'text-destructive' : 'text-muted-foreground'}>{otherOrigin ? `Its origin is ${inspect.data.origin}, not this repository's.` : `OK · branch ${inspect.data.branch ?? 'detached'} · origin ${inspect.data.origin ?? '(none)'}`}</span>}
           </Field>
         </div>
         <div className="sm:col-span-2"><Field label="Jira projects (comma separated)" hint="Tasks of these projects run here unless a task picks another workplace."><Input value={f.projects} onChange={set('projects')} placeholder="COL" /></Field></div>
-        {taken.length > 0 && <p className="text-xs text-amber-600 sm:col-span-2">Already mapped elsewhere ({taken.join(', ')}): the first registered workplace wins for those projects.</p>}
+        {taken.length > 0 && <p className="text-xs text-warning sm:col-span-2">Already mapped elsewhere ({taken.join(', ')}): the first registered workplace wins for those projects.</p>}
         <div className="sm:col-span-2"><Field label="Notes"><Input value={f.notes} onChange={set('notes')} /></Field></div>
       </div>
-      {save.error && <p className="text-sm text-red-600">{(save.error as Error).message}</p>}
+      {save.error && <p className="text-sm text-destructive">{(save.error as Error).message}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button

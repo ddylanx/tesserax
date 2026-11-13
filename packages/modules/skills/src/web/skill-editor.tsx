@@ -31,7 +31,7 @@ export function SkillEditor({ name, extras }: { name: string; extras?: (s: { nam
         </CardHeader>
         <CardContent>
           <textarea className="min-h-[420px] w-full rounded-md border bg-background p-3 font-mono text-xs leading-5" value={text} onChange={e => setText(e.target.value)} spellCheck={false} />
-          {save.error && <p className="mt-2 text-sm text-red-600">{(save.error as Error).message}</p>}
+          {save.error && <p className="mt-2 text-sm text-destructive">{(save.error as Error).message}</p>}
         </CardContent>
       </Card>
       {extras?.({ name, dirty })}

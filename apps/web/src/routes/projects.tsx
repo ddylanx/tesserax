@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import type { Project } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+import { StatusPill, Tag } from '@/components/ui/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,13 +38,14 @@ export function ProjectsPage() {
               <div className="flex items-center gap-2">
                 <ProjectDot color={p.color} name={p.name} />
                 <Link to="/projects/$slug" params={{ slug: p.slug }} className="font-semibold hover:underline">{p.name}</Link>
-                <Badge variant="outline">{p.kind}</Badge>
-                {p.isDefault && <Badge variant="slate" title="Receives tasks no project rule matches">default</Badge>}
+                <Tag>{p.kind}</Tag>
+                {p.isDefault && <Tag title="Receives tasks no project rule matches">default</Tag>}
               </div>
-              <div className="flex flex-wrap gap-2 text-sm">
-                <Badge variant="blue">{p.summary.inProgress} in progress</Badge>
-                <Badge variant={p.summary.waitingForYou ? 'amber' : 'default'}>{p.summary.waitingForYou} waiting for you</Badge>
-                <Badge variant={p.summary.failedRuns ? 'red' : 'default'}>{p.summary.failedRuns} failed runs</Badge>
+              <div className="flex min-h-5 flex-wrap gap-2 text-sm">
+                {p.summary.waitingForYou > 0 && <StatusPill tone="warning">{p.summary.waitingForYou} waiting for you</StatusPill>}
+                {p.summary.inProgress > 0 && <StatusPill tone="info">{p.summary.inProgress} in progress</StatusPill>}
+                {p.summary.failedRuns > 0 && <StatusPill tone="destructive">{p.summary.failedRuns} failed {p.summary.failedRuns === 1 ? 'run' : 'runs'}</StatusPill>}
+                {!p.summary.waitingForYou && !p.summary.inProgress && !p.summary.failedRuns && <span className="text-xs text-muted-foreground">Nothing in progress</span>}
               </div>
               <div className="flex gap-2">
                 <Button size="sm" variant="outline" onClick={() => setSelected(selected === p.slug ? '' : p.slug)}>{selected === p.slug ? 'Show all' : 'Focus on it'}</Button>
@@ -59,7 +60,7 @@ export function ProjectsPage() {
           New project:
           <Input className="w-56" placeholder="name, e.g. Tesserax" value={name} onChange={e => setName(e.target.value)} />
           <Button size="sm" disabled={!slugify(name) || create.isPending} onClick={() => create.mutate()}><Plus className="size-3.5" />Create</Button>
-          {create.error && <span className="text-red-600">{(create.error as Error).message}</span>}
+          {create.error && <span className="text-destructive">{(create.error as Error).message}</span>}
         </CardContent>
       </Card>
     </Page>

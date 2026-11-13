@@ -20,6 +20,7 @@ import { autoScrollForElements } from '@atlaskit/pragmatic-drag-and-drop-auto-sc
 import { cn } from '@/lib/utils';
 import { ProjectDot } from '@/lib/project-context';
 import { Button } from '@/components/ui/button';
+import { StatusPill } from '@/components/ui/status-pill';
 import { renderPriorityBadge, renderTypeBadge } from '@/components/task-badges';
 
 export interface TaskBoardProps {
@@ -115,10 +116,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-sky-500/30 bg-sky-500/10 px-2 py-0.5 text-xs font-medium text-sky-700 hover:bg-sky-500/20 dark:text-sky-300 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-sky-500 animate-pulse" />
-              Running{run.currentNodeLabel ? ` · ${run.currentNodeLabel}` : ''} →
+              <StatusPill tone="info" pulse className="truncate">Running{run.currentNodeLabel ? ` · ${run.currentNodeLabel}` : ''} →</StatusPill>
             </Link>
           )}
           {run.status === 'waiting' && (
@@ -126,10 +126,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-500/20 dark:text-amber-300 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-              Waiting for you →
+              <StatusPill tone="warning" pulse>Waiting for you →</StatusPill>
             </Link>
           )}
           {run.status === 'failed' && (
@@ -137,10 +136,9 @@ function BoardCard({
               to="/runs/$runId"
               params={{ runId: run.id }}
               onClick={e => e.stopPropagation()}
-              className="inline-flex items-center gap-1.5 rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-700 hover:bg-red-500/20 dark:text-red-300 transition-colors"
+              className="inline-flex max-w-full rounded-md hover:opacity-80"
             >
-              <span className="size-1.5 rounded-full bg-red-500" />
-              Failed →
+              <StatusPill tone="destructive">Failed →</StatusPill>
             </Link>
           )}
         </div>
@@ -220,7 +218,7 @@ function BoardColumnView({
     <div
       ref={columnRef}
       className={cn(
-        'flex flex-col rounded-lg bg-muted/40 p-2.5 max-h-[calc(100vh-260px)] transition-all',
+        'flex flex-col rounded-lg bg-muted/40 p-2.5 max-h-[calc(100dvh-308px)] transition-all',
         over && 'ring-2 ring-primary/50',
       )}
     >
@@ -336,13 +334,13 @@ export function TaskBoard({
   return (
     <div>
       {error && (
-        <div className="mb-3 flex items-center justify-between rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-600 dark:text-red-400">
+        <div className="mb-3 flex items-center justify-between rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <span>{error}</span>
           {onDismissError && (
             <button
               type="button"
               onClick={onDismissError}
-              className="ml-2 rounded p-0.5 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer"
+              className="ml-2 rounded p-0.5 hover:bg-destructive/20 text-destructive cursor-pointer"
             >
               <X className="size-3.5" />
             </button>

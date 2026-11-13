@@ -118,7 +118,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
           <label className="flex flex-col gap-1 text-xs sm:col-span-2">Workplace (required: repo checkout and brand)
             <WorkplaceSelect view={registry.data} value={f.workplaceId ?? ''} onChange={pickWorkplace} required />
             {registry.data && f.workplaceId && <WorkplaceInfo view={registry.data} w={workplace} />}
-            {registry.data && !registry.data.workplaces.length && <span className="text-amber-600">No workplace yet: add one on the Repos page.</span>}
+            {registry.data && !registry.data.workplaces.length && <span className="text-warning">No workplace yet: add one on the Repos page.</span>}
           </label>
           <label className="flex flex-col gap-1 text-xs">Priority
             <Select value={f.priority ?? ''} onChange={e => set('priority', (e.target.value || undefined) as Form['priority'])}>
@@ -165,7 +165,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
             </div>
           )}
         </div>
-        {(save.error || remove.error) && <p className="text-sm text-red-600">{((save.error ?? remove.error) as Error).message}</p>}
+        {(save.error || remove.error) && <p className="text-sm text-destructive">{((save.error ?? remove.error) as Error).message}</p>}
         <div className="flex items-center justify-between gap-2">
           {task ? (
             <Button variant="ghost" onClick={() => confirm(`Delete ${task.key}? Its runs are deleted too.`) && remove.mutate()}><Trash2 className="size-3.5" />Delete</Button>

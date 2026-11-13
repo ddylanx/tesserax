@@ -109,7 +109,7 @@ export function AgentsPage() {
                       <div className="text-xs">
                         <b>{s.lastEvent}</b>{s.lastTool && s.status === 'running' ? ` · ${s.lastTool}` : ''} · {timeAgo(s.lastEventAt)}
                       </div>
-                      {s.lastMessage && <div className="text-xs text-amber-700 dark:text-amber-400">{s.lastMessage}</div>}
+                      {s.lastMessage && <div className="text-xs text-warning">{s.lastMessage}</div>}
                       {s.lastPrompt && <div className="truncate text-xs text-muted-foreground" title={s.lastPrompt}>“{s.lastPrompt}”</div>}
                       <div className="text-xs text-muted-foreground">{s.promptCount} prompts · {s.toolCount} tool calls{s.model ? ` · ${s.model}` : ''}</div>
                     </Td>

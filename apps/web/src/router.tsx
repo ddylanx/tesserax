@@ -17,7 +17,7 @@ import { ProjectsPage } from './routes/projects';
 import { ProjectDetailPage } from './routes/project-detail';
 
 const rootRoute = createRootRoute({ component: Layout });
-const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/runs' }); } });
+const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: '/', beforeLoad: () => { throw redirect({ to: '/inbox' }); } });
 const inboxRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/inbox',

@@ -9,10 +9,10 @@ import { api } from '@/lib/api';
 import { cn, timeAgo } from '@/lib/utils';
 
 const STATE: Record<AgentState, { label: string; variant: 'blue' | 'slate' | 'amber' | 'red' | 'outline'; icon: typeof Loader2; ring: string }> = {
-  running: { label: 'working', variant: 'blue', icon: Loader2, ring: 'ring-sky-500' },
+  running: { label: 'working', variant: 'blue', icon: Loader2, ring: 'ring-info' },
   queued: { label: 'about to start', variant: 'slate', icon: Clock, ring: 'ring-slate-400' },
-  waiting: { label: 'waiting for you', variant: 'amber', icon: Hand, ring: 'ring-amber-500' },
-  failed: { label: 'last step failed', variant: 'red', icon: AlertTriangle, ring: 'ring-red-500' },
+  waiting: { label: 'waiting for you', variant: 'amber', icon: Hand, ring: 'ring-warning' },
+  failed: { label: 'last step failed', variant: 'red', icon: AlertTriangle, ring: 'ring-destructive' },
   idle: { label: 'idle', variant: 'outline', icon: Moon, ring: 'ring-transparent' },
 };
 
@@ -69,8 +69,8 @@ export function TeamLive({ departments, roles, scopeParam }: { departments: Depa
       </div>
 
       {act.waitingForYou.length > 0 && (
-        <section className="flex flex-col gap-2 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3">
-          <h2 className="flex items-center gap-2 font-semibold"><Hand className="size-4 text-amber-600" />Waiting for you</h2>
+        <section className="flex flex-col gap-2 rounded-xl border border-warning/40 bg-warning/5 p-3">
+          <h2 className="flex items-center gap-2 font-semibold"><Hand className="size-4 text-warning" />Waiting for you</h2>
           <ul className="flex flex-col gap-1 text-sm">
             {act.waitingForYou.map(s => (
               <li key={s.nodeRunId} className="flex flex-wrap items-center gap-2">
@@ -127,7 +127,7 @@ function AgentDesk({ title, roleKey, color, enabled, activity, now }: { title: s
           >
             {roleKey ? initials(title) : '·'}
           </div>
-          {activity.state === 'running' && <span className="absolute -right-0.5 -top-0.5 size-3 animate-ping rounded-full bg-sky-500" />}
+          {activity.state === 'running' && <span className="absolute -right-0.5 -top-0.5 size-3 animate-ping rounded-full bg-info" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="truncate font-medium">{title}</div>
@@ -155,15 +155,15 @@ function AgentDesk({ title, roleKey, color, enabled, activity, now }: { title: s
       {activity.last && (
         <div className="flex flex-col gap-0.5 border-t pt-2 text-xs">
           <div className="flex flex-wrap items-center gap-1.5 text-muted-foreground">
-            {activity.last.status === 'failed' ? <AlertTriangle className="size-3 text-red-600" /> : <CheckCircle2 className="size-3 text-emerald-600" />}
+            {activity.last.status === 'failed' ? <AlertTriangle className="size-3 text-destructive" /> : <CheckCircle2 className="size-3 text-success" />}
             <span>Last:</span>
             <StepLink step={activity.last} small />
             <span>{timeAgo(activity.last.endedAt)}</span>
             {activity.last.confidence && <Badge variant="outline">confidence {activity.last.confidence}</Badge>}
           </div>
-          {activity.last.error && <p className="line-clamp-2 text-red-700 dark:text-red-400">{activity.last.error}</p>}
+          {activity.last.error && <p className="line-clamp-2 text-destructive">{activity.last.error}</p>}
           {activity.last.summary && <p className="line-clamp-3 whitespace-pre-line">{activity.last.summary}</p>}
-          {activity.last.decisionNeeded && <p className="line-clamp-2 text-amber-700 dark:text-amber-400"><Pause className="mr-1 inline size-3" />Needs a decision: {activity.last.decisionNeeded}</p>}
+          {activity.last.decisionNeeded && <p className="line-clamp-2 text-warning"><Pause className="mr-1 inline size-3" />Needs a decision: {activity.last.decisionNeeded}</p>}
         </div>
       )}
 
@@ -196,7 +196,7 @@ function LogTail({ step }: { step: AgentStep }) {
   const lines = (q.data?.text ?? '').split('\n').map(l => l.trimEnd()).filter(Boolean).slice(-3);
   if (!lines.length) return null;
   return (
-    <pre className="max-h-20 overflow-hidden rounded-md bg-black/80 p-2 font-mono text-[11px] leading-4 text-emerald-200">
+    <pre className="max-h-20 overflow-hidden rounded-md bg-black/80 p-2 font-mono text-[11px] leading-4 text-success">
       {lines.map(l => (l.length > 160 ? `${l.slice(0, 160)}…` : l)).join('\n')}
     </pre>
   );

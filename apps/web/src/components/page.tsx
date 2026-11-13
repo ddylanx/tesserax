@@ -17,7 +17,7 @@ export function Page({ title, description, actions, children }: { title: string;
 
 export function QueryState({ isLoading, error, empty, emptyText }: { isLoading: boolean; error: unknown; empty?: boolean; emptyText?: string }) {
   if (isLoading) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
-  if (error) return <p className="p-4 text-sm text-red-600">{String((error as Error).message ?? error)}</p>;
+  if (error) return <p className="p-4 text-sm text-destructive">{String((error as Error).message ?? error)}</p>;
   if (empty) return <p className="p-4 text-sm text-muted-foreground">{emptyText ?? 'Nothing here yet.'}</p>;
   return null;
 }

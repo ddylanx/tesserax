@@ -169,7 +169,7 @@ function DepartmentDialog({ department, onClose, onSaved }: { department?: Depar
         <label className="flex flex-col gap-1 text-xs">Color<Input type="color" value={f.color} onChange={e => setF({ ...f, color: e.target.value })} /></label>
         <label className="flex flex-col gap-1 text-xs sm:col-span-2">Description<Input value={f.description} onChange={e => setF({ ...f, description: e.target.value })} /></label>
       </div>
-      {save.error && <p className="text-sm text-red-600">{(save.error as Error).message}</p>}
+      {save.error && <p className="text-sm text-destructive">{(save.error as Error).message}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button disabled={!f.name.trim() || !f.slug.trim() || save.isPending} onClick={() => save.mutate()}>Save</Button>
@@ -281,7 +281,7 @@ function RoleDialog({ role, departmentId, departments, onClose, onSaved }: { rol
             <label key={s.path} className="flex items-center gap-1"><input type="checkbox" checked={f.skills.includes(s.path)} onChange={() => set('skills', toggle(f.skills, s.path))} />{s.name}</label>
           ))}
           {f.skills.filter(p => !skills.data?.some(s => s.path === p)).map(p => (
-            <label key={p} className="flex items-center gap-1 text-red-600"><input type="checkbox" checked onChange={() => set('skills', toggle(f.skills, p))} />{p} (missing)</label>
+            <label key={p} className="flex items-center gap-1 text-destructive"><input type="checkbox" checked onChange={() => set('skills', toggle(f.skills, p))} />{p} (missing)</label>
           ))}
           {!skills.data?.length && <span className="text-muted-foreground">No skills found.</span>}
         </div>
@@ -312,10 +312,10 @@ function RoleDialog({ role, departmentId, departments, onClose, onSaved }: { rol
       <div className="flex flex-col gap-1 text-xs">
         <span>Prompt (markdown, placed before the skills and the step's prompt)</span>
         <MarkdownPanel text={f.prompt} onChange={v => set('prompt', v)} startInSource={!f.prompt} maxHeight="max-h-72" />
-        <span className={f.prompt.length > ROLE_LIMITS.prompt ? 'text-red-600' : 'text-muted-foreground'}>{f.prompt.length} / {ROLE_LIMITS.prompt} characters. Never put tokens or passwords here.</span>
+        <span className={f.prompt.length > ROLE_LIMITS.prompt ? 'text-destructive' : 'text-muted-foreground'}>{f.prompt.length} / {ROLE_LIMITS.prompt} characters. Never put tokens or passwords here.</span>
       </div>
 
-      {save.error && <p className="whitespace-pre-wrap text-sm text-red-600">{(save.error as Error).message}</p>}
+      {save.error && <p className="whitespace-pre-wrap text-sm text-destructive">{(save.error as Error).message}</p>}
       <div className="flex justify-end gap-2">
         <Button variant="ghost" onClick={onClose}>Cancel</Button>
         <Button disabled={!f.title.trim() || !f.slug.trim() || !f.departmentId || save.isPending} onClick={() => save.mutate()}>Save</Button>

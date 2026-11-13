@@ -156,7 +156,7 @@ export function McpPage() {
         </Button>
       }
     >
-      <div className="rounded-lg border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-800 dark:text-sky-300">
+      <div className="rounded-lg border border-info/30 bg-info/10 p-3 text-xs text-info">
         <strong>Antigravity policy note:</strong> Antigravity grants are synchronized globally to{' '}
         <code>~/.gemini/antigravity-cli/settings.json</code>. Rules configured here apply to all <code>agy</code> runs on this machine.
       </div>
@@ -322,8 +322,8 @@ export function McpPage() {
           role="dialog"
           aria-modal="true"
         >
-          <div className="flex max-h-[92vh] w-full max-w-md flex-col gap-3 rounded-xl border border-red-500/50 bg-card p-5 shadow-2xl">
-            <div className="flex items-center gap-2 text-red-600">
+          <div className="flex max-h-[92vh] w-full max-w-md flex-col gap-3 rounded-xl border border-destructive/50 bg-card p-5 shadow-2xl">
+            <div className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="size-5" />
               <h3 className="font-semibold text-base">Production MCP Server Confirmation</h3>
             </div>
@@ -341,7 +341,7 @@ export function McpPage() {
               </Button>
               <Button
                 variant="default"
-                className="bg-red-600 text-white hover:bg-red-700"
+                className="bg-destructive text-destructive-foreground hover:opacity-90"
                 onClick={() => {
                   const target = prodConfirm;
                   setProdConfirm(null);

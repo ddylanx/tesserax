@@ -6,10 +6,10 @@ const badge = cva('inline-flex items-center gap-1 rounded-md border px-1.5 py-0.
   variants: {
     variant: {
       default: 'bg-muted text-foreground',
-      green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-      amber: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
-      blue: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-400',
-      red: 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400',
+      green: 'border-success/30 bg-success/10 text-success',
+      amber: 'border-warning/30 bg-warning/10 text-warning',
+      blue: 'border-info/30 bg-info/10 text-info',
+      red: 'border-destructive/30 bg-destructive/10 text-destructive',
       purple: 'border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-400',
       indigo: 'border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-400',
       slate: 'border-slate-500/30 bg-slate-500/10 text-slate-700 dark:text-slate-300',

@@ -69,7 +69,7 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
         </div>
         <div className="truncate text-sm text-muted-foreground">{task.title}</div>
         {active && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+          <div className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
             {task.key} already has a run on <b>{active.workflowId}</b> ({active.status}{active.currentNodeLabel ? `, at “${active.currentNodeLabel}”` : ''}).
             Starting does not create a second run: it would reopen that one. To use the workflow below, cancel it and start again.
           </div>
@@ -86,7 +86,7 @@ export function StartWorkflowDialog({ task, onClose }: { task: TaskRef; onClose:
             Suggested: <b>{suggestion.id}</b> {suggestion.rule ? `(rule “${suggestion.rule}”)` : '(default, no rule matched)'}. Rules are on the Workflows page.
           </p>
         )}
-        {start.error && <p className="text-sm text-red-600">{(start.error as Error).message}</p>}
+        {start.error && <p className="text-sm text-destructive">{(start.error as Error).message}</p>}
         <div className="flex flex-wrap justify-end gap-2">
           <Button variant="ghost" onClick={onClose}>Close</Button>
           {active ? (
@@ -128,7 +128,7 @@ export function ChangeWorkflow({ run }: { run: WorkflowRunDetail }) {
           Switch
         </Button>
       )}
-      {change.error && <span className="text-red-600">{(change.error as Error).message}</span>}
+      {change.error && <span className="text-destructive">{(change.error as Error).message}</span>}
     </div>
   );
 }
