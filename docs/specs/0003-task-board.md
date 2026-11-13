@@ -105,6 +105,19 @@ progress / Done) that calls the same endpoint, so the board works by keyboard an
 - By hand in the running app: drag local cards between columns, a refused drop rolls back, a Jira card cannot be picked
   up, a run reaching a gate moves its card to In review.
 
+## Swimlanes, quick filters and sort (2026-11-13)
+
+- **Release.** `tasks.release` (migration 016): a Jira task takes it from `fixVersions` (the earliest unreleased version by
+  release date, else the latest released one), filled on every sync; a local task gets it in the task dialog (free text,
+  with names already in use as suggestions). A "phase" is just a release name.
+- **Group by** (board): None / Release / Sprint / Priority / Assignee / Epic (`parent`). Each lane holds the four columns,
+  collapses, and shows its count. Lanes are in natural name order (v1.2 before v1.10), priority lanes by rank, and the
+  "No …" lane last. A drop still only changes the status.
+- **Quick filters** (list and board): Release, Priority, Assignee, Type, picked from the values on the loaded tasks, with a
+  "No …" choice. Applied in the browser.
+- **Sort inside a column:** Priority (default), Last updated, Due date, Key; missing values last.
+- Group by, sort and quick filters are kept in local storage (`tesserax:board-prefs`). Helpers live in `board.ts`.
+
 ## Later
 
 - Write a drop on a Jira card back to Jira with the transitions API (needs write access, and a change to the rule that

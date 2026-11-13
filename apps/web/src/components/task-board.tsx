@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from '@tanstack/react-router';
-import { Lock, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Lock, X } from 'lucide-react';
 import {
   activeRun,
   boardColumn,
   canDragCard,
-  compareCards,
+  compareCardsBy,
+  laneOf,
+  sortLanes,
   BOARD_COLUMNS,
+  BOARD_GROUP_LABELS,
   BOARD_COLUMN_LABELS,
   DROPPABLE_COLUMNS,
   type BoardColumn,
+  type BoardGroup,
+  type BoardSort,
   type DroppableColumn,
   type TaskDto,
   type WorkflowRunDto,
@@ -34,6 +39,9 @@ export interface TaskBoardProps {
   onOpen: (task: TaskDto) => void;
   error?: string | null;
   onDismissError?: () => void;
+  /** Swimlanes; 'none' = plain columns. */
+  group?: BoardGroup;
+  sort?: BoardSort;
 }
 
 interface BoardCardProps {
@@ -181,6 +189,8 @@ interface BoardColumnViewProps {
   onLoadMoreDone: () => void;
   onMove: (task: TaskDto, to: DroppableColumn) => void;
   onOpen: (task: TaskDto) => void;
+  /** Inside a swimlane: no header, no own scroll, no "Load more". */
+  inLane?: boolean;
 }
 
 function BoardColumnView({
@@ -193,6 +203,7 @@ function BoardColumnView({
   onLoadMoreDone,
   onMove,
   onOpen,
+  inLane = false,
 }: BoardColumnViewProps) {
   const columnRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -218,12 +229,13 @@ function BoardColumnView({
     <div
       ref={columnRef}
       className={cn(
-        'flex flex-col rounded-lg bg-muted/40 p-2.5 max-h-[calc(100dvh-308px)] transition-all',
+        'flex flex-col rounded-lg bg-muted/40 p-2.5 transition-all',
+        !inLane && 'max-h-[calc(100dvh-308px)]',
         over && 'ring-2 ring-primary/50',
       )}
     >
       {/* Column Header */}
-      <div className="flex items-center justify-between px-1.5 py-1 mb-2 shrink-0">
+      {!inLane && <div className="flex items-center justify-between px-1.5 py-1 mb-2 shrink-0">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm">{BOARD_COLUMN_LABELS[column]}</span>
           {column === 'done' && (
@@ -233,12 +245,12 @@ function BoardColumnView({
         <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
           {tasks.length}
         </span>
-      </div>
+      </div>}
 
       {/* Scrollable Card List */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-2.5 pr-1 min-h-[120px]">
+      <div ref={scrollRef} className={cn('flex-1 space-y-2.5 pr-1', inLane ? 'min-h-12' : 'overflow-y-auto min-h-[120px]')}>
         {tasks.length === 0 ? (
-          <div className="flex items-center justify-center h-24 text-xs text-muted-foreground">
+          <div className={cn('flex items-center justify-center text-xs text-muted-foreground', inLane ? 'h-10' : 'h-24')}>
             Nothing here
           </div>
         ) : (
@@ -256,7 +268,7 @@ function BoardColumnView({
         )}
 
         {/* Load more button in Done column */}
-        {column === 'done' && doneHasMore && (
+        {column === 'done' && doneHasMore && !inLane && (
           <div className="pt-2 text-center shrink-0">
             <Button
               variant="ghost"
@@ -285,7 +297,17 @@ export function TaskBoard({
   onOpen,
   error,
   onDismissError,
+  group = 'none',
+  sort = 'priority',
 }: TaskBoardProps) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  const toggleLane = (id: string) =>
+    setCollapsed(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   const tasksById = useRef<Map<string, TaskDto>>(new Map());
   const onMoveRef = useRef(onMove);
   useEffect(() => {
@@ -310,12 +332,34 @@ export function TaskBoard({
 
     tasksById.current = map;
 
+    const cmp = compareCardsBy(sort);
     for (const col of BOARD_COLUMNS) {
-      cols[col].sort(compareCards);
+      cols[col].sort(cmp);
     }
 
     return cols;
-  }, [tasks, runs]);
+  }, [tasks, runs, sort]);
+
+  // Swimlanes: the same columns split by lane (release, sprint, …), in lane order.
+  const lanes = useMemo(() => {
+    if (group === 'none') return [];
+    const keys = sortLanes(tasks.map(t => laneOf(t, group)), group);
+    return keys.map(key => ({
+      key,
+      id: key ?? '\u0000none',
+      cols: Object.fromEntries(BOARD_COLUMNS.map(c => [c, columns[c].filter(t => laneOf(t, group) === key)])) as Record<BoardColumn, TaskDto[]>,
+    }));
+  }, [tasks, columns, group]);
+
+  const columnProps = {
+    runs,
+    showProjectDot,
+    doneHasMore,
+    doneLoadingMore,
+    onLoadMoreDone,
+    onMove,
+    onOpen,
+  };
 
   useEffect(() => {
     return monitorForElements({
@@ -349,22 +393,63 @@ export function TaskBoard({
       )}
 
       <div className="overflow-x-auto pb-4">
-        <div className="grid grid-cols-4 gap-3 min-w-[960px]">
-          {BOARD_COLUMNS.map(col => (
-            <BoardColumnView
-              key={col}
-              column={col}
-              tasks={columns[col]}
-              runs={runs}
-              showProjectDot={showProjectDot}
-              doneHasMore={doneHasMore}
-              doneLoadingMore={doneLoadingMore}
-              onLoadMoreDone={onLoadMoreDone}
-              onMove={onMove}
-              onOpen={onOpen}
-            />
-          ))}
-        </div>
+        {group === 'none' ? (
+          <div className="grid grid-cols-4 gap-3 min-w-[960px]">
+            {BOARD_COLUMNS.map(col => (
+              <BoardColumnView key={col} column={col} tasks={columns[col]} {...columnProps} />
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 min-w-[960px]">
+            {/* Column names once, above the lanes */}
+            <div className="grid grid-cols-4 gap-3 px-2.5">
+              {BOARD_COLUMNS.map(col => (
+                <div key={col} className="flex items-center justify-between text-sm font-semibold">
+                  <span>
+                    {BOARD_COLUMN_LABELS[col]}
+                    {col === 'done' && <span className="ml-2 text-[11px] font-normal text-muted-foreground">last 14 days</span>}
+                  </span>
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{columns[col].length}</span>
+                </div>
+              ))}
+            </div>
+            {lanes.length === 0 && <div className="py-8 text-center text-xs text-muted-foreground">Nothing here</div>}
+            {lanes.map(lane => {
+              const open = !collapsed.has(lane.id);
+              const count = BOARD_COLUMNS.reduce((n, c) => n + lane.cols[c].length, 0);
+              return (
+                <section key={lane.id} className="rounded-lg border border-border/60">
+                  <button
+                    type="button"
+                    aria-expanded={open}
+                    onClick={() => toggleLane(lane.id)}
+                    className="flex w-full items-center gap-1.5 px-2.5 py-2 text-left text-sm font-medium hover:bg-muted/40 cursor-pointer"
+                  >
+                    {open ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
+                    <span className={cn('truncate', lane.key === null && 'text-muted-foreground')}>
+                      {lane.key ?? `No ${BOARD_GROUP_LABELS[group].toLowerCase()}`}
+                    </span>
+                    <span className="text-xs text-muted-foreground">({count})</span>
+                  </button>
+                  {open && (
+                    <div className="grid grid-cols-4 gap-3 px-2.5 pb-2.5">
+                      {BOARD_COLUMNS.map(col => (
+                        <BoardColumnView key={col} column={col} tasks={lane.cols[col]} inLane {...columnProps} />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+            {doneHasMore && (
+              <div className="text-center">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" disabled={doneLoadingMore} onClick={onLoadMoreDone}>
+                  {doneLoadingMore ? 'Loading…' : 'Load more done tasks'}
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

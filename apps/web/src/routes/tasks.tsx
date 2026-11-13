@@ -32,6 +32,15 @@ import {
   type TaskQuery,
   type WorkflowRunList,
   groupByWorkType,
+  matchesQuickFilters,
+  BOARD_GROUPS,
+  BOARD_GROUP_LABELS,
+  BOARD_SORTS,
+  BOARD_SORT_LABELS,
+  NO_VALUE,
+  type BoardGroup,
+  type BoardSort,
+  type QuickFilters,
 } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +56,35 @@ import { renderPriorityBadge, renderTypeBadge } from '@/components/task-badges';
 
 const STORAGE_KEY = 'tesserax:tasks-filter-v2';
 const VIEW_STORAGE_KEY = 'tesserax:tasks-view';
+const PREFS_STORAGE_KEY = 'tesserax:board-prefs';
+
+interface BoardPrefs {
+  group: BoardGroup;
+  sort: BoardSort;
+  quick: QuickFilters;
+}
+
+function loadBoardPrefs(): BoardPrefs {
+  const prefs: BoardPrefs = { group: 'none', sort: 'priority', quick: {} };
+  try {
+    const p = JSON.parse(localStorage.getItem(PREFS_STORAGE_KEY) ?? '{}');
+    if ((BOARD_GROUPS as readonly string[]).includes(p.group)) prefs.group = p.group;
+    if ((BOARD_SORTS as readonly string[]).includes(p.sort)) prefs.sort = p.sort;
+    for (const k of ['release', 'priority', 'assignee', 'type'] as const) {
+      if (typeof p.quick?.[k] === 'string' && p.quick[k]) prefs.quick[k] = p.quick[k];
+    }
+  } catch {
+    /* ignore storage issues */
+  }
+  return prefs;
+}
+
+const QUICK_FILTERS = [
+  { key: 'release', label: 'Release' },
+  { key: 'priority', label: 'Priority' },
+  { key: 'assignee', label: 'Assignee' },
+  { key: 'type', label: 'Type' },
+] as const;
 
 function loadCachedView(): 'list' | 'board' {
   if (typeof window === 'undefined') return 'list';
@@ -138,8 +176,17 @@ export function TasksPage() {
     }
   }, [f]);
 
+  const [prefs, setPrefs] = useState<BoardPrefs>(loadBoardPrefs);
+  useEffect(() => {
+    try {
+      localStorage.setItem(PREFS_STORAGE_KEY, JSON.stringify(prefs));
+    } catch {}
+  }, [prefs]);
+  const setQuick = (k: keyof QuickFilters) => (v: string) => setPrefs(p => ({ ...p, quick: { ...p.quick, [k]: v || undefined } }));
+
   const clearFilters = () => {
     setF({});
+    setPrefs(p => ({ ...p, quick: {} }));
     try {
       localStorage.removeItem(STORAGE_KEY);
     } catch {}
@@ -384,7 +431,17 @@ export function TasksPage() {
   };
 
   const d = view === 'list' ? q.data : boardOpenQ.data;
-  const tasks = d?.tasks ?? [];
+  const loaded = view === 'list' ? (q.data?.tasks ?? []) : boardTasks;
+  // quick filter choices come from the tasks loaded for the current view
+  const quickOptions = useMemo(
+    () =>
+      Object.fromEntries(
+        QUICK_FILTERS.map(({ key }) => [key, [...new Set(loaded.map(t => t[key]).filter((v): v is string => !!v))].sort()]),
+      ) as Record<keyof QuickFilters, string[]>,
+    [loaded],
+  );
+  const tasks = (q.data?.tasks ?? []).filter(t => matchesQuickFilters(t, prefs.quick));
+  const filteredBoardTasks = useMemo(() => boardTasks.filter(t => matchesQuickFilters(t, prefs.quick)), [boardTasks, prefs.quick]);
 
   const activeFilterCount = [
     f.q,
@@ -392,6 +449,7 @@ export function TasksPage() {
     f.board,
     view === 'list' ? f.statusCategory : undefined,
     f.includeArchived === '1' ? 'archived' : undefined,
+    ...QUICK_FILTERS.map(({ key }) => prefs.quick[key]),
   ].filter(Boolean).length;
 
   return (
@@ -552,7 +610,7 @@ export function TasksPage() {
             </label>
           </div>
 
-          {/* Reset Filters button */}
+          {/* Reset Filters button (quick filters included) */}
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
@@ -564,6 +622,49 @@ export function TasksPage() {
               <RotateCcw className="size-3" />
               Reset filters ({activeFilterCount})
             </Button>
+          )}
+        </div>
+
+        {/* Quick filters (both views), and Group by / Sort (board) */}
+        <div className="flex flex-wrap items-center gap-2">
+          {QUICK_FILTERS.map(({ key, label }) => (
+            <Select
+              key={key}
+              aria-label={`${label} filter`}
+              value={prefs.quick[key] ?? ''}
+              onChange={e => setQuick(key)(e.target.value)}
+              className={cn('h-8 text-xs font-medium cursor-pointer', prefs.quick[key] ? 'border-primary/50 bg-primary/5 text-primary font-semibold' : '')}
+            >
+              <option value="">{label}: any</option>
+              <option value={NO_VALUE}>No {label.toLowerCase()}</option>
+              {quickOptions[key].map(v => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </Select>
+          ))}
+          {view === 'board' && (
+            <div className="ml-auto flex items-center gap-2">
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Group by
+                <Select
+                  value={prefs.group}
+                  onChange={e => setPrefs(p => ({ ...p, group: e.target.value as BoardGroup }))}
+                  className="h-8 text-xs cursor-pointer"
+                >
+                  {BOARD_GROUPS.map(g => <option key={g} value={g}>{BOARD_GROUP_LABELS[g]}</option>)}
+                </Select>
+              </label>
+              <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                Sort
+                <Select
+                  value={prefs.sort}
+                  onChange={e => setPrefs(p => ({ ...p, sort: e.target.value as BoardSort }))}
+                  className="h-8 text-xs cursor-pointer"
+                >
+                  {BOARD_SORTS.map(o => <option key={o} value={o}>{BOARD_SORT_LABELS[o]}</option>)}
+                </Select>
+              </label>
+            </div>
           )}
         </div>
 
@@ -648,8 +749,10 @@ export function TasksPage() {
           <QueryState isLoading={boardOpenQ.isLoading} error={boardOpenQ.error} />
           {!boardOpenQ.isLoading && !boardOpenQ.error && (
             <TaskBoard
-              tasks={boardTasks}
+              tasks={filteredBoardTasks}
               runs={latestRuns}
+              group={prefs.group}
+              sort={prefs.sort}
               showProjectDot={!project}
               doneHasMore={Boolean(boardDoneQ.hasNextPage)}
               doneLoadingMore={boardDoneQ.isFetchingNextPage}

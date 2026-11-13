@@ -56,7 +56,7 @@ export function canDragCard(
   return task.source === 'local' && (run === null || run.status === 'failed');
 }
 
-function priorityRank(priority: string | null | undefined): number {
+export function priorityRank(priority: string | null | undefined): number {
   if (!priority) return 5;
   const p = priority.trim().toLowerCase();
   switch (p) {
@@ -93,4 +93,80 @@ export function compareCards(
   }
 
   return a.id.localeCompare(b.id);
+}
+
+export const BOARD_SORTS = ['priority', 'updated', 'due', 'key'] as const;
+export type BoardSort = (typeof BOARD_SORTS)[number];
+export const BOARD_SORT_LABELS: Record<BoardSort, string> = { priority: 'Priority', updated: 'Last updated', due: 'Due date', key: 'Key' };
+
+type SortableCard = Pick<TaskDto, 'priority' | 'updatedAt' | 'id' | 'dueAt' | 'key'>;
+const naturalCollator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+
+/** Order inside a column for the picked sort; ties fall back to compareCards. Missing values go last. */
+export function compareCardsBy(sort: BoardSort): (a: SortableCard, b: SortableCard) => number {
+  if (sort === 'priority') return compareCards;
+  const pick = (t: SortableCard) => (sort === 'due' ? t.dueAt : sort === 'key' ? t.key : t.updatedAt);
+  const dir = sort === 'updated' ? -1 : 1;
+  return (a, b) => {
+    const va = pick(a);
+    const vb = pick(b);
+    if (va !== vb) {
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      const d = naturalCollator.compare(va, vb) * dir;
+      if (d !== 0) return d;
+    }
+    return compareCards(a, b);
+  };
+}
+
+export const BOARD_GROUPS = ['none', 'release', 'sprint', 'priority', 'assignee', 'epic'] as const;
+export type BoardGroup = (typeof BOARD_GROUPS)[number];
+export const BOARD_GROUP_LABELS: Record<BoardGroup, string> = {
+  none: 'None', release: 'Release', sprint: 'Sprint', priority: 'Priority', assignee: 'Assignee', epic: 'Epic',
+};
+
+type GroupableCard = Pick<TaskDto, 'release' | 'sprint' | 'priority' | 'assignee' | 'parent'>;
+
+/** Swimlane of a card; null = the "No …" lane. */
+export function laneOf(task: GroupableCard, group: BoardGroup): string | null {
+  switch (group) {
+    case 'release': return task.release;
+    case 'sprint': return task.sprint;
+    case 'priority': return task.priority;
+    case 'assignee': return task.assignee;
+    case 'epic': return task.parent;
+    default: return null;
+  }
+}
+
+/** Lanes in display order: priority by rank, others by natural name order (v1.2 before v1.10); the null lane last. */
+export function sortLanes(lanes: (string | null)[], group: BoardGroup): (string | null)[] {
+  return [...new Set(lanes)].sort((a, b) => {
+    if (a === b) return 0;
+    if (a === null) return 1;
+    if (b === null) return -1;
+    if (group === 'priority') {
+      const d = priorityRank(a) - priorityRank(b);
+      if (d !== 0) return d;
+    }
+    return naturalCollator.compare(a, b);
+  });
+}
+
+/** Quick filters (Release, Priority, Assignee, Type) applied in the browser; an empty value means "any". "__none" matches a missing value. */
+export interface QuickFilters {
+  release?: string;
+  priority?: string;
+  assignee?: string;
+  type?: string;
+}
+export const NO_VALUE = '__none';
+
+export function matchesQuickFilters(task: Pick<TaskDto, 'release' | 'priority' | 'assignee' | 'type'>, f: QuickFilters): boolean {
+  return (['release', 'priority', 'assignee', 'type'] as const).every(k => {
+    const want = f[k];
+    if (!want) return true;
+    return want === NO_VALUE ? !task[k] : task[k] === want;
+  });
 }

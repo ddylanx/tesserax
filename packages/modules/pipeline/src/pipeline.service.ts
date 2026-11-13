@@ -312,6 +312,7 @@ export class PipelineService {
         't.id as t_id', 't.key as t_key', 't.title as t_title', 't.status as t_status', 't.status_category as t_status_category',
         't.priority as t_priority', 't.assignee as t_assignee', 't.project as t_project', 't.type as t_type', 't.labels as t_labels',
         't.url as t_url', 't.due_at as t_due_at', 't.updated_at_source as t_updated', 't.archived_at as t_archived_at',
+        't.release as t_release', 't.sprint as t_sprint', 't.parent as t_parent',
         'w.slug as t_project_slug', 's.kind as t_source',
       ]);
   }
@@ -325,7 +326,7 @@ export class PipelineService {
       task: {
         id: r.t_id, projectSlug: r.t_project_slug, source: r.t_source, key: r.t_key, title: r.t_title, status: r.t_status,
         statusCategory: r.t_status_category, priority: r.t_priority, assignee: r.t_assignee, project: r.t_project, type: r.t_type,
-        labels: r.t_labels ?? [], url: r.t_url, dueAt: r.t_due_at ? new Date(r.t_due_at).toISOString().slice(0, 10) : null,
+        labels: r.t_labels ?? [], release: r.t_release ?? null, sprint: r.t_sprint ?? null, parent: r.t_parent ?? null, url: r.t_url, dueAt: r.t_due_at ? new Date(r.t_due_at).toISOString().slice(0, 10) : null,
         updatedAt: iso(r.t_updated), archived: r.t_archived_at != null,
       },
       classification: (r.classification as Classification | null) ?? null,

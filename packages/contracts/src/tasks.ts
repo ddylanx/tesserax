@@ -19,6 +19,11 @@ export const taskSchema = z.object({
   project: z.string().nullable(),
   type: z.string().nullable(),
   labels: z.array(z.string()),
+  /** Release or phase (Jira fixVersion); board swimlanes group by it. */
+  release: z.string().nullable(),
+  sprint: z.string().nullable(),
+  /** Parent issue (epic), "KEY summary". */
+  parent: z.string().nullable(),
   url: z.string().nullable(),
   dueAt: z.string().nullable(),
   updatedAt: z.string().nullable(),
@@ -90,6 +95,8 @@ export const createLocalTaskSchema = z.object({
   /** Workplace (Repos page) the workflow works in. */
   workplaceId: z.string().max(60).nullable().optional(),
   labels: z.array(z.string().min(1).max(50)).max(20).default([]),
+  /** Release or phase name; empty clears it. */
+  release: z.string().trim().max(100).optional(),
   dueAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   review: reviewTargetSchema.optional(),
 });
@@ -111,8 +118,6 @@ export const taskDetailSchema = taskSchema.extend({
   description: z.string().nullable(),
   reporter: z.string().nullable(),
   components: z.array(z.string()),
-  parent: z.string().nullable(),
-  sprint: z.string().nullable(),
   createdAt: z.string().nullable(),
   review: reviewTargetSchema.nullable(),
   comments: z.array(z.object({ author: z.string().nullable(), created: z.string().nullable(), body: z.string() })),

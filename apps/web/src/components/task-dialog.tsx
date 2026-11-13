@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto } from '@tesserax/contracts';
+import { LOCAL_TASK_TYPES, type CreateLocalTask, type TaskDetailDto, type TaskList } from '@tesserax/contracts';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { api } from '@/lib/api';
@@ -10,7 +10,8 @@ import { WorkplaceInfo, WorkplaceSelect, resolveWorkplace, useRepoRegistry } fro
 import { suggestWorkflow, useWorkflowChoices } from '@/components/workflow-picker';
 import { useProjectScope } from '@/lib/project-context';
 
-type Form = Omit<CreateLocalTask, 'labels' | 'review' | 'workplaceId'> & {
+type Form = Omit<CreateLocalTask, 'labels' | 'review' | 'workplaceId' | 'release'> & {
+  release: string;
   workplaceId: string;
   labels: string;
   statusCategory: 'todo' | 'in_progress' | 'done';
@@ -32,6 +33,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     project: task?.project ?? '',
     workplaceId: task?.workplaceId ?? '',
     labels: task?.labels.join(', ') ?? '',
+    release: task?.release ?? '',
     dueAt: task?.dueAt ?? undefined,
     statusCategory: task?.statusCategory ?? 'todo',
     sourceBranch: task?.review?.sourceBranch ?? '',
@@ -39,6 +41,13 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     prUrl: task?.review?.prUrl ?? '',
   }));
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF(prev => ({ ...prev, [k]: v }));
+  // release names already used on loaded tasks, offered as suggestions
+  const knownReleases = [...new Set(
+    qc.getQueriesData<TaskList | { pages: TaskList[] }>({ queryKey: ['tasks'] })
+      .flatMap(([, d]) => (d ? ('pages' in d ? d.pages : [d]) : []))
+      .flatMap(l => l.tasks.map(t => t.release))
+      .filter((r): r is string => !!r),
+  )].sort();
   const isReview = f.type === 'Code review';
   const body = () => ({
     ...(task ? {} : { projectSlug: f.projectSlug || scope.projects.find(p => p.isDefault)?.slug || scope.projects[0]?.slug }),
@@ -49,6 +58,7 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
     project: f.project || undefined,
     workplaceId: f.workplaceId || null,
     labels: f.labels.split(',').map(s => s.trim()).filter(Boolean),
+    release: f.release.trim(),
     dueAt: f.dueAt || undefined,
     ...(task ? { statusCategory: f.statusCategory } : {}),
     review: isReview && f.sourceBranch.trim()
@@ -125,6 +135,10 @@ export function TaskDialog({ task, onClose, onCreated }: { task?: TaskDetailDto;
               <option value="">–</option>
               {['Highest', 'High', 'Medium', 'Low', 'Lowest'].map(p => <option key={p}>{p}</option>)}
             </Select>
+          </label>
+          <label className="flex flex-col gap-1 text-xs">Release / phase
+            <Input list="task-release-options" value={f.release} onChange={e => set('release', e.target.value)} placeholder="e.g. v1.2 or Phase 1" maxLength={100} />
+            <datalist id="task-release-options">{knownReleases.map(r => <option key={r} value={r} />)}</datalist>
           </label>
           <label className="flex flex-col gap-1 text-xs">Labels (comma separated)
             <Input value={f.labels} onChange={e => set('labels', e.target.value)} />

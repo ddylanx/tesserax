@@ -5,8 +5,14 @@ import {
   boardColumn,
   canDragCard,
   compareCards,
+  compareCardsBy,
+  laneOf,
+  matchesQuickFilters,
+  NO_VALUE,
+  sortLanes,
   latestRunByTask,
 } from '@tesserax/contracts';
+import { pickRelease } from './jira/map';
 
 test('boardColumn handles active runs and task status categories', () => {
   // run running -> in_progress
@@ -169,4 +175,43 @@ test('compareCards orders by priority, then updatedAt desc, then id', () => {
   const idA = { id: 'a', priority: 'Low', updatedAt: '2026-10-10T00:00:00Z' };
   const idB = { id: 'b', priority: 'Low', updatedAt: '2026-10-10T00:00:00Z' };
   assert.ok(compareCards(idA, idB) < 0);
+});
+
+test('pickRelease: earliest unreleased version, else the latest released', () => {
+  assert.equal(pickRelease(undefined), null);
+  assert.equal(pickRelease([]), null);
+  assert.equal(
+    pickRelease([
+      { name: 'v2', released: false, releaseDate: '2026-12-01' },
+      { name: 'v1.5', released: false, releaseDate: '2026-11-20' },
+      { name: 'v1', released: true, releaseDate: '2026-10-01' },
+      { name: 'vNext', released: false },
+    ]),
+    'v1.5',
+  );
+  assert.equal(pickRelease([{ name: 'v1', released: true, releaseDate: '2026-01-01' }, { name: 'v2', released: true, releaseDate: '2026-05-01' }]), 'v2');
+});
+
+test('sortLanes: natural order, priority by rank, empty lane last', () => {
+  assert.deepEqual(sortLanes(['v1.10', null, 'v1.2', 'v1.2'], 'release'), ['v1.2', 'v1.10', null]);
+  assert.deepEqual(sortLanes(['Low', 'Highest', null, 'Medium'], 'priority'), ['Highest', 'Medium', 'Low', null]);
+  assert.equal(laneOf({ release: null, sprint: 'S1', priority: null, assignee: null, parent: 'E-1 Epic' }, 'epic'), 'E-1 Epic');
+});
+
+test('compareCardsBy: missing values last, updated newest first', () => {
+  const card = (id: string, dueAt: string | null, updatedAt: string | null, key: string | null = null) => ({ id, dueAt, updatedAt, key, priority: null });
+  const due = [card('a', null, null), card('b', '2026-12-01', null), card('c', '2026-11-01', null)].sort(compareCardsBy('due'));
+  assert.deepEqual(due.map(c => c.id), ['c', 'b', 'a']);
+  const upd = [card('a', null, '2026-01-01'), card('b', null, '2026-02-01')].sort(compareCardsBy('updated'));
+  assert.deepEqual(upd.map(c => c.id), ['b', 'a']);
+  const keys = [card('a', null, null, 'T-10'), card('b', null, null, 'T-9')].sort(compareCardsBy('key'));
+  assert.deepEqual(keys.map(c => c.id), ['b', 'a']);
+});
+
+test('matchesQuickFilters: any, exact, and "none"', () => {
+  const t = { release: 'v1', priority: 'High', assignee: null, type: 'Bug' };
+  assert.ok(matchesQuickFilters(t, {}));
+  assert.ok(matchesQuickFilters(t, { release: 'v1', assignee: NO_VALUE }));
+  assert.ok(!matchesQuickFilters(t, { priority: 'Low' }));
+  assert.ok(!matchesQuickFilters(t, { release: NO_VALUE }));
 });

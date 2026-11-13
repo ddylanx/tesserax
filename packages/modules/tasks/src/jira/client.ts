@@ -17,7 +17,7 @@ export interface JiraIssue {
 
 export const SEARCH_FIELDS = [
   'summary', 'status', 'priority', 'assignee', 'reporter', 'project', 'issuetype', 'labels', 'components',
-  'duedate', 'created', 'updated', 'parent', 'description',
+  'duedate', 'created', 'updated', 'parent', 'description', 'fixVersions',
 ];
 export const DETAIL_FIELDS = [...SEARCH_FIELDS, 'comment', 'attachment'];
 

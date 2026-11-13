@@ -151,6 +151,8 @@ export interface TasksTable {
   description: string | null;
   parent: string | null;
   sprint: string | null;
+  /** Jira fixVersion, or a release/phase name typed on a local task. */
+  release: string | null;
   comments: Json;
   attachments: Json;
   detail_synced_at: Timestamp | null;

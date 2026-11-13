@@ -62,7 +62,7 @@ export async function runJiraSync(db: Db, config: AppConfig, fetchFn: typeof fet
         return { ...m, project_id: source.project_id, source_id: source.id, url: client.browseUrl(m.key), synced_at: startedAt, archived_at: null };
       });
       const cols = ['key', 'title', 'status', 'status_category', 'priority', 'assignee', 'reporter', 'project', 'type', 'labels', 'components',
-        'description', 'parent', 'sprint', 'url', 'due_at', 'created_at_source', 'updated_at_source', 'raw', 'synced_at'] as const;
+        'description', 'parent', 'sprint', 'release', 'url', 'due_at', 'created_at_source', 'updated_at_source', 'raw', 'synced_at'] as const;
       const result = await db
         .insertInto('tasks')
         .values(rows)

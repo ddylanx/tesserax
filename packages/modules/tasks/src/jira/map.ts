@@ -21,6 +21,16 @@ export function pickSprint(v: unknown): string | null {
   return (parsed.find(s => s.state === 'active') ?? parsed.at(-1))?.name ?? null;
 }
 
+type JiraVersion = { name?: string; released?: boolean; releaseDate?: string };
+
+/** fixVersions -> the release the issue is aiming at: earliest unreleased (by date, undated last), else the latest released. */
+export function pickRelease(v: unknown): string | null {
+  const list = (Array.isArray(v) ? v : []).filter((x): x is JiraVersion => !!x && typeof x.name === 'string' && x.name !== '');
+  const byDate = (a: JiraVersion, b: JiraVersion) => (a.releaseDate ?? '9999').localeCompare(b.releaseDate ?? '9999');
+  const open = list.filter(x => !x.released).sort(byDate);
+  return (open[0] ?? list.sort(byDate).at(-1))?.name ?? null;
+}
+
 export interface MappedTask {
   external_id: string;
   key: string;
@@ -37,6 +47,7 @@ export interface MappedTask {
   description: string | null;
   parent: string | null;
   sprint: string | null;
+  release: string | null;
   due_at: string | null;
   created_at_source: string | null;
   updated_at_source: string | null;
@@ -61,6 +72,7 @@ export function mapIssue(issue: JiraIssue, sprintField?: string | null): MappedT
     description: richText(f.description),
     parent: f.parent ? `${f.parent.key}${f.parent.fields?.summary ? ` ${f.parent.fields.summary}` : ''}` : null,
     sprint: sprintField ? pickSprint(f[sprintField]) : null,
+    release: pickRelease(f.fixVersions),
     due_at: f.duedate ?? null,
     created_at_source: f.created ?? null,
     updated_at_source: f.updated ?? null,
