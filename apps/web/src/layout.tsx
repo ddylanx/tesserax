@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useState } from 'react';
-import type { PipelineList, WorkflowRunList } from '@tesserax/contracts';
+import { groupByWorkType, type PipelineList, type WorkflowRunList } from '@tesserax/contracts';
 import { SidebarNav } from '@/components/sidebar-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -58,7 +58,9 @@ function ProjectPicker() {
       <ProjectDot color={current?.color ?? '#94a3b8'} name={current?.name ?? 'All projects'} />
       <Select className="h-7 w-40 min-w-0 text-xs" value={selected} onChange={e => setSelected(e.target.value)} title="Show one project, or all of them" aria-label="Project">
         <option value="">All projects</option>
-        {projects.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}
+        {groupByWorkType(projects).map(([type, list]) => (
+          <optgroup key={type} label={type}>{list.map(p => <option key={p.id} value={p.slug}>{p.name}</option>)}</optgroup>
+        ))}
       </Select>
     </div>
   );

@@ -18,6 +18,7 @@ ordering inside a column, swimlanes, WIP limits, live updates over SSE, starting
 | 1 | Use an open-source board or build our own? | Build our own board. A full board app (Planka, Wekan, Kanboard…) has its own database and would need two-way sync, and does not know about runs; Planka is AGPL, which does not fit this Apache-2.0 repo. |
 | 2 | Which drag-and-drop library? | `@atlaskit/pragmatic-drag-and-drop` (Apache-2.0, actively maintained, small core), with its `auto-scroll` and `hitbox` add-ons (Apache-2.0). `@dnd-kit/core` has had no release since 12/2024 and its successor `@dnd-kit/react` is still 0.x. |
 | 3 | Which columns? | To do / In progress / In review / Done. |
+| 3b | Can a board mix projects? | No. A board shows one project, and a project holds one kind of work (`settings.workType`: dev, business…). With All projects picked, the Board view asks for a project instead; the List view still shows everything. |
 | 4 | Where does a card's column come from? | An active run decides first (see the table below), else the task's `status_category`. |
 | 5 | Which cards can be dragged? | Local tasks whose latest run is not running or waiting (a failed run does not block, so the task can still be closed). Jira tasks are read-only (their status comes from Jira sync) and show a lock. |
 | 6 | Order inside a column | Priority (highest first), then `updated_at_source` (newest first). No manual ordering yet, so no new column. |
