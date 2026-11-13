@@ -2,11 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { sql } from 'kysely';
 import type {
   ArtifactDto,
+  NodeRunDto,
   WorkflowDefinition,
   WorkflowRunDetail,
   WorkflowRunDto,
   WorkflowRunList,
 } from '@tesserax/contracts';
+import { redact } from '@tesserax/contracts';
 import { DB } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { repoRegistry } from '@tesserax/mod-repos';
@@ -121,6 +123,11 @@ export class WorkflowQueryService {
         numTurns: n.num_turns,
         model: n.model,
         skillHash: n.skill_hash,
+        role: n.role,
+        roleHash: n.role_hash,
+        summary: n.summary,
+        confidence: (n.confidence as NodeRunDto['confidence']) ?? null,
+        decisionNeeded: n.decision_needed,
         agentSessionId: n.agent_session_id,
         startedAt: iso(n.started_at),
         endedAt: iso(n.ended_at),
@@ -132,7 +139,7 @@ export class WorkflowQueryService {
           name: a.name,
           version: a.version,
           author: a.author,
-          content: a.content,
+          content: redact(a.content, process.env),
           nodeRunId: a.node_run_id,
           createdAt: a.created_at.toISOString(),
         }),

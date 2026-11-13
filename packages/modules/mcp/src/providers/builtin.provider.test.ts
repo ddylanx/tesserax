@@ -7,6 +7,9 @@ import { findRepoRoot } from '@tesserax/config';
 import { chooseMcpProvider } from '../mcp.module';
 import { BuiltinMcpProvider, parseCodexToml } from './builtin.provider';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 test('parseCodexToml parses TOML tables, env keys, commands, and URLs', () => {
   const toml = `
     # Config file for Codex CLI
@@ -47,7 +50,7 @@ test('parseCodexToml parses TOML tables, env keys, commands, and URLs', () => {
   assert.equal(parsed['other_section'], undefined);
 });
 
-test('reads Claude Code user, local and project scopes with permissions', async () => {
+test('reads Claude Code user, local and project scopes with permissions', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'ot-mcp-claude-'));
   const proj = join(home, 'proj');
   mkdirSync(proj);
@@ -105,7 +108,7 @@ test('reads Claude Code user, local and project scopes with permissions', async 
   assert.ok(!JSON.stringify(list).includes('super_secret'));
 });
 
-test('reads Cursor user and project configs', async () => {
+test('reads Cursor user and project configs', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'ot-mcp-cursor-'));
   const proj = join(home, 'my-cursor-project');
   mkdirSync(join(home, '.cursor'), { recursive: true });
@@ -147,7 +150,7 @@ test('reads Cursor user and project configs', async () => {
   assert.ok(!JSON.stringify(list).includes('secret_cursor'));
 });
 
-test('reads Claude Desktop config with OS platform variations', async () => {
+test('reads Claude Desktop config with OS platform variations', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'ot-mcp-desktop-'));
 
   // darwin
@@ -186,7 +189,7 @@ test('reads Claude Desktop config with OS platform variations', async () => {
   assert.equal(linuxList[0]?.file, '~/.config/Claude/claude_desktop_config.json');
 });
 
-test('reads Gemini CLI and Antigravity configs', async () => {
+test('reads Gemini CLI and Antigravity configs', { skip: onWindows('expects POSIX paths (~/... and / separators)') }, async () => {
   const home = mkdtempSync(join(tmpdir(), 'ot-mcp-gemini-'));
   const proj = join(home, 'gemini-project');
   mkdirSync(join(home, '.gemini', 'antigravity'), { recursive: true });

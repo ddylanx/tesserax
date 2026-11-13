@@ -36,6 +36,11 @@ export const AI_MODEL_SUGGESTIONS: Record<AiEngine, string[]> = {
 
 const tools = z.array(z.string()).default(['Read', 'Grep', 'Glob', 'Bash(git log:*)', 'Bash(git show:*)', 'Bash(git diff:*)']);
 const artifactName = z.string().regex(/^[a-z][a-z0-9_-]*$/, 'lowercase name, e.g. analysis');
+/** A Team role `<department>/<role>`: fills the fields this node leaves unset (Team page). */
+export const ROLE_KEY_PATTERN = /^[a-z0-9][a-z0-9-]*\/[a-z0-9][a-z0-9-]*$/;
+const role = z.string().regex(ROLE_KEY_PATTERN, 'a role key like engineering/backend-dev').optional();
+/** Node types that can name a Team role. */
+export const ROLE_NODE_TYPES = ['ai.step', 'ai.review', 'doc.write', 'jira.comment', 'git.pr', 'agent.run'] as const;
 
 export const nodeConfigSchemas = {
   'trigger.jira': z.object({}).default({}),
@@ -44,6 +49,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(180),
   }),
   'ai.step': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -61,6 +67,7 @@ export const nodeConfigSchemas = {
     editable: z.array(artifactName).default([]),
   }),
   'agent.run': z.object({
+    role,
     executor: z.enum(['ask', ...AGENT_EXECUTORS]).default('ask'),
     skill: z.string().optional(),
     prompt: z.string().min(1),
@@ -78,6 +85,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(900),
   }),
   'ai.review': z.object({
+    role,
     skills: z.array(z.string()).default([]),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -90,6 +98,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(900),
   }),
   'doc.write': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -105,6 +114,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(600),
   }),
   'jira.comment': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -117,6 +127,7 @@ export const nodeConfigSchemas = {
     timeoutSeconds: z.number().int().positive().default(600),
   }),
   'git.pr': z.object({
+    role,
     skill: z.string().optional(),
     prompt: z.string().min(1),
     inputs: z.array(artifactName).default([]),
@@ -272,6 +283,14 @@ export function validateWorkflow(w: WorkflowDefinition): string[] {
   return problems;
 }
 
+/** Nodes naming a Team role that does not exist (shown as problems; runs of such a node fail). */
+export function roleProblems(w: Pick<WorkflowDefinition, 'nodes'>, knownRoles: readonly string[]): string[] {
+  return w.nodes.flatMap(n => {
+    const role = (n.config as { role?: unknown } | undefined)?.role;
+    return typeof role === 'string' && role && !knownRoles.includes(role) ? [`Node "${n.label}" uses unknown role "${role}"`] : [];
+  });
+}
+
 // ---------- routing: which workflow a ticket starts ----------
 
 export const routingSchema = z.object({
@@ -337,6 +356,13 @@ export const nodeRunSchema = z.object({
   /** Model the step used: reported by Claude Code, else the one asked for; null = the CLI's default (not reported). */
   model: z.string().nullable(),
   skillHash: z.string().nullable(),
+  /** Team role key the step used and the hash of its prompt + config then; null when the node names none. */
+  role: z.string().nullable(),
+  roleHash: z.string().nullable(),
+  /** From the step report the output ends with (else its first lines); confidence and decision only from a report block. */
+  summary: z.string().nullable(),
+  confidence: z.enum(['high', 'medium', 'low']).nullable(),
+  decisionNeeded: z.string().nullable(),
   agentSessionId: z.string().nullable(),
   startedAt: z.string().nullable(),
   endedAt: z.string().nullable(),

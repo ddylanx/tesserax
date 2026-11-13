@@ -8,9 +8,12 @@ import { tmpdir } from 'node:os';
 import { readLiveLog, renderLiveLog } from './livelog';
 import { askAgent } from './claude';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const FAKE = join(__dirname, '../../../../../scripts/fake-agy.mjs');
 
-test('runAntigravity returns the response; auth and denied-shell runs are recognised', async () => {
+test('runAntigravity returns the response; auth and denied-shell runs are recognised', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   const ok = await runAntigravity({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000 });
   assert.equal(ok.signal, 'ok');
   assert.match(ok.text!, /Fake agy answer/);
@@ -43,7 +46,7 @@ test('antigravity: missing binary, parsing with log noise, prompt attached to --
   assert.match(antigravitySignal({ out: { status: 'SUCCESS', response: '', denied_actions: [{ action: 'read_file' }] }, stderr: '', exitCode: 0, timedOut: false }).message!, /refused read_file/);
 });
 
-test('live log: the event stream is written while running and rendered as readable lines', async () => {
+test('live log: the event stream is written while running and rendered as readable lines', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'ot-livelog-'));
   const logFile = join(dir, 'stream.ndjson');
   const r = await runAntigravity({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000, logFile });
@@ -81,7 +84,7 @@ test('launchAntigravityDetached includes gitCommonDir in args when run in git re
   assert.ok(cmd.args.includes('--add-dir'));
 });
 
-test('antigravity: a turn stopped by a refused tool is continued in the same conversation', async () => {
+test('antigravity: a turn stopped by a refused tool is continued in the same conversation', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   assert.equal(deniedConversation({ conversation_id: 'c', response: '', denied_actions: [{ action: 'read_file' }] }), 'c');
   assert.equal(deniedConversation({ conversation_id: 'c', response: 'answer', denied_actions: [{ action: 'read_file' }] }), null);
   assert.equal(deniedConversation({ conversation_id: 'c', response: '' }), null);

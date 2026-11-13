@@ -1,12 +1,12 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { sql } from 'kysely';
 import type { AppConfig } from '@tesserax/config';
 import {
   AGENT_EXECUTORS, AI_ENGINES, ENGINE_NODE_TYPES, MODEL_NODE_TYPES, CONFIRM_NODE_TYPES, HUMAN_NODE_TYPES, canSwitchWorkflow, NODE_PORTS, conditionsMatch, describeCondition, routeWorkflow,
-  type ConfirmAction, type ProjectDirectory, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
+  type ConfirmAction, type ProjectDirectory, type RoleLookup, type EvaluateAction, type GateAction, type NodeType, type WorkflowDefinition, type WorkflowEdge,
   type WorkflowNode, type WorkflowRunDetail, type WorkflowRunDto, type WorkflowRunList,
 } from '@tesserax/contracts';
-import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, WorkContext, createLogger, type Queue } from '@tesserax/core';
+import { CONFIG, DB, PROJECT_DIRECTORY, QUEUE, ROLE_LOOKUP, WorkContext, createLogger, type Queue } from '@tesserax/core';
 import type { Db, NodeRun, NodeRunUpdate, WorkflowRun, WorkflowRunUpdate } from '@tesserax/db';
 import { isAlive, stopProcess } from '@tesserax/agent-runtime';
 import { TasksService } from '@tesserax/mod-tasks';
@@ -15,6 +15,7 @@ import { RoutingStore, WorkflowStore } from './stores';
 import { ArtifactService } from './artifact.service';
 import { type RunListFilter, WorkflowQueryService } from './query.service';
 import { WorkflowVcsService } from './vcs.service';
+import { snapshotRoles } from './apply-role';
 
 const log = createLogger('workflow');
 
@@ -42,6 +43,7 @@ export class WorkflowEngine {
     readonly queries: WorkflowQueryService,
     readonly vcs: WorkflowVcsService,
     @Inject(PROJECT_DIRECTORY) readonly projects: ProjectDirectory,
+    @Optional() @Inject(ROLE_LOOKUP) private readonly roles?: RoleLookup,
   ) {}
 
   onRunEvent(fn: RunListener) {
@@ -95,11 +97,13 @@ export class WorkflowEngine {
     const { def, hash, problems } = this.workflows.load(workflowId);
     if (problems.length) throw new Error(`Workflow ${workflowId} is invalid: ${problems.join('; ')}`);
     const triggerNode = def.nodes.find(n => n.type === 'trigger.jira')!;
+    // the Team roles as they are now: the whole run uses these, whatever is edited later
+    const roles = await snapshotRoles(this.roles, def);
     const inserted = await this.db
       .insertInto('workflow_runs')
       .values({
         task_id: taskId, project_id: project.id, workflow_id: def.id, workflow_hash: hash, workflow_snapshot: JSON.stringify(def), trigger,
-        vars: JSON.stringify({ project: { slug: project.slug, name: project.name, vars: project.settings.vars } }),
+        vars: JSON.stringify({ project: { slug: project.slug, name: project.name, vars: project.settings.vars }, roles }),
         branch: `tx/${(task.key ?? taskId.slice(0, 8)).replace(/[^A-Za-z0-9._-]+/g, '-')}`,
       })
       .returning('id')

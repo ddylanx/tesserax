@@ -4,9 +4,12 @@ import { test } from 'node:test';
 import { askAgent } from './claude';
 import { geminiArgs, geminiSignal, parseGemini, runGemini } from './gemini';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const FAKE = join(__dirname, '../../../../../scripts/fake-gemini.mjs');
 
-test('runGemini returns the response; auth errors are recognised', async () => {
+test('runGemini returns the response; auth errors are recognised', { skip: onWindows('spawns a fake CLI script (shebang); Windows cannot execute it') }, async () => {
   const ok = await runGemini({ bin: FAKE, cwd: __dirname, prompt: 'hello', timeoutMs: 10_000 });
   assert.equal(ok.signal, 'ok');
   assert.match(ok.text!, /Fake gemini answer/);

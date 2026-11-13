@@ -1,5 +1,5 @@
 import { Link, Outlet } from '@tanstack/react-router';
-import { BarChart3, Bot, Boxes, FolderGit2, Layers, ListChecks, Network, Server, Sparkles, Workflow } from 'lucide-react';
+import { BarChart3, Bot, Boxes, FolderGit2, Layers, ListChecks, Network, Server, Sparkles, Users, Workflow } from 'lucide-react';
 import { Select } from '@/components/ui/input';
 import { ProjectDot, ProjectProvider, useProjectScope } from '@/lib/project-context';
 
@@ -8,6 +8,7 @@ const nav = [
   { to: '/runs', label: 'Runs', icon: Workflow },
   { to: '/workflows', label: 'Workflows', icon: Network },
   { to: '/skills', label: 'Skills', icon: Sparkles },
+  { to: '/team', label: 'Team', icon: Users },
   { to: '/metrics', label: 'Metrics', icon: BarChart3 },
   { to: '/tasks', label: 'Tasks', icon: ListChecks },
   { to: '/repos', label: 'Repos', icon: FolderGit2 },

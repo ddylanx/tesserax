@@ -6,6 +6,9 @@ import { test } from 'node:test';
 import { FatalNodeError } from './executors/types';
 import { ensureWorktreeLinks, parseWorktreeLinks } from './worktree-links';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 test('parseWorktreeLinks handles null, undefined, whitespace, commas and newlines', () => {
   assert.deepEqual(parseWorktreeLinks(null), []);
   assert.deepEqual(parseWorktreeLinks(undefined), []);
@@ -16,7 +19,7 @@ test('parseWorktreeLinks handles null, undefined, whitespace, commas and newline
   assert.deepEqual(parseWorktreeLinks('  node_modules,  .env , , package.json \n'), ['node_modules', '.env', 'package.json']);
 });
 
-test('ensureWorktreeLinks creates symlinks for files and directories idempotently', () => {
+test('ensureWorktreeLinks creates symlinks for files and directories idempotently', { skip: onWindows('creating symlinks needs Developer Mode or admin on Windows') }, () => {
   const root = mkdtempSync(join(tmpdir(), 'wt-links-test-'));
   try {
     const repo = join(root, 'repo');
@@ -56,7 +59,7 @@ test('ensureWorktreeLinks creates symlinks for files and directories idempotentl
   }
 });
 
-test('ensureWorktreeLinks recovers from dangling or outdated symlinks', () => {
+test('ensureWorktreeLinks recovers from dangling or outdated symlinks', { skip: onWindows('creating symlinks needs Developer Mode or admin on Windows') }, () => {
   const root = mkdtempSync(join(tmpdir(), 'wt-links-test-'));
   try {
     const repo = join(root, 'repo');
@@ -179,7 +182,7 @@ test('ensureWorktreeLinks rejects path traversal, absolute paths and null bytes'
   }
 });
 
-test('ensureWorktreeLinks handles paths with trailing slashes correctly', () => {
+test('ensureWorktreeLinks handles paths with trailing slashes correctly', { skip: onWindows('creating symlinks needs Developer Mode or admin on Windows') }, () => {
   const root = mkdtempSync(join(tmpdir(), 'wt-links-test-'));
   try {
     const repo = join(root, 'repo');

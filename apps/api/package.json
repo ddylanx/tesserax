@@ -7,7 +7,7 @@
     "dev:watch": "node --watch -r @swc-node/register src/main.ts",
     "start": "node -r @swc-node/register src/main.ts",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
+    "test": "node --test -r @swc-node/register \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@tesserax/mod-projects": "workspace:*",
@@ -24,6 +24,7 @@
     "@tesserax/mod-pipeline": "workspace:*",
     "@tesserax/mod-skills": "workspace:*",
     "@tesserax/mod-tasks": "workspace:*",
+    "@tesserax/mod-team": "workspace:*",
     "@tesserax/mod-workflow": "workspace:*",
     "@tesserax/mod-telegram": "workspace:*",
     "kysely": "^0.28.17",

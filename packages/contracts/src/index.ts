@@ -7,4 +7,8 @@ export * from './workflow';
 export * from './repos';
 export * from './projects';
 export * from './board';
+export * from './project-scope';
+export * from './team';
+export * from './report';
+export * from './redact';
 export * from './openapi';

@@ -6,6 +6,7 @@ import type { TasksService } from '@tesserax/mod-tasks';
 import type { WorkflowEngine } from '../engine.service';
 import type { SkillCatalog } from '@tesserax/mod-skills';
 import type { McpService } from '@tesserax/mod-mcp';
+import type { AppliedRole } from '../apply-role';
 
 export interface NodeContext {
   engine: WorkflowEngine;
@@ -24,6 +25,8 @@ export interface NodeContext {
   /** Variables of the run's project as they were when the run started. */
   projectVars: Record<string, string>;
   mcp?: McpService;
+  /** The Team role the node names (already applied to `config`); its prompt and skills are added to the step's prompt. */
+  role?: AppliedRole | null;
 }
 
 export type NodeResult =

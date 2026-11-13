@@ -7,7 +7,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { AlertTriangle, LayoutGrid, Redo2, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { validateWorkflow, type NodeType, type WorkflowDefinition, type WorkflowNode } from '@tesserax/contracts';
+import { validateWorkflow, type NodeType, type TeamList, type WorkflowDefinition, type WorkflowNode } from '@tesserax/contracts';
 import type { PackageSkill } from '@tesserax/mod-skills/contracts';
 import { edgeTypes, type InsertEdgeData } from '@/components/flow/insert-edge';
 import { tidyLayout } from '@/components/flow/layout';
@@ -48,6 +48,7 @@ function Editor() {
   const wf = useQuery({ queryKey: ['wf', 'def', workflowId], queryFn: () => api<{ def: WorkflowDefinition; hash: string }>(`/api/workflows/${workflowId}`) });
   const types = useQuery({ queryKey: ['wf', 'node-types'], queryFn: () => api<NodeTypeInfo[]>('/api/node-types') });
   const skills = useQuery({ queryKey: ['skills'], queryFn: () => api<SkillInfo[]>('/api/skills') });
+  const team = useQuery({ queryKey: ['team', 'all'], queryFn: () => api<TeamList>('/api/team') });
   // Skills from installed packages (Skills page > Packages) are offered next to the repo's own, labelled with the package.
   const pkgSkills = useQuery({ queryKey: ['skill-packages', 'skills'], queryFn: () => api<PackageSkill[]>('/api/skill-packages/skills') });
   const allSkills = useMemo(() => [...(skills.data ?? []), ...(pkgSkills.data ?? []).map(s => ({ ...s, name: `${s.name} (${s.package})` }))], [skills.data, pkgSkills.data]);
@@ -403,6 +404,7 @@ function Editor() {
                   node={selNode}
                   info={info.get(selNode.type)}
                   skills={allSkills}
+                  team={team.data}
                   onChange={p => updateNode(selNode.id, p)}
                   onDelete={selNode.type === 'trigger.jira' ? undefined : () => handlers.current.remove(selNode.id)}
                 />

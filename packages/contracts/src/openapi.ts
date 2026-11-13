@@ -5,6 +5,7 @@ import { decisionSchema, feedbackStatsSchema, pipelineListSchema, pipelineRunDet
 import { moveTaskSchema, projectCardSchema, projectSchema, saveProjectSchema } from './projects';
 import { demoRepoResponseSchema, repoRegistrySchema, setTaskWorkplaceSchema } from './repos';
 import { environmentStatusSchema, healthSchema, systemInfoSchema } from './system';
+import { departmentSchema, roleChangeSchema, roleSchema, saveDepartmentSchema, saveRoleSchema, teamListSchema } from './team';
 import { createLocalTaskSchema, taskDetailSchema, taskListSchema, taskQuerySchema, updateLocalTaskSchema, updateTaskStatusSchema } from './tasks';
 import {
   confirmActionSchema,
@@ -118,6 +119,16 @@ export const API_ROUTES: ApiRoute[] = [
   { method: 'post', path: '/skill-packages/{id}/update', tag: 'skills', summary: 'Update a skill package.' },
   { method: 'patch', path: '/skill-packages/{id}', tag: 'skills', summary: 'Edit a skill package.' },
   { method: 'delete', path: '/skill-packages/{id}', tag: 'skills', summary: 'Remove a skill package.', query: z.object({ force: z.string().optional() }) },
+
+  // team: departments and roles for sub agents (settings: only the person edits them, from the web UI)
+  { method: 'get', path: '/team', tag: 'team', summary: 'Departments and roles (roles filtered by the project when given).', query: z.object({ project: z.string().optional() }), response: teamListSchema },
+  { method: 'post', path: '/team/departments', tag: 'team', summary: 'Create a department.', body: saveDepartmentSchema, response: departmentSchema },
+  { method: 'patch', path: '/team/departments/{id}', tag: 'team', summary: 'Edit a department.', body: saveDepartmentSchema.partial(), response: departmentSchema },
+  { method: 'delete', path: '/team/departments/{id}', tag: 'team', summary: 'Delete an empty department.', response: ok },
+  { method: 'post', path: '/team/roles', tag: 'team', summary: 'Create a role.', body: saveRoleSchema, response: roleSchema },
+  { method: 'patch', path: '/team/roles/{id}', tag: 'team', summary: 'Edit a role.', body: saveRoleSchema.partial(), response: roleSchema },
+  { method: 'delete', path: '/team/roles/{id}', tag: 'team', summary: 'Delete a role no workflow uses.', response: ok },
+  { method: 'get', path: '/team/roles/{id}/changes', tag: 'team', summary: 'Audit trail of a role (hash before and after each change).', response: z.object({ changes: z.array(roleChangeSchema) }) },
 
   // repos
   { method: 'get', path: '/repos', tag: 'repos', summary: 'Repositories and workplaces.', response: repoRegistrySchema },
