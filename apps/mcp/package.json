@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node bin.cjs",
     "typecheck": "tsc -p tsconfig.json",
-    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
+    "test": "node --test -r @swc-node/register \"src/**/*.test.ts\""
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.1",
