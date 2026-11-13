@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
 import { join } from 'node:path';
-import type { AgentExecutor, NodeType } from '@tesserax/contracts';
+import { reportInstruction, type AgentExecutor, type NodeType } from '@tesserax/contracts';
 import { cleanEnv, diffInfo, diffPatch, git } from '@tesserax/agent-runtime';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, normalize, relative } from 'node:path';
-import { buildShellEnv, renderShellTemplate, renderTemplate, withSkills } from '../render';
+import { buildShellEnv, renderShellTemplate, renderTemplate, withRole, withSkills } from '../render';
 import { askAgent } from './claude';
 import { liveLogFile } from './livelog';
 import { startAgent } from './agent';
@@ -31,6 +31,17 @@ const worktree = async (ctx: NodeContext) => {
   }
 };
 
+/** The role's skills, then the node's own (each once); a skill the project does not enable fails the step. */
+function stepSkills(ctx: NodeContext, nodeSkills: (string | undefined | null)[]) {
+  const paths = [...new Set([...(ctx.role?.skills ?? []), ...nodeSkills.filter((s): s is string => Boolean(s))])];
+  return paths.map(p => ctx.skills.get(p));
+}
+
+/** Role first, then skills, then the task prompt; a role-driven step is also told to end with the step report block. */
+const compose = (ctx: NodeContext, prompt: string, skills: { name: string; body: string }[]) =>
+  withRole(ctx.role, withSkills(ctx.role ? `${prompt}\n\n${reportInstruction(ctx.role.reportLanguage)}` : prompt, skills));
+const skillHashOf = (skills: { hash: string }[]) => skills.map(s => s.hash).join(',') || null;
+
 const triggerJira: NodeExecutor = async ctx => {
   await ctx.tasks.ensureDetail(ctx.task.id).catch(() => undefined);
   return { port: 'next', output: { key: ctx.task.key, title: ctx.task.title } };
@@ -39,8 +50,8 @@ const triggerJira: NodeExecutor = async ctx => {
 const aiStep: NodeExecutor = async ctx => {
   const c = ctx.config;
   const wt = await worktree(ctx);
-  const skill = c.skill ? ctx.skills.get(c.skill) : null;
-  const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
+  const skills = stepSkills(ctx, [c.skill]);
+  const prompt = compose(ctx, renderTemplate(c.prompt, await renderCtx(ctx, wt)), skills);
   const mcpGrant = ctx.mcp
     ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
     : undefined;
@@ -51,7 +62,7 @@ const aiStep: NodeExecutor = async ctx => {
   });
   return {
     port: 'next', artifact: { name: c.output, content: text }, output: { chars: text.length },
-    costUsd, numTurns, model, skillHash: skill?.hash ?? null,
+    costUsd, numTurns, model, skillHash: skillHashOf(skills),
   };
 };
 
@@ -60,9 +71,10 @@ const aiReview: NodeExecutor = async ctx => {
   const wt = await worktree(ctx);
   const info = await diffInfo(wt.worktree, wt.baseRef);
   const { patch, truncated } = await diffPatch(wt.worktree, info.base, 150_000);
-  const skills = (c.skills as string[]).map(p => ctx.skills.get(p));
-  const prompt = withSkills(
-    `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\nEnd your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL`,
+  const skills = stepSkills(ctx, c.skills as string[]);
+  const prompt = compose(
+    ctx,
+    `${renderTemplate(c.prompt, await renderCtx(ctx, { ...wt, diff: patch + (truncated ? '\n… (diff truncated)' : '') }))}\n\n${ctx.role ? 'Write exactly one line VERDICT: PASS or VERDICT: FAIL just before the report block.' : 'End your answer with exactly one line: VERDICT: PASS or VERDICT: FAIL'}`,
     skills,
   );
   const mcpGrant = ctx.mcp
@@ -78,7 +90,7 @@ const aiReview: NodeExecutor = async ctx => {
   return {
     port: verdict === 'PASS' ? 'pass' : 'fail', artifact: { name: c.output, content: text },
     output: { verdict, filesChanged: info.files }, costUsd, numTurns, model,
-    skillHash: skills.map(s => s.hash).join(',') || null,
+    skillHash: skillHashOf(skills),
   };
 };
 
@@ -154,9 +166,9 @@ const checkCommand: NodeExecutor = async ctx => {
 export async function prepareAgent(ctx: NodeContext) {
   const c = ctx.config;
   const wt = await worktree(ctx);
-  const skill = c.skill ? ctx.skills.get(c.skill) : null;
-  const prompt = withSkills(renderTemplate(c.prompt, await renderCtx(ctx, wt)), skill ? [skill] : []);
-  return { worktree: wt.worktree, prompt, skillHash: skill?.hash ?? null };
+  const skills = stepSkills(ctx, [c.skill]);
+  const prompt = compose(ctx, renderTemplate(c.prompt, await renderCtx(ctx, wt)), skills);
+  return { worktree: wt.worktree, prompt, skillHash: skillHashOf(skills) };
 }
 
 /** executor "ask": wait for you to pick (CLI agent or an editor); otherwise start right away. */
@@ -177,9 +189,9 @@ export const slugify = (s: string) =>
 async function draft(ctx: NodeContext) {
   const c = ctx.config;
   const wt = await worktree(ctx);
-  const skill = c.skill ? ctx.skills.get(c.skill) : null;
+  const skills = stepSkills(ctx, [c.skill]);
   const info = await diffInfo(wt.worktree, wt.baseRef).catch(() => null);
-  const prompt = withSkills(renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skill ? [skill] : []);
+  const prompt = compose(ctx, renderTemplate(c.prompt, { ...(await renderCtx(ctx, wt)), diff: info?.stat }), skills);
   const mcpGrant = ctx.mcp
     ? await ctx.mcp.grantFor({ engine: c.engine ?? 'claude', node: ctx.node.config, projectDirs: [wt.worktree] })
     : undefined;
@@ -188,7 +200,7 @@ async function draft(ctx: NodeContext) {
     timeoutSeconds: c.timeoutSeconds, model: c.model ?? (c.engine === 'claude' ? ctx.appConfig.PLAYBOOK_MODEL : undefined), maxBudgetUsd: c.maxBudgetUsd, logFile: liveLogFile(ctx),
     mcpGrant,
   });
-  return { text, wt, info, cost: costUsd, turns: numTurns, model, skillHash: skill?.hash ?? null };
+  return { text, wt, info, cost: costUsd, turns: numTurns, model, skillHash: skillHashOf(skills) };
 }
 
 /** Writes the ticket document into the repo and commits only that file on the ticket branch (local). */

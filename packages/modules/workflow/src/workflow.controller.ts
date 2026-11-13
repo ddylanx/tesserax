@@ -7,9 +7,10 @@ import { join } from 'node:path';
 import type { AppConfig } from '@tesserax/config';
 import {
   NODE_PORTS, NODE_TYPES, NODE_TYPE_INFO, prCommentActionSchema, confirmActionSchema, evaluateActionSchema, executorActionSchema, handoffActionSchema, nodeAgentActionSchema, nodeModelActionSchema, rerunNodeActionSchema, runFromActionSchema, gateActionSchema, nodeConfigJsonSchema, trySkillSchema,
-  routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
+  redact, roleProblems, teamActivityQuerySchema, type TeamActivity, routingSchema, workflowSchema, type RunDiff, type WorkflowRunDetail, type WorkflowRunList,
 } from '@tesserax/contracts';
-import { CONFIG, DB } from '@tesserax/core';
+import { CONFIG, DB, ROLE_LOOKUP } from '@tesserax/core';
+import type { RoleLookup } from '@tesserax/contracts';
 import type { Db } from '@tesserax/db';
 import { diffInfo, diffPatch } from '@tesserax/agent-runtime';
 import { ClassificationService } from '@tesserax/mod-classify';
@@ -19,6 +20,7 @@ import type { McpService } from '@tesserax/mod-mcp';
 import { askClaude } from './executors/claude';
 import { nodeRunDir, readLiveLog } from './executors/livelog';
 import { renderTemplate, withSkills } from './render';
+import { buildTeamActivity, queryActivityRows } from './team-activity';
 import { RunConflict, WorkflowEngine } from './engine.service';
 import { HandoffService } from './handoff.service';
 import { postReviewComment } from './review';
@@ -45,8 +47,9 @@ export class WorkflowController {
     @Inject(DB) private readonly db: Db,
     classifier: ClassificationService,
     @Optional() private readonly mcp?: McpService,
+    @Optional() @Inject(ROLE_LOOKUP) private readonly roles?: RoleLookup,
   ) {
-    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp);
+    this.handoff = new HandoffService(db, config, engine, tasks, skills, classifier, mcp, roles);
   }
 
   private readonly handoff: HandoffService;
@@ -127,9 +130,9 @@ export class WorkflowController {
   }
 
   @Get('metrics')
-  metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string) {
+  metrics(@Query('days') days?: string, @Query('workflowId') workflowId?: string, @Query('project') project?: string) {
     const d = Math.min(365, Math.max(1, Number(days) || 30));
-    return computeMetrics(this.db, this.skills, { days: d, workflowId: workflowId || undefined });
+    return computeMetrics(this.db, this.skills, { days: d, workflowId: workflowId || undefined, project: project || undefined });
   }
 
   @Get('node-types')
@@ -213,19 +216,45 @@ export class WorkflowController {
     });
   }
 
+  /** Role keys the workflows can name; null when the Team module is not loaded (then role problems are not reported). */
+  private async roleKeys(): Promise<string[] | null> {
+    return this.roles ? this.roles.keys() : null;
+  }
+
   @Get('workflows')
-  workflows() {
-    return this.engine.workflows.list();
+  async workflows() {
+    const keys = await this.roleKeys();
+    return this.engine.workflows.list().map(w => {
+      if (!keys || !w.hash) return w;
+      try {
+        return { ...w, problems: [...w.problems, ...roleProblems(this.engine.workflows.load(w.id).def, keys)] };
+      } catch {
+        return w;
+      }
+    });
   }
 
   @Get('workflows/:id')
   workflow(@Param('id') id: string) {
-    return guard(async () => this.engine.workflows.load(id));
+    return guard(async () => {
+      const w = this.engine.workflows.load(id);
+      const keys = await this.roleKeys();
+      return keys ? { ...w, problems: [...w.problems, ...roleProblems(w.def, keys)] } : w;
+    });
   }
 
   @Get('workflow-runs')
   runs(@Query('status') status?: string, @Query('project') project?: string, @Query('workflow') workflow?: string, @Query('q') q?: string): Promise<WorkflowRunList> {
     return this.engine.listRuns({ status, project, workflow, q });
+  }
+
+  /** What each Team role is doing now and did lately (Team page → Live). Read only. */
+  @Get('team/activity')
+  async teamActivity(@Query() query: Record<string, string>): Promise<TeamActivity> {
+    const q = teamActivityQuerySchema.safeParse(query);
+    if (!q.success) throw new BadRequestException(q.error.issues.map(i => i.message).join('; '));
+    const rows = await queryActivityRows(this.db, { project: q.data.project || undefined, hours: q.data.hours });
+    return buildTeamActivity(rows, { windowHours: q.data.hours, env: process.env });
   }
 
   @Get('workflow-runs/:id')
@@ -241,7 +270,7 @@ export class WorkflowController {
     const nr = await this.db.selectFrom('node_runs').select(['status']).where('id', '=', nodeRunId).where('run_id', '=', id).executeTakeFirst();
     if (!nr) throw new NotFoundException();
     const r = readLiveLog(nodeRunDir(this.config, id, nodeRunId), Math.max(0, Number(from) || 0));
-    return { ...r, live: nr.status === 'running' || nr.status === 'queued' };
+    return { ...r, text: redact(r.text, process.env), live: nr.status === 'running' || nr.status === 'queued' };
   }
 
   @Get('workflow-runs/:id/diff')

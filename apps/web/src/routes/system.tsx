@@ -11,7 +11,7 @@ export function SystemPage() {
   const fb = useQuery({ queryKey: ['pipeline', 'feedback'], queryFn: () => api<FeedbackStats>('/api/pipeline/feedback') });
   const s = q.data;
   return (
-    <Page title="System" description="Health of the local backoffice, its schedules and integrations.">
+    <Page title="System" description="Health of the local backoffice, its schedules and integrations. Not filtered by project: this page covers the whole machine.">
       <QueryState isLoading={q.isLoading} error={q.error} />
       {s && (
         <div className="grid gap-4 md:grid-cols-2">

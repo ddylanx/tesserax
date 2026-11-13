@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { Plus, Save, X } from 'lucide-react';
-import type { WorkflowRouting } from '@tesserax/contracts';
+import { workflowInScope, type WorkflowRouting } from '@tesserax/contracts';
 import { ConditionEditor } from '@/components/conditions';
 import { useState } from 'react';
 import { Page, QueryState } from '@/components/page';
@@ -18,6 +18,8 @@ export function WorkflowsPage() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const [id, setId] = useState('');
+  const shown = q.data?.filter(w => workflowInScope(scope.current, w.id));
+  const hidden = (q.data?.length ?? 0) - (shown?.length ?? 0);
   const create = useMutation({
     mutationFn: () => api<{ id: string }>('/api/workflows', { method: 'POST', body: JSON.stringify({ id, copyFrom: 'default' }) }),
     onSuccess: r => { qc.invalidateQueries({ queryKey: ['wf', 'list'] }); navigate({ to: '/workflows/$workflowId', params: { workflowId: r.id } }); },
@@ -25,9 +27,9 @@ export function WorkflowsPage() {
   return (
     <Page title="Workflows" description="Graphs of nodes stored in workflows/*.workflow.json. Runs use the default workflow.">
       <Card>
-        <QueryState isLoading={q.isLoading} error={q.error} empty={q.data?.length === 0} />
+        <QueryState isLoading={q.isLoading} error={q.error} empty={shown?.length === 0} />
         <ul className="divide-y">
-          {q.data?.map(w => (
+          {shown?.map(w => (
             <li key={w.id} className="flex items-center justify-between gap-2 px-4 py-3">
               <div>
                 <Link to="/workflows/$workflowId" params={{ workflowId: w.id }} className="font-medium hover:underline">{w.name}</Link>
@@ -37,6 +39,7 @@ export function WorkflowsPage() {
             </li>
           ))}
         </ul>
+        {hidden > 0 && <p className="border-t px-4 py-2 text-xs text-muted-foreground">{hidden} more not enabled in {scope.current?.name}. Choose All projects to see them.</p>}
       </Card>
       <Card>
         <CardContent className="flex flex-wrap items-center gap-2 pt-4 text-sm">
@@ -46,7 +49,7 @@ export function WorkflowsPage() {
           {create.error && <span className="text-destructive">{(create.error as Error).message}</span>}
         </CardContent>
       </Card>
-      {q.data && <RoutingEditor key={scope.selected} project={scope.selected} workflows={q.data.map(w => ({ id: w.id, name: w.name }))} />}
+      {shown && <RoutingEditor key={scope.selected} project={scope.selected} workflows={shown.map(w => ({ id: w.id, name: w.name }))} />}
     </Page>
   );
 }

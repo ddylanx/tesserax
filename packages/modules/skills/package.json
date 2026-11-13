@@ -13,7 +13,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.web.json",
-    "test": "node --test -r @swc-node/register 'src/**/*.test.ts'"
+    "test": "node --test -r @swc-node/register \"src/**/*.test.ts\""
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",

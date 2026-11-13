@@ -4,6 +4,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 
 ## Layout
 - `apps/api` NestJS. In local mode it also runs pg-boss workers and schedules (no separate worker app yet).
+- `apps/mcp` (`@tesserax/mcp-server`) stdio MCP server over the HTTP API (`.mcp.json`, guide `docs/ai-control.md`): read / act / decide tools; outward actions (Jira comment, push + PR, PR comment) are never exposed. Every API route is listed in `@tesserax/contracts` `openapi.ts` (`GET /api/openapi.json`; a test checks the list against the controllers).
 - `apps/web` React + Vite + TanStack Router/Query + Tailwind 4 + shadcn-style components in `src/components/ui`.
 - `packages/config` Zod-validated env, loads `<repo>/.env`.
 - `packages/contracts` Zod schemas + types shared by api and web (the API contract).
@@ -16,6 +17,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - `packages/modules/workflow` node-based workflow engine (spec: `docs/specs/0001-workflow-engine.md`): `engine.service.ts` (runs, routing, gates, loops), `executors/` (one per node type), `jobs.ts`. Workflows in `workflows/*.workflow.json` (gitignored, start from `examples/workflows/`), reads skills through `SkillCatalog` from `@tesserax/mod-skills` (gitignored, start from `examples/skills/`); node config schemas in `@tesserax/contracts` (`workflow.ts`).
 - `packages/modules/skills` (`@tesserax/mod-skills`) self-contained, extractable module: the repo's own skills (`skills/<name>/SKILL.md`) and external packages (git repos installed into `skills/_packages/<id>/`, only .md/.txt text plus LICENSE; manifest `skills/packages.json`). Entries: `.` (Nest `SkillsModule.forRoot`, `SkillCatalog`), `./contracts`, `./web` (React). It must not import `@tesserax/*` or `@/*` (enforced by `boundary.test.ts`); host things come in through `forRoot` options.
 - `packages/modules/projects` (`@tesserax/mod-projects`) projects (spec: `docs/specs/0002-projects.md`): the `projects` table (was `workspaces`) and `ProjectsService`, provided globally under `PROJECT_DIRECTORY` (contract `ProjectDirectory` in `@tesserax/contracts`): `resolveForTask` (first project by position whose rules match, else the default project), `resolveForPath` (run worktree, then workplace folders), `reassign`. Tasks, workflow and agents depend on the contract, never on the table. A project's `settings` hold task rules (Jira keys = "Board" in the UI, sources, repositories), workplaces, enabled workflows/skills (null = all), routing, engines and variables (`{{project.<name>}}`, `$TX_PROJECT_<NAME>`). A task you move by hand is `project_pinned`; sync never moves it.
+- `packages/modules/team` (`@tesserax/mod-team`) Team page (spec: `docs/specs/0006-team-roles.md`): departments and roles in `team_*` tables, `TeamModule.forRoot({ workflowUsage })`, provides `ROLE_LOOKUP`. The workflow applies a node's role in `apply-role.ts` (node wins, tools only narrow, role re-validated at run time).
 - Tasks page has a List / Board view (spec: `docs/specs/0003-task-board.md`); column, drag and order rules live in `@tesserax/contracts` `board.ts`.
 - `packages/modules/repos` repos registry (Repos page): repositories (origin, base branch) and their workplaces (a local checkout per brand, with the Jira projects that default to it), stored in `config/workplaces.json` (gitignored; created from `config/repos.json` the first time). A task runs in its picked workplace (`tasks.workplace_id`), else the first workplace registered for its project; resolve with `repoRegistry.resolve(task)`.
 - `playbooks/*.md` playbook definitions (older pipeline) (frontmatter + prompt template). `config/repos.json` (gitignored) is the legacy project → repo map, still read as a fallback.
@@ -27,7 +29,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - Inject infra with tokens from `@tesserax/core` (`CONFIG`, `DB`, `QUEUE`, `SCHEDULES`) using `@Inject(...)`.
 - Register job handlers / schedules in a module's `onModuleInit`; the queue starts in `InfraModule.onApplicationBootstrap`.
 - New table: add a migration file, register it, extend `Database` in `packages/db/src/schema.ts`. Migrations + seed run when the api boots.
-- New endpoint: define the response schema/type in `@tesserax/contracts` first, then use it in api and web.
+- New endpoint: define the response schema/type in `@tesserax/contracts` first, then use it in api and web, and add it to `API_ROUTES` (`openapi.ts`).
 - Everything binds to 127.0.0.1; no auth in local mode. Never log or store secrets; `.env` is gitignored.
 - Pipeline state only changes through `PipelineService.transition` (guarded UPDATE + event). Steps start via `startStep` and run inside `runStep` (stale-job skip, retries, then failed).
 - Issue text is untrusted: keep it inside `<issue>` delimiters in every prompt. Never write to Jira except `postJiraComment`, which needs an explicit confirmed click.

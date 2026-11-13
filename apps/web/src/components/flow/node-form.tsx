@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import type { NodeType, WorkflowNode } from '@tesserax/contracts';
+import type { NodeType, TeamList, WorkflowNode } from '@tesserax/contracts';
 import { ConditionEditor } from '@/components/conditions';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,10 +40,22 @@ const typeOf = (p: JsonProp): string => {
   return String(t ?? 'string');
 };
 
-export function NodeForm({ node, info, skills, onChange, onDelete }: {
-  node: WorkflowNode; info?: NodeTypeInfo; skills: SkillInfo[]; onChange: (p: Partial<WorkflowNode>) => void; onDelete?: () => void;
+/** Node fields a Team role can fill (the node's own value wins). */
+const ROLE_FIELDS = new Set(['engine', 'model', 'executor', 'allowedTools', 'maxBudgetUsd', 'timeoutSeconds']);
+
+export function NodeForm({ node, info, skills, team, onChange, onDelete }: {
+  node: WorkflowNode; info?: NodeTypeInfo; skills: SkillInfo[]; team?: TeamList; onChange: (p: Partial<WorkflowNode>) => void; onDelete?: () => void;
 }) {
   const cfg = node.config as Record<string, unknown>;
+  const roleKey = typeof cfg.role === 'string' ? cfg.role : '';
+  const role = roleKey ? team?.roles.find(r => r.key === roleKey) : undefined;
+  /** What the role gives a field the node leaves empty (shown as a placeholder), or undefined. */
+  const fromRole = (k: string): string | undefined => {
+    if (!role || !ROLE_FIELDS.has(k) || cfg[k] !== undefined) return undefined;
+    const v = (role.config as Record<string, unknown>)[k];
+    if (v === undefined || v === null) return undefined;
+    return Array.isArray(v) ? v.join('\n') : String(v);
+  };
   const set = (k: string, v: unknown) => {
     const next = { ...cfg };
     if (v === undefined || v === '') delete next[k];
@@ -64,6 +76,24 @@ export function NodeForm({ node, info, skills, onChange, onDelete }: {
         {props.map(([k, p]) => {
           const kind = typeOf(p);
           const v = cfg[k];
+          const inherited = fromRole(k);
+          if (k === 'role') {
+            return (
+              <label key={k} className="flex flex-col gap-1 text-xs">Role (Team page)
+                <Select value={roleKey} onChange={e => set(k, e.target.value || undefined)}>
+                  <option value="">(none)</option>
+                  {(team?.departments ?? []).map(d => (
+                    <optgroup key={d.id} label={d.name}>
+                      {team!.roles.filter(r => r.departmentId === d.id).map(r => <option key={r.id} value={r.key}>{r.title}{r.enabled ? '' : ' (disabled)'}</option>)}
+                    </optgroup>
+                  ))}
+                  {roleKey && !role && <option value={roleKey}>{roleKey} (unknown)</option>}
+                </Select>
+                {roleKey && !role && team && <span className="text-[11px] text-destructive">Unknown role: runs of this node will fail. Create it on the Team page or pick another.</span>}
+                {role && <span className="text-[11px] text-muted-foreground">Empty fields below take the role's value; set a field to override it.{(role.config as { skills?: string[] }).skills?.length ? ` Adds skills: ${(role.config as { skills: string[] }).skills.join(', ')}.` : ''}</span>}
+              </label>
+            );
+          }
           if (k === 'skill') {
             return (
               <label key={k} className="flex flex-col gap-1 text-xs">Skill
@@ -90,7 +120,10 @@ export function NodeForm({ node, info, skills, onChange, onDelete }: {
           if (kind === 'enum') {
             return (
               <label key={k} className="flex flex-col gap-1 text-xs">{k}
-                <Select value={String(v ?? p.default ?? '')} onChange={e => set(k, e.target.value)}>{p.enum!.map(o => <option key={o}>{o}</option>)}</Select>
+                <Select value={String(v ?? (inherited !== undefined ? '' : p.default ?? ''))} onChange={e => set(k, e.target.value)}>
+                  {inherited !== undefined && <option value="">from role: {inherited}</option>}
+                  {p.enum!.map(o => <option key={o}>{o}</option>)}
+                </Select>
               </label>
             );
           }
@@ -98,7 +131,7 @@ export function NodeForm({ node, info, skills, onChange, onDelete }: {
             return (
               <label key={k} className="flex flex-col gap-1 text-xs">{k} <span className="text-muted-foreground">(one per line)</span>
                 <textarea className="min-h-20 rounded-md border bg-background p-2 font-mono text-xs" value={((v as string[] | undefined) ?? []).join('\n')}
-                  placeholder={Array.isArray(p.default) && p.default.length ? `default:\n${(p.default as string[]).join('\n')}` : ''}
+                  placeholder={inherited !== undefined ? `from role:\n${inherited}` : Array.isArray(p.default) && p.default.length ? `default:\n${(p.default as string[]).join('\n')}` : ''}
                   onChange={e => {
                     const lines = e.target.value.split('\n').map(s => s.trim());
                     // keep the typed lines while editing; an empty box means "use the default"
@@ -110,7 +143,7 @@ export function NodeForm({ node, info, skills, onChange, onDelete }: {
           if (kind === 'number' || kind === 'integer') {
             return (
               <label key={k} className="flex flex-col gap-1 text-xs">{k}
-                <Input type="number" value={v === undefined ? '' : String(v)} placeholder={p.default !== undefined ? String(p.default) : ''} onChange={e => set(k, e.target.value === '' ? undefined : Number(e.target.value))} />
+                <Input type="number" value={v === undefined ? '' : String(v)} placeholder={inherited !== undefined ? `from role: ${inherited}` : p.default !== undefined ? String(p.default) : ''} onChange={e => set(k, e.target.value === '' ? undefined : Number(e.target.value))} />
               </label>
             );
           }
@@ -124,7 +157,7 @@ export function NodeForm({ node, info, skills, onChange, onDelete }: {
           }
           return (
             <label key={k} className="flex flex-col gap-1 text-xs">{k}
-              <Input value={String(v ?? '')} placeholder={p.default !== undefined ? String(p.default) : ''} onChange={e => set(k, e.target.value)} />
+              <Input value={String(v ?? '')} placeholder={inherited !== undefined ? `from role: ${inherited}` : p.default !== undefined ? String(p.default) : ''} onChange={e => set(k, e.target.value)} />
             </label>
           );
         })}

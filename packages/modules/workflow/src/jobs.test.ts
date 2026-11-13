@@ -163,3 +163,11 @@ test('finalizeAgentJob succeeds when mcp.json does not exist', async () => {
     rmSync(runDir, { recursive: true, force: true });
   }
 });
+
+test('reportPatch: AI steps store summary, confidence and decision; other steps store nothing', async () => {
+  const { reportPatch } = await import('./jobs');
+  assert.deepEqual(reportPatch('ai.step', '## Summary\nDone.\n## Decision needed\nPick A or B.\n## Confidence\nlow - no tests'), { summary: 'Done.', confidence: 'low', decision_needed: 'Pick A or B.' });
+  assert.deepEqual(reportPatch('agent.run', 'Changed two files.\nAll tests pass.'), { summary: 'Changed two files.\nAll tests pass.', confidence: null, decision_needed: null });
+  assert.deepEqual(reportPatch('check.command', '## Summary\nx'), {});
+  assert.deepEqual(reportPatch('ai.step', '  '), {});
+});

@@ -30,8 +30,9 @@ export function ProjectsPage() {
   return (
     <Page title="Projects" description="Each project has its own tasks, workplaces, workflows, skills and agents. Pick one in the top bar to filter every page.">
       <QueryState isLoading={false} error={null} empty={projects.length === 0} emptyText="No projects yet." />
+      {selected && projects.length > 1 && <p className="text-xs text-muted-foreground">Showing {projects.find(p => p.slug === selected)?.name} only. {projects.length - 1} more project(s): choose All projects or click Show all.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {projects.map(p => (
+        {projects.filter(p => !selected || p.slug === selected).map(p => (
           <Card key={p.id} className={selected === p.slug ? 'ring-2 ring-primary/40' : ''}>
             <CardContent className="flex flex-col gap-3 pt-4">
               <div className="flex items-center gap-2">

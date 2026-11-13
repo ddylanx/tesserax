@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FolderGit2, GitBranch, Pencil, Plus, Search, Trash2, TriangleAlert, X } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
-import type { RepoInspection, RepoRegistryView, Repository } from '@tesserax/contracts';
+import { scopeRepoRegistry, type RepoInspection, type RepoRegistryView, type Repository } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TBody, Td, Th, THead, Tr } from '@/components/ui/table';
 import { useRepoRegistry, type WorkplaceView } from '@/components/workplace';
 import { api } from '@/lib/api';
+import { useProjectScope } from '@/lib/project-context';
 
 const slugify = (s: string) => s.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
 const keys = (s: string) => s.split(/[\s,]+/).map(x => x.trim().toUpperCase()).filter(Boolean);
@@ -29,6 +30,9 @@ export function ReposPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['repos'] }),
   });
   const v = q.data;
+  const scope = useProjectScope();
+  const shown = v && scopeRepoRegistry(scope.current, v);
+  const hidden = v && shown ? v.repositories.length - shown.repositories.length + v.workplaces.length - shown.workplaces.length : 0;
   return (
     <Page
       title="Repos"
@@ -37,8 +41,9 @@ export function ReposPage() {
     >
       <QueryState isLoading={q.isLoading} error={q.error} empty={!!v && !v.repositories.length} emptyText="No repository yet. Add one from a local checkout." />
       {remove.error && <p className="text-sm text-destructive">{(remove.error as Error).message}</p>}
-      {v?.repositories.map(r => {
-        const wps = v.workplaces.filter(w => w.repositoryId === r.id);
+      {hidden > 0 && <p className="text-xs text-muted-foreground">Showing the workplaces of {scope.current?.name} and their repositories ({hidden} more hidden). Choose All projects to see them.</p>}
+      {shown?.repositories.map(r => {
+        const wps = shown.workplaces.filter(w => w.repositoryId === r.id);
         return (
           <Card key={r.id}>
             <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">

@@ -2,7 +2,7 @@ import { combine } from '@atlaskit/pragmatic-drag-and-drop/combine';
 import { draggable, dropTargetForElements, monitorForElements } from '@atlaskit/pragmatic-drag-and-drop/element/adapter';
 import { Link } from '@tanstack/react-router';
 import {
-  BarChart3, Bot, Boxes, FolderGit2, GripVertical, Inbox, Layers, ListChecks, Network, RotateCcw, Server, Sparkles, Workflow, type LucideIcon,
+  BarChart3, Bot, Boxes, FolderGit2, GripVertical, Inbox, Layers, ListChecks, Network, RotateCcw, Server, Sparkles, Users, Workflow, type LucideIcon,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Count, type Tone } from '@/components/ui/status-pill';
@@ -18,6 +18,7 @@ const ITEMS: NavItem[] = [
   { to: '/runs', label: 'Runs', icon: Workflow, counter: 'runs' },
   { to: '/workflows', label: 'Workflows', icon: Network },
   { to: '/skills', label: 'Skills', icon: Sparkles },
+  { to: '/team', label: 'Team', icon: Users },
   { to: '/agents', label: 'Agents', icon: Bot },
   { to: '/projects', label: 'Projects', icon: Layers },
   { to: '/repos', label: 'Repos', icon: FolderGit2 },
@@ -29,7 +30,7 @@ const BY_ROUTE = new Map(ITEMS.map(i => [i.to, i]));
 
 const DEFAULT_LAYOUT: NavLayout = [
   { group: 'Work', items: ['/inbox', '/tasks', '/runs'] },
-  { group: 'Build', items: ['/workflows', '/skills', '/agents'] },
+  { group: 'Build', items: ['/workflows', '/skills', '/team', '/agents'] },
   { group: 'Setup', items: ['/projects', '/repos', '/mcp', '/system'] },
   { group: 'Insights', items: ['/metrics'] },
 ];

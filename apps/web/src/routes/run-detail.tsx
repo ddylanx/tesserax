@@ -20,6 +20,12 @@ import { ChangeWorkflow, canChangeWorkflow } from '@/components/workflow-picker'
 
 
 
+const CONFIDENCE_CLASS: Record<NonNullable<NodeRunDto['confidence']>, string> = {
+  high: 'border-success/30 bg-success/10 text-success',
+  medium: 'border-warning/30 bg-warning/10 text-warning',
+  low: 'border-destructive/30 bg-destructive/10 text-destructive',
+};
+
 /** The agent picked for a step in this run only (run vars `engine` / `executor`). */
 const agentOverrideOf = (run: WorkflowRunDetail, node: WorkflowNode): string | undefined =>
   (run.vars[node.type === 'agent.run' ? 'executor' : 'engine'] as Record<string, string> | undefined)?.[node.id];
@@ -316,9 +322,19 @@ function NodePanel({ run, node }: { run: WorkflowRunDetail; node: WorkflowNode }
                     {(MODEL_NODE_TYPES as readonly string[]).includes(n.nodeType) && (n.model
                       ? <span title="Model this run used (reported by Claude Code, else the one asked for)">model {n.model}</span>
                       : n.status === 'done' && <span className="text-muted-foreground" title="No model was passed and the CLI did not report one">CLI default model</span>)}
+                    {n.role && <span className="rounded border border-indigo-500/30 bg-indigo-500/10 px-1 text-indigo-700 dark:text-indigo-400" title="Team role this step used, and the version of its prompt + config">role {n.role}{n.roleHash ? ` #${n.roleHash}` : ''}</span>}
                     {n.startedAt && <span className="text-muted-foreground">{timeAgo(n.startedAt)}</span>}
                     {n.waitingMs != null && <span className="text-muted-foreground">waited {Math.round(n.waitingMs / 60000)} min</span>}
                   </div>
+                  {n.summary && (
+                    <div className="mt-1 flex flex-col gap-0.5">
+                      <div className="flex items-start gap-1.5">
+                        {n.confidence && <span className={`shrink-0 rounded border px-1 ${CONFIDENCE_CLASS[n.confidence]}`} title="Confidence the step reported">{n.confidence}</span>}
+                        <span className="whitespace-pre-line">{n.summary}</span>
+                      </div>
+                      {n.decisionNeeded && <div className="font-medium text-warning">Decision needed: <span className="whitespace-pre-line font-normal">{n.decisionNeeded}</span></div>}
+                    </div>
+                  )}
                   {typeof n.input.feedback === 'string' && <div className="text-warning">feedback: {n.input.feedback}</div>}
                   {n.output.skipped === true && <div className="text-muted-foreground">skipped: {String(n.output.reason)}</div>}
                   {n.error && <div className="text-destructive">{n.error}</div>}

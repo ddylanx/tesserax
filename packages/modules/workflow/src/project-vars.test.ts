@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import type { TaskDetailDto } from '@tesserax/contracts';
 import { buildShellEnv, renderShellTemplate, renderTemplate } from './render';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 const task = { id: '1', key: 'TX-1', title: 'x', labels: [], components: [], comments: [], attachments: [] } as unknown as TaskDetailDto;
 const ctx = { task, artifacts: {}, projectVars: { test_command: 'pnpm test' } };
 
@@ -16,7 +19,7 @@ test('shell steps read project variables from the environment, never from the co
   assert.equal(buildShellEnv(ctx).TX_PROJECT_TEST_COMMAND, 'pnpm test');
 });
 
-test('check.command executes compound commands containing && via eval', async () => {
+test('check.command executes compound commands containing && via eval', { skip: onWindows('runs shell commands through /bin/sh') }, async () => {
   const { EXECUTORS } = await import('./executors');
   const mockCtx = {
     config: { commands: ['{{project.test_command}}'], output: 'checks', timeoutSeconds: 5 },
@@ -36,7 +39,7 @@ test('check.command executes compound commands containing && via eval', async ()
   assert.match(res.artifact!.content, /step_two/);
 });
 
-test('check.command preserves compound command prefix and does not drop it', async () => {
+test('check.command preserves compound command prefix and does not drop it', { skip: onWindows('runs shell commands through /bin/sh') }, async () => {
   const { EXECUTORS } = await import('./executors');
   const mockCtx = {
     config: { commands: ['echo prefix_ok && {{project.test_command}}'], output: 'checks', timeoutSeconds: 5 },

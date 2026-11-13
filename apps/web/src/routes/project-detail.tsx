@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { Plus, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { AI_ENGINES, type Project, type ProjectSettings, type RepoInspection, type TaskList, type WorkflowRunList } from '@tesserax/contracts';
+import { AI_ENGINES, type Project, type ProjectSettings, type RepoInspection, type TaskList, type TeamList, type WorkflowRunList } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -107,6 +107,7 @@ function Settings({ project }: { project: Project }) {
   const repos = useRepoRegistry();
   const workflows = useQuery({ queryKey: ['wf', 'list'], queryFn: () => api<{ id: string; name: string }[]>('/api/workflows') });
   const skills = useQuery({ queryKey: ['skills', 'list'], queryFn: () => api<{ path: string; name: string }[]>('/api/skills') });
+  const team = useQuery({ queryKey: ['team', 'all'], queryFn: () => api<TeamList>('/api/team') });
   const save = useMutation({
     mutationFn: () => api<Project>(`/api/projects/${project.slug}`, { method: 'PUT', body: JSON.stringify({ name, color, kind, settings: s }) }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['project', project.slug] }); qc.invalidateQueries({ queryKey: ['projects'] }); qc.invalidateQueries({ queryKey: ['tasks'] }); },
@@ -177,8 +178,8 @@ function Settings({ project }: { project: Project }) {
         </CardContent>
       </Card>
       <Card>
-        <CardHeader><CardTitle>Workplaces, workflows and skills</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 text-sm md:grid-cols-3">
+        <CardHeader><CardTitle>Workplaces, workflows, skills and roles</CardTitle></CardHeader>
+        <CardContent className="grid gap-4 text-sm md:grid-cols-2 lg:grid-cols-4">
           <PickList
             title="Workplaces" hint="the first is the default" value={s.workplaceIds.length ? s.workplaceIds : null}
             options={(repos.data?.workplaces ?? []).map(w => ({ id: w.id, label: workplaceLabel(repos.data, w) }))}
@@ -186,8 +187,9 @@ function Settings({ project }: { project: Project }) {
           />
           <PickList title="Workflows" hint="enabled here" value={s.workflows} options={(workflows.data ?? []).map(w => ({ id: w.id, label: w.name }))} onChange={v => setS({ ...s, workflows: v })} />
           <PickList title="Skills" hint="enabled here" value={s.skills} options={(skills.data ?? []).map(k => ({ id: k.path, label: k.name }))} onChange={v => setS({ ...s, skills: v })} />
-          {missing.length > 0 && <p className="text-xs text-destructive md:col-span-3">Workplaces removed from Repos: {missing.join(', ')}. New runs of this project will not start until you fix this.</p>}
-          <p className="text-xs text-muted-foreground md:col-span-3">Which workflow a task starts is set on the Workflows page, for the project picked in the top bar.</p>
+          <PickList title="Roles" hint="Team roles runs may use" value={s.roles} options={(team.data?.roles ?? []).map(r => ({ id: r.key, label: `${r.title} (${r.key})` }))} onChange={v => setS({ ...s, roles: v })} />
+          {missing.length > 0 && <p className="text-xs text-destructive md:col-span-2 lg:col-span-4">Workplaces removed from Repos: {missing.join(', ')}. New runs of this project will not start until you fix this.</p>}
+          <p className="text-xs text-muted-foreground md:col-span-2 lg:col-span-4">Which workflow a task starts is set on the Workflows page, for the project picked in the top bar.</p>
         </CardContent>
       </Card>
       <Card>

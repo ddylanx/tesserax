@@ -7,7 +7,7 @@ const avg = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.le
 const round = (x: number | null, d = 2) => (x == null ? null : Math.round(x * 10 ** d) / 10 ** d);
 
 /** Aggregates for tuning workflows and skills. Everything is computed from runs started in the last `days` days. */
-export async function computeMetrics(db: Db, skills: SkillCatalog, opts: { days: number; workflowId?: string }): Promise<MetricsReport> {
+export async function computeMetrics(db: Db, skills: SkillCatalog, opts: { days: number; workflowId?: string; project?: string }): Promise<MetricsReport> {
   let q = db
     .selectFrom('workflow_runs as r')
     .innerJoin('tasks as t', 't.id', 'r.task_id')
@@ -17,6 +17,8 @@ export async function computeMetrics(db: Db, skills: SkillCatalog, opts: { days:
     .orderBy('r.created_at', 'desc')
     .limit(2000);
   if (opts.workflowId) q = q.where('r.workflow_id', '=', opts.workflowId);
+  // same scope as the Runs page: the project the run's task is in
+  if (opts.project) q = q.where(eb => eb.exists(eb.selectFrom('projects as p').select('p.id').whereRef('p.id', '=', 't.project_id').where('p.slug', '=', opts.project!)));
   const runs = await q.execute();
   const ids = runs.map(r => r.id);
   const nodeRuns = ids.length ? await db.selectFrom('node_runs').selectAll().where('run_id', 'in', ids).orderBy('run_id').orderBy('seq').execute() : [];

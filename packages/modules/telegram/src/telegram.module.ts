@@ -1,6 +1,7 @@
 import { Inject, Module, type OnApplicationBootstrap, type OnApplicationShutdown } from '@nestjs/common';
 import type { Bot } from 'grammy';
 import type { AppConfig } from '@tesserax/config';
+import { redact } from '@tesserax/contracts';
 import { CONFIG, createLogger } from '@tesserax/core';
 import { AgentsModule, AgentsService } from '@tesserax/mod-agents';
 import { McpModule, McpService } from '@tesserax/mod-mcp';
@@ -26,8 +27,10 @@ export class TelegramModule implements OnApplicationBootstrap, OnApplicationShut
     private readonly workflow: WorkflowEngine,
   ) {}
 
-  private async notify(text: string) {
+  private async notify(raw: string) {
     if (!this.bot) return;
+    // never send a secret value or token-shaped string out of the machine
+    const text = redact(raw, process.env);
     for (const userId of this.config.TELEGRAM_ALLOWED_USER_IDS) {
       await this.bot.api
         .sendMessage(userId, text, { parse_mode: 'HTML', link_preview_options: { is_disabled: true } })

@@ -7,6 +7,9 @@ import { test } from 'node:test';
 import { diffInfo, ensureWorktree, checkBranch } from './git';
 import { ALWAYS_DENIED, buildRunArgs } from './launcher';
 
+/** Skip reason on Windows (false elsewhere): these tests need POSIX behaviour. */
+const onWindows = (reason: string) => (process.platform === 'win32' ? reason : false);
+
 test('run args always deny push/merge/remote changes, whatever the playbook allows', () => {
   const args = buildRunArgs({ sessionId: 's', permissionMode: 'acceptEdits', allowedTools: ['Edit', 'Bash(git push:*)'], maxBudgetUsd: 2 });
   const denied = args.slice(args.indexOf('--disallowedTools') + 1);
@@ -42,7 +45,7 @@ test('buildRunArgs includes mcp-config and mcp tool allowances when mcpServers a
   assert.ok(allowed.includes('mcp__files__*'));
 });
 
-test('launchDetached writes mcp.json with mode 0600 when mcpServers are configured', async () => {
+test('launchDetached writes mcp.json with mode 0600 when mcpServers are configured', { skip: onWindows('checks POSIX file mode 0600 on a spawned fake CLI') }, async () => {
   const { launchDetached } = await import('./launcher');
   const { existsSync, readFileSync, statSync } = await import('node:fs');
   const runDir = mkdtempSync(join(tmpdir(), 'ot-launcher-mcp-'));

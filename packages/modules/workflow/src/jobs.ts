@@ -1,5 +1,5 @@
 import type { AppConfig } from '@tesserax/config';
-import { MODEL_NODE_TYPES, nodeConfigSchemas, type NodeType } from '@tesserax/contracts';
+import { ROLE_NODE_TYPES, nodeConfigSchemas, parseStepReport, type NodeType, type RoleLookup } from '@tesserax/contracts';
 import { createLogger, type JobMeta, type Queue } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 import { diffInfo, isAlive, readOutcome, resultModel, stopProcess } from '@tesserax/agent-runtime';
@@ -11,12 +11,20 @@ import { readAntigravityOutcome } from './executors/antigravity';
 import { engineOf, readGeminiOutcome } from './executors/gemini';
 import { FatalNodeError } from './executors/types';
 import { projectSkills } from './project-skills';
+import { applyRunOverrides, resolveRole, runRoleLookup } from './apply-role';
 import type { SkillCatalog } from '@tesserax/mod-skills';
 import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import type { McpService } from '@tesserax/mod-mcp';
 
 const log = createLogger('workflow.jobs');
+
+/** Summary, confidence and decision from the report an AI step ends with (summary falls back to the first lines). */
+export function reportPatch(nodeType: string, text: string | null | undefined) {
+  if (!text?.trim() || !(ROLE_NODE_TYPES as readonly string[]).includes(nodeType)) return {};
+  const r = parseStepReport(text);
+  return { summary: r.summary || null, confidence: r.confidence, decision_needed: r.decisionNeeded };
+}
 
 export interface JobDeps {
   db: Db;
@@ -27,6 +35,8 @@ export interface JobDeps {
   config: AppConfig;
   queue: Queue;
   mcp?: McpService;
+  /** Team roles (ROLE_LOOKUP); without it a node that names a role fails. */
+  roles?: RoleLookup;
 }
 
 /** Node runs executing in this process right now (to tell them apart from ones orphaned by a restart). */
@@ -65,8 +75,6 @@ export async function runNodeJob(d: JobDeps, data: { nodeRunId: string }, meta: 
   }
 }
 
-const hasModel = (type: string) => (MODEL_NODE_TYPES as readonly string[]).includes(type);
-
 async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string }, meta: JobMeta) {
   const nr = await d.db
     .updateTable('node_runs')
@@ -84,18 +92,12 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     if (!executor) throw new FatalNodeError(`No executor for node type ${node.type}`);
     const task = await d.tasks.getTask(run.task_id);
     if (!task) throw new FatalNodeError('The task no longer exists');
-    const config = nodeConfigSchemas[node.type].parse(node.config);
-    // the agent picked on the run page for this run only wins over the workflow's engine
-    const runVars = (run.vars ?? {}) as { engine?: Record<string, string>; model?: Record<string, string> };
-    const engineOverride = runVars.engine?.[node.id];
-    if (engineOverride && 'engine' in config && engineOverride !== (config as { engine?: string }).engine) {
-      // a model the workflow named is for its own engine (an Antigravity model id means nothing to Claude Code)
-      Object.assign(config, { engine: engineOverride, model: undefined });
-    }
-    // the model picked on the run page for this run only wins over the workflow's model
-    const modelOverride = runVars.model?.[node.id];
-    if (modelOverride && hasModel(node.type)) Object.assign(config, { model: modelOverride });
     const project = run.project_id ? await d.engine.projects.get(run.project_id) : null;
+    // run override > field set in the node > its Team role > the node type's default; the project's engines are enforced last
+    const { config: raw, role } = await resolveRole(runRoleLookup(run.vars, d.roles), node, project);
+    if (role) await d.engine.patchNode(nr.id, { role: role.key, role_hash: role.hash });
+    const config = nodeConfigSchemas[node.type].parse(raw);
+    const { modelOverride } = applyRunOverrides(config as Record<string, unknown>, node, run.vars);
     if (project && 'engine' in config) {
       const allowed = project.settings.engines.allowed;
       const current = String((config as { engine?: string }).engine ?? '');
@@ -108,17 +110,17 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
     const input = (nr.input ?? {}) as { feedback?: string };
     const projectVars = ((run.vars ?? {}) as { project?: { vars?: Record<string, string> } }).project?.vars ?? {};
     const result = await executor({
-      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr, node, config, task,
-      artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
+      engine: d.engine, tasks: d.tasks, classifier: d.classifier, skills: projectSkills(d.skills, project), projectVars, appConfig: d.config, run, nodeRun: nr,
+      node: { ...node, config: raw }, config, task, role, artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
     });
     if ('async' in result) return; // finishes later (agent runs)
     if ('wait' in result) {
       if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
+      await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null, ...reportPatch(nr.node_type, result.artifact?.content) });
       return;
     }
     if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
-    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null });
+    await d.engine.patchNode(nr.id, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null, ...reportPatch(nr.node_type, result.artifact?.content) });
     await d.engine.complete(nr.id, result.port, result.output ?? {}, 'job', ['running']);
   } catch (err) {
     const message = String((err as Error)?.message ?? err).slice(0, 4000);
@@ -136,14 +138,15 @@ export async function scanAgentNodes(d: JobDeps) {
   const rows = await d.db
     .selectFrom('node_runs as n')
     .innerJoin('workflow_runs as r', 'r.id', 'n.run_id')
-    .select(['n.id', 'n.node_id', 'n.process_id', 'n.run_dir', 'n.started_at', 'r.workflow_snapshot'])
+    .select(['n.id', 'n.node_id', 'n.process_id', 'n.run_dir', 'n.started_at', 'r.workflow_snapshot', 'r.vars'])
     .where('n.status', '=', 'running')
     .where('n.node_type', '=', 'agent.run')
     .where('n.process_id', 'is not', null)
     .execute();
   for (const r of rows) {
     const node = d.engine.node(r, r.node_id);
-    const timeoutSeconds = nodeConfigSchemas['agent.run'].parse(node.config).timeoutSeconds;
+    const raw = await resolveRole(runRoleLookup(r.vars, d.roles), node, null).then(x => x.config, () => node.config);
+    const timeoutSeconds = nodeConfigSchemas['agent.run'].parse(raw).timeoutSeconds;
     const tooLong = Date.now() - new Date(r.started_at ?? Date.now()).getTime() > timeoutSeconds * 1000;
     const done = !isAlive(r.process_id) || readOutcome(r.run_dir!, r.process_id, false).exitCode !== null;
     if (!done && !tooLong) continue;
@@ -179,7 +182,7 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
   ].join('\n');
   await d.engine.saveArtifact(run.id, nr.id, output, content, 'ai');
   const usedModel = resultModel(r);
-  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}) });
+  await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}), ...reportPatch(nr.node_type, r?.result) });
   log.info({ runId: run.id, signal: outcome.signal }, 'agent node finished');
   if (nr.run_dir) {
     const mcpFile = join(nr.run_dir, 'mcp.json');
