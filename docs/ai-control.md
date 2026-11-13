@@ -39,13 +39,14 @@ A cloud session (a Claude project, claude.ai on your phone) cannot reach `127.0.
 | `read_document` | read | A document a run made (analysis, spec, review), any version. |
 | `get_run_diff`, `get_step_log` | read | The code change; what an agent step did. |
 | `get_metrics` | read | Outcomes, cost and time per workflow version. |
+| `list_team`, `get_role` | read | Departments and roles (sub agents): what each role is for, when to use it, what it needs; one role's persona prompt and version hash. |
 | `create_task`, `set_task_status`, `sync_tasks` | act | Local tasks and source sync. |
 | `start_run`, `cancel_run`, `retry_run`, `rerun_step`, `run_from_step` | act | Run control. |
 | `decide_gate` | decide | Records **your** decision at a review gate: approved, changes (with feedback) or rejected. |
 
 Tasks and runs can be named by key (`TESS-12`, `#14`) instead of id; a task key means its latest run.
 
-What the server does not do: confirm steps (Jira comment, push + open PR, PR comment), evaluations, deleting anything, editing projects, workflows, skills or repos. For a run waiting at a confirm step, `get_run` returns the link for you to open.
+What the server does not do: confirm steps (Jira comment, push + open PR, PR comment), evaluations, deleting anything, editing projects, workflows, skills, repos or Team roles. For a run waiting at a confirm step, `get_run` returns the link for you to open.
 
 ### The decision rule
 

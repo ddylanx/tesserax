@@ -52,6 +52,17 @@ function runDetail(status: string, currentNodeId: string | null) {
   };
 }
 
+const team = {
+  departments: [{ id: 'd1', slug: 'qa', name: 'QA', color: '#f59e0b', description: 'Checks quality.', position: 0 }],
+  roles: [
+    {
+      id: 'r1', key: 'qa/reviewer', departmentId: 'd1', slug: 'reviewer', title: 'Code reviewer', enabled: true, prompt: 'You review strictly.',
+      config: { engine: 'claude', model: 'sonnet', skills: ['code-review'], allowedTools: ['Read'], mission: 'Find real defects.', whenToUse: ['Before a PR'], reportLanguage: 'vi' },
+      position: 0, hash: 'abc123def456', problems: [], usedBy: ['dev'],
+    },
+  ],
+};
+
 function fakeApi(detail = runDetail('waiting', 'review')) {
   const calls: { method: string; path: string; body?: unknown; query?: Query }[] = [];
   const api: Api = {
@@ -61,6 +72,7 @@ function fakeApi(detail = runDetail('waiting', 'review')) {
       if (path === '/workflow-runs') return { runs: [{ ...detail, task }], counts: { waiting: 1 } } as T;
       if (path === `/workflow-runs/${RUN_ID}`) return detail as T;
       if (path === `/tasks/${TASK_ID}`) return detail.task as T;
+      if (path === '/team') return team as T;
       throw new Error(`unexpected GET ${path}`);
     },
     async send<T>(method: 'POST' | 'PATCH', path: string, body?: unknown) {
@@ -144,4 +156,30 @@ test('endpoints: env beats .env, only known keys are read', () => {
   const e = resolveEndpoints({ API_HOST: '0.0.0.0', API_PORT: '4401' }, '/nonexistent');
   assert.deepEqual(e, { api: 'http://127.0.0.1:4401', web: 'http://127.0.0.1:5180' });
   assert.equal(resolveEndpoints({ TESSERAX_API_URL: 'http://h:1/' }, '/nonexistent').api, 'http://h:1');
+});
+
+test('list_team groups roles by department and leaves tools out', async () => {
+  const { ctx, calls } = fakeApi();
+  const out = (await tool('list_team').run(ctx, { project: 'tesserax' })) as { departments: { slug: string; roles: Record<string, unknown>[] }[]; link: string };
+  assert.deepEqual(calls.at(-1), { method: 'GET', path: '/team', query: { project: 'tesserax' } });
+  const role = out.departments[0]!.roles[0]!;
+  assert.equal(role.key, 'qa/reviewer');
+  assert.equal(role.mission, 'Find real defects.');
+  assert.equal(role.reportLanguage, 'vi');
+  assert.ok(!('allowedTools' in role) && !('prompt' in role));
+  assert.equal(out.link, 'http://web/team');
+});
+
+test('get_role returns the prompt and hash, and names the roles when the key is wrong', async () => {
+  const { ctx } = fakeApi();
+  const out = (await tool('get_role').run(ctx, { role: 'QA/Reviewer' })) as { prompt: string; hash: string; department: string };
+  assert.equal(out.prompt, 'You review strictly.');
+  assert.equal(out.hash, 'abc123def456');
+  assert.equal(out.department, 'qa');
+  await assert.rejects(tool('get_role').run(ctx, { role: 'qa/nope' }), /Roles: qa\/reviewer/);
+});
+
+test('team tools only read', () => {
+  assert.equal(tool('list_team').kind, 'read');
+  assert.equal(tool('get_role').kind, 'read');
 });
