@@ -1,0 +1,21 @@
+{
+  "name": "@tesserax/mcp-server",
+  "version": "0.0.0",
+  "private": true,
+  "description": "MCP server (stdio) that lets an AI assistant drive a local Tesserax through its HTTP API.",
+  "main": "src/main.ts",
+  "scripts": {
+    "start": "node bin.cjs",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test -r @swc-node/register \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@tesserax/contracts": "workspace:*",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@swc-node/register": "^1.10.10",
+    "@swc/core": "^1.13.5"
+  }
+}
