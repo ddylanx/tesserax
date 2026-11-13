@@ -76,6 +76,10 @@ Copy `.env.example` to `.env` (gitignored). The defaults work as they are; the k
 
 Setup for each integration is in [docs/integrations.md](docs/integrations.md).
 
+## Drive it from an AI assistant
+
+Tesserax ships an MCP server, so Claude Code (or any MCP client) can list tasks, start and follow runs and record your gate decisions; outward actions stay with you in the web UI. See [docs/ai-control.md](docs/ai-control.md).
+
 ## Roadmap
 
 See [docs/roadmap.md](docs/roadmap.md).

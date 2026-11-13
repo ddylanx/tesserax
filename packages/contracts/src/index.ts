@@ -11,3 +11,4 @@ export * from './project-scope';
 export * from './team';
 export * from './report';
 export * from './redact';
+export * from './openapi';

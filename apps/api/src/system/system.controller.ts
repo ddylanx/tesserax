@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { sql } from 'kysely';
 import type { AppConfig } from '@tesserax/config';
 import { jiraConfigured } from '@tesserax/config';
-import type { AgentCliStatus, EnvironmentStatus, Health, SystemInfo } from '@tesserax/contracts';
+import { buildOpenApi, type AgentCliStatus, type EnvironmentStatus, type Health, type SystemInfo } from '@tesserax/contracts';
 import { CONFIG, DB, QUEUE, SCHEDULES, type Queue, type ScheduleRegistry } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
 
@@ -94,6 +94,14 @@ export class SystemController {
       time: new Date().toISOString(),
     };
   }
+
+  /** OpenAPI document of the API, built from the Zod contracts (for tools and AI assistants; see docs/ai-control.md). */
+  @Get('openapi.json')
+  openapi() {
+    this.openapiDoc ??= buildOpenApi({ serverUrl: `http://${this.config.API_HOST}:${this.config.API_PORT}` });
+    return this.openapiDoc;
+  }
+  private openapiDoc?: ReturnType<typeof buildOpenApi>;
 
   @Get('system/environment')
   async environment(): Promise<EnvironmentStatus> {

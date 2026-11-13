@@ -4,6 +4,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 
 ## Layout
 - `apps/api` NestJS. In local mode it also runs pg-boss workers and schedules (no separate worker app yet).
+- `apps/mcp` (`@tesserax/mcp-server`) stdio MCP server over the HTTP API (`.mcp.json`, guide `docs/ai-control.md`): read / act / decide tools; outward actions (Jira comment, push + PR, PR comment) are never exposed. Every API route is listed in `@tesserax/contracts` `openapi.ts` (`GET /api/openapi.json`; a test checks the list against the controllers).
 - `apps/web` React + Vite + TanStack Router/Query + Tailwind 4 + shadcn-style components in `src/components/ui`.
 - `packages/config` Zod-validated env, loads `<repo>/.env`.
 - `packages/contracts` Zod schemas + types shared by api and web (the API contract).
@@ -28,7 +29,7 @@ Personal backoffice for AI coding work. pnpm + Turborepo monorepo, TypeScript st
 - Inject infra with tokens from `@tesserax/core` (`CONFIG`, `DB`, `QUEUE`, `SCHEDULES`) using `@Inject(...)`.
 - Register job handlers / schedules in a module's `onModuleInit`; the queue starts in `InfraModule.onApplicationBootstrap`.
 - New table: add a migration file, register it, extend `Database` in `packages/db/src/schema.ts`. Migrations + seed run when the api boots.
-- New endpoint: define the response schema/type in `@tesserax/contracts` first, then use it in api and web.
+- New endpoint: define the response schema/type in `@tesserax/contracts` first, then use it in api and web, and add it to `API_ROUTES` (`openapi.ts`).
 - Everything binds to 127.0.0.1; no auth in local mode. Never log or store secrets; `.env` is gitignored.
 - Pipeline state only changes through `PipelineService.transition` (guarded UPDATE + event). Steps start via `startStep` and run inside `runStep` (stale-job skip, retries, then failed).
 - Issue text is untrusted: keep it inside `<issue>` delimiters in every prompt. Never write to Jira except `postJiraComment`, which needs an explicit confirmed click.
