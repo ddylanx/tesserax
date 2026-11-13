@@ -21,7 +21,17 @@ const readCollapsed = () => {
   }
 };
 
-/** Live numbers for the shell, from lists the pages already use (counts do not depend on the status filter). */
+/**
+ * Inbox items that need you (pipeline runs to decide or verify).
+ * Not scoped to the picked project yet (the Inbox list is not either); scope it here, the only place it is counted.
+ */
+function useInboxCount(_scopeParam: string): number {
+  const pipeline = useQuery({ queryKey: ['pipeline', 'shell'], queryFn: () => api<PipelineList>('/api/pipeline/runs?group=decide'), refetchInterval: 10_000 });
+  const pc = pipeline.data?.counts ?? {};
+  return (pc.awaiting_decision ?? 0) + (pc.awaiting_verify ?? 0);
+}
+
+/** Live numbers for the shell. Run counts come from the list the Runs page uses, scoped to the picked project by the API. */
 function useShellCounts() {
   const { scopeParam } = useProjectScope();
   const runs = useQuery({
@@ -29,14 +39,13 @@ function useShellCounts() {
     queryFn: () => api<WorkflowRunList>(`/api/workflow-runs?status=waiting${scopeParam ? `&${scopeParam}` : ''}`),
     refetchInterval: 10_000,
   });
-  const pipeline = useQuery({ queryKey: ['pipeline', 'shell'], queryFn: () => api<PipelineList>('/api/pipeline/runs?group=decide'), refetchInterval: 10_000 });
+  const inbox = useInboxCount(scopeParam);
   const rc = runs.data?.counts ?? {};
-  const pc = pipeline.data?.counts ?? {};
   const waiting = rc.waiting ?? 0;
   return {
     waiting,
     counters: {
-      inbox: { n: (pc.awaiting_decision ?? 0) + (pc.awaiting_verify ?? 0), tone: 'warning' as Tone },
+      inbox: { n: inbox, tone: 'warning' as Tone },
       runs: { n: waiting + (rc.running ?? 0) + (rc.failed ?? 0), tone: (rc.failed ? 'destructive' : 'neutral') as Tone },
     },
   };
