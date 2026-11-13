@@ -1,49 +1,16 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link, Outlet } from '@tanstack/react-router';
-import {
-  BarChart3, Bot, Boxes, FolderGit2, Inbox, Layers, ListChecks, Network, PanelLeftClose, PanelLeftOpen, Server, Sparkles, Workflow, type LucideIcon,
-} from 'lucide-react';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useState } from 'react';
 import type { PipelineList, WorkflowRunList } from '@tesserax/contracts';
+import { SidebarNav } from '@/components/sidebar-nav';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/input';
-import { Count, StatusPill, type Tone } from '@/components/ui/status-pill';
+import { StatusPill, type Tone } from '@/components/ui/status-pill';
 import { api } from '@/lib/api';
 import { ProjectDot, ProjectProvider, useProjectScope } from '@/lib/project-context';
 import { cn } from '@/lib/utils';
-
-type Counter = 'inbox' | 'runs';
-interface NavItem { to: string; label: string; icon: LucideIcon; counter?: Counter }
-
-const groups: { label: string; items: NavItem[] }[] = [
-  {
-    label: 'Work',
-    items: [
-      { to: '/inbox', label: 'Inbox', icon: Inbox, counter: 'inbox' },
-      { to: '/tasks', label: 'Tasks', icon: ListChecks },
-      { to: '/runs', label: 'Runs', icon: Workflow, counter: 'runs' },
-    ],
-  },
-  {
-    label: 'Build',
-    items: [
-      { to: '/workflows', label: 'Workflows', icon: Network },
-      { to: '/skills', label: 'Skills', icon: Sparkles },
-      { to: '/agents', label: 'Agents', icon: Bot },
-    ],
-  },
-  {
-    label: 'Setup',
-    items: [
-      { to: '/projects', label: 'Projects', icon: Layers },
-      { to: '/repos', label: 'Repos', icon: FolderGit2 },
-      { to: '/mcp', label: 'MCP', icon: Boxes },
-      { to: '/system', label: 'System', icon: Server },
-    ],
-  },
-  { label: 'Insights', items: [{ to: '/metrics', label: 'Metrics', icon: BarChart3 }] },
-];
 
 const COLLAPSED_KEY = 'tesserax:sidebar-collapsed';
 const readCollapsed = () => {
@@ -136,31 +103,7 @@ function Shell() {
             collapsed ? 'md:w-14' : 'md:w-52',
           )}
         >
-          {groups.map(g => (
-            <div key={g.label} className="flex items-center gap-0.5 md:flex-col md:items-stretch">
-              <div className={cn('hidden px-2 pt-3 pb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase', !collapsed && 'md:block')}>{g.label}</div>
-              {collapsed && <div className="mx-2 my-1.5 hidden border-t border-sidebar-border md:block" />}
-              {g.items.map(({ to, label, icon: Icon, counter }) => {
-                const c = counter ? counters[counter] : null;
-                return (
-                  <Link
-                    key={to}
-                    to={to}
-                    title={label}
-                    className={cn(
-                      'relative flex items-center gap-2 rounded-md px-2 py-1.5 text-sm whitespace-nowrap text-muted-foreground hover:bg-sidebar-accent hover:text-foreground',
-                      collapsed && 'md:justify-center',
-                    )}
-                    activeProps={{ className: 'bg-sidebar-accent !text-foreground font-medium' }}
-                  >
-                    <Icon className="size-4 shrink-0" />
-                    <span className={cn('hidden sm:inline', collapsed && 'md:hidden')}>{label}</span>
-                    {c && <Count n={c.n} tone={c.tone} className={cn('ml-auto', collapsed && 'md:absolute md:-top-0.5 md:-right-0.5 md:ml-0')} />}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+          <SidebarNav collapsed={collapsed} counters={counters} />
           <Button
             variant="ghost"
             size="icon-sm"
