@@ -63,6 +63,16 @@ const team = {
   ],
 };
 
+const busyStep = { runId: RUN_ID, nodeRunId: 'n1', taskKey: 'TESS-12', taskTitle: 'Fix it', projectSlug: 'tesserax', workflowId: 'dev', step: 'review', stepLabel: 'Review', nodeType: 'ai.review', status: 'running', attempt: 1, engine: 'claude', model: 'sonnet', startedAt: 'x', endedAt: null, costUsd: null, numTurns: null, summary: null, confidence: null, decisionNeeded: null, error: null };
+const activity = {
+  generatedAt: 'x', windowHours: 24,
+  agents: [
+    { roleKey: 'qa/reviewer', state: 'running', current: [busyStep], last: null, stats: { done: 2, failed: 0, costUsd: 0.4 } },
+    { roleKey: null, state: 'queued', current: [{ ...busyStep, status: 'queued', step: 'spec', stepLabel: 'Spec' }], last: null, stats: { done: 0, failed: 0, costUsd: 0 } },
+  ],
+  waitingForYou: [{ ...busyStep, nodeType: 'human.gate', status: 'waiting', step: 'gate', stepLabel: 'You review' }],
+};
+
 function fakeApi(detail = runDetail('waiting', 'review')) {
   const calls: { method: string; path: string; body?: unknown; query?: Query }[] = [];
   const api: Api = {
@@ -73,6 +83,7 @@ function fakeApi(detail = runDetail('waiting', 'review')) {
       if (path === `/workflow-runs/${RUN_ID}`) return detail as T;
       if (path === `/tasks/${TASK_ID}`) return detail.task as T;
       if (path === '/team') return team as T;
+      if (path === '/team/activity') return activity as T;
       throw new Error(`unexpected GET ${path}`);
     },
     async send<T>(method: 'POST' | 'PATCH', path: string, body?: unknown) {
@@ -182,4 +193,16 @@ test('get_role returns the prompt and hash, and names the roles when the key is 
 test('team tools only read', () => {
   assert.equal(tool('list_team').kind, 'read');
   assert.equal(tool('get_role').kind, 'read');
+});
+
+test('team_activity puts every role in, idle when it has nothing, with run links', async () => {
+  const { ctx } = fakeApi();
+  const out = (await tool('team_activity').run(ctx, {})) as { roles: { role: string; state: string; current: { task: string; link: string }[] }[]; noRole: { state: string } | null; waitingForYou: { step: string }[] };
+  const qa = out.roles.find(r => r.role === 'qa/reviewer')!;
+  assert.equal(qa.state, 'running');
+  assert.equal(qa.current[0]!.task, 'TESS-12');
+  assert.equal(qa.current[0]!.link, `http://web/runs/${RUN_ID}`);
+  assert.equal(out.noRole!.state, 'queued');
+  assert.deepEqual(out.waitingForYou.map(s => s.step), ['You review']);
+  assert.equal(tool('team_activity').kind, 'read');
 });
