@@ -163,6 +163,10 @@ function Settings({ project }: { project: Project }) {
           <label className="flex flex-col gap-1 text-xs">Key prefix of new tasks
             <Input placeholder="e.g. TX" value={s.keyPrefix ?? ''} onChange={e => setS({ ...s, keyPrefix: e.target.value.toUpperCase() || undefined })} />
           </label>
+          <label className="flex flex-col gap-1 text-xs">Kind of work on its board
+            <Input list="work-types" placeholder="e.g. dev, business" value={s.workType ?? ''} onChange={e => setS({ ...s, workType: e.target.value.toLowerCase().trim() || undefined })} />
+            <datalist id="work-types"><option value="dev" /><option value="business" /></datalist>
+          </label>
         </CardContent>
       </Card>
       <Card>

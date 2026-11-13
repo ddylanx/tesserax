@@ -31,6 +31,7 @@ import {
   type TaskList,
   type TaskQuery,
   type WorkflowRunList,
+  groupByWorkType,
 } from '@tesserax/contracts';
 import { Page, QueryState } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
@@ -144,7 +145,7 @@ export function TasksPage() {
     } catch {}
   };
 
-  const { selected: project, projects } = useProjectScope();
+  const { selected: project, projects, setSelected: setProject } = useProjectScope();
   const qc = useQueryClient();
 
   // List view query
@@ -165,7 +166,8 @@ export function TasksPage() {
     queryKey: ['tasks', 'board-open', boardFilters, project],
     queryFn: () => api<TaskList>(`/api/tasks?${boardOpenParams}`),
     refetchInterval: 30_000,
-    enabled: view === 'board',
+    // a board holds one project (one kind of work), never all of them mixed
+    enabled: view === 'board' && Boolean(project),
   });
 
   const [doneUpdatedSince] = useState(() => new Date(Date.now() - 14 * 864e5).toISOString());
@@ -187,7 +189,7 @@ export function TasksPage() {
     initialPageParam: null as string | null,
     getNextPageParam: last => last.nextCursor ?? undefined,
     refetchInterval: 30_000,
-    enabled: view === 'board',
+    enabled: view === 'board' && Boolean(project),
   });
 
   const boardTasks = useMemo(() => {
@@ -624,7 +626,24 @@ export function TasksPage() {
       </div>
 
       {/* Board or List view */}
-      {view === 'board' ? (
+      {view === 'board' && !project ? (
+        <Card>
+          <div className="flex flex-col gap-3 p-4 text-sm">
+            <p className="text-muted-foreground">A board shows one project, so each board holds one kind of work. Pick a project:</p>
+            {groupByWorkType(projects).map(([type, list]) => (
+              <div key={type} className="flex flex-wrap items-center gap-2">
+                <span className="w-20 text-xs font-medium uppercase text-muted-foreground">{type}</span>
+                {list.map(p => (
+                  <Button key={p.id} size="sm" variant="outline" onClick={() => setProject(p.slug)}>
+                    <ProjectDot color={p.color} name={p.name} />
+                    {p.name}
+                  </Button>
+                ))}
+              </div>
+            ))}
+          </div>
+        </Card>
+      ) : view === 'board' ? (
         <>
           <QueryState isLoading={boardOpenQ.isLoading} error={boardOpenQ.error} />
           {!boardOpenQ.isLoading && !boardOpenQ.error && (
