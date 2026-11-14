@@ -211,6 +211,8 @@ function toBody(f: RoleForm, keep: Record<string, unknown>) {
   if (f.mission.trim()) config.mission = f.mission.trim();
   for (const k of ['whenToUse', 'notFor', 'inputsNeeded'] as const) if (lines(f[k]).length) config[k] = lines(f[k]);
   config.reportLanguage = f.reportLanguage;
+  // the packs switched on for the role are edited on the Context page; saving the role here must not drop them
+  if (Array.isArray(keep.context)) config.context = keep.context;
   return { departmentId: f.departmentId, slug: f.slug.trim(), title: f.title.trim(), enabled: f.enabled, prompt: f.prompt, config };
 }
 
