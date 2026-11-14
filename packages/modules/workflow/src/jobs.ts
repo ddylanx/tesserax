@@ -26,6 +26,25 @@ export function reportPatch(nodeType: string, text: string | null | undefined) {
   return { summary: r.summary || null, confidence: r.confidence, decision_needed: r.decisionNeeded };
 }
 
+/**
+ * Hands the improvement proposals a role-driven step ended its report with to the Team module; the owner decides on the
+ * Context page. Never fails the step.
+ */
+export async function keepImprovements(roles: RoleLookup | undefined, roleKey: string | null | undefined, text: string | null | undefined, source: string): Promise<number> {
+  if (!roleKey || !text?.trim() || !roles?.proposeImprovements) return 0;
+  const items = parseStepReport(text).improvements;
+  if (!items.length) return 0;
+  try {
+    return await roles.proposeImprovements(roleKey, items, source);
+  } catch (err) {
+    log.warn({ err, role: roleKey }, 'could not save improvement proposals');
+    return 0;
+  }
+}
+
+/** Where a proposal came from, as the Context page links it. */
+export const proposalSource = (runId: string, nodeId: string) => `run:${runId}:${nodeId}`;
+
 export interface JobDeps {
   db: Db;
   engine: WorkflowEngine;
@@ -114,6 +133,7 @@ async function runNodeJobInner(d: JobDeps, { nodeRunId }: { nodeRunId: string },
       node: { ...node, config: raw }, config, task, role, artifacts: await d.engine.latestArtifacts(run.id), feedback: input.feedback ?? null, mcp: d.mcp,
     });
     if ('async' in result) return; // finishes later (agent runs)
+    await keepImprovements(d.roles, role?.key, result.artifact?.content, proposalSource(run.id, nr.node_id));
     if ('wait' in result) {
       if (result.artifact) await d.engine.saveArtifact(run.id, nr.id, result.artifact.name, result.artifact.content, 'ai');
       await d.engine.awaitConfirmation(nr.id, result.output ?? {}, { cost_usd: result.costUsd ?? null, num_turns: result.numTurns ?? null, model: result.model ?? null, skill_hash: result.skillHash ?? null, ...reportPatch(nr.node_type, result.artifact?.content) });
@@ -183,6 +203,7 @@ export async function finalizeAgentJob(d: JobDeps, data: { nodeRunId: string; ti
   await d.engine.saveArtifact(run.id, nr.id, output, content, 'ai');
   const usedModel = resultModel(r);
   await d.engine.patchNode(nr.id, { cost_usd: r?.total_cost_usd ?? null, num_turns: r?.num_turns ?? null, process_id: null, ...(usedModel ? { model: usedModel } : {}), ...reportPatch(nr.node_type, r?.result) });
+  await keepImprovements(d.roles, nr.role, r?.result, proposalSource(run.id, nr.node_id));
   log.info({ runId: run.id, signal: outcome.signal }, 'agent node finished');
   if (nr.run_dir) {
     const mcpFile = join(nr.run_dir, 'mcp.json');

@@ -139,3 +139,18 @@ test('a run uses the roles as they were when it started; older runs without a sn
   // a role missing when the run started stays missing
   await assert.rejects(resolveRole(runRoleLookup(vars, live), step({ role: 'qa/ghost' }), null), /not found or disabled/);
 });
+
+test('a role\'s context (packs + lessons) follows its prompt and card, and is kept in the run snapshot', async () => {
+  assert.equal(
+    withRole({ title: 'Dev', prompt: 'Be careful.', brief: '## Your role\nMission: x', context: '## Context: Notes\n\nDEMO' }, 'T'),
+    '# Role: Dev\n\nBe careful.\n\n## Your role\nMission: x\n\n## Context: Notes\n\nDEMO\n\n---\n\nT',
+  );
+  const live = {
+    getByKey: async (key: string) => ({ id: '1', key, departmentId: 'd', slug: 'dev', title: 'Dev', enabled: true, prompt: 'P', config: { skills: [] }, position: 0, hash: 'h1', problems: [], usedBy: [], contextText: '## Context: Notes\n\nDEMO' }),
+    keys: async () => ['eng/dev'],
+  };
+  const snap = await snapshotRoles(live, { nodes: [{ id: 'n', type: 'ai.step', config: { role: 'eng/dev' } }] } as never);
+  assert.equal(snap['eng/dev']!.context, '## Context: Notes\n\nDEMO');
+  const role = await runRoleLookup({ roles: snap }, undefined)!.getByKey('eng/dev');
+  assert.equal(applyRole({}, role!, 'ai.step').role.context, '## Context: Notes\n\nDEMO');
+});

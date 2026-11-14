@@ -114,9 +114,9 @@ export function renderTemplate(template: string, c: RenderContext): string {
   });
 }
 
-/** The Team role's instructions go first, before the skills and the task prompt. */
-export function withRole(role: { title: string; prompt: string; brief?: string } | null | undefined, prompt: string): string {
-  const body = [role?.prompt.trim(), role?.brief?.trim()].filter(Boolean).join('\n\n');
+/** The Team role's instructions go first (prompt, role card, then its context packs and lessons), before the skills and the task prompt. */
+export function withRole(role: { title: string; prompt: string; brief?: string; context?: string } | null | undefined, prompt: string): string {
+  const body = [role?.prompt.trim(), role?.brief?.trim(), role?.context?.trim()].filter(Boolean).join('\n\n');
   if (!role || !body) return prompt;
   return [`# Role: ${role.title}\n\n${body}`, prompt].join('\n\n---\n\n');
 }

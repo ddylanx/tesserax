@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { test } from 'node:test';
 import type { Db } from '@tesserax/db';
-import { finalizeAgentJob, type JobDeps } from './jobs';
+import { finalizeAgentJob, keepImprovements, proposalSource, type JobDeps } from './jobs';
 
 function createMockDeps(nodeRun: any, workflowRun: any): { deps: JobDeps; completed: any[]; artifacts: any[] } {
   const completed: any[] = [];
@@ -170,4 +170,16 @@ test('reportPatch: AI steps store summary, confidence and decision; other steps 
   assert.deepEqual(reportPatch('agent.run', 'Changed two files.\nAll tests pass.'), { summary: 'Changed two files.\nAll tests pass.', confidence: null, decision_needed: null });
   assert.deepEqual(reportPatch('check.command', '## Summary\nx'), {});
   assert.deepEqual(reportPatch('ai.step', '  '), {});
+});
+
+test('the proposals a role-driven step ends with go to the Team module; a failure there never fails the step', async () => {
+  const got: unknown[] = [];
+  const roles = { getByKey: async () => null, keys: async () => [], proposeImprovements: async (...a: unknown[]) => (got.push(a), 1) };
+  const text = '## Summary\nDone.\n## Improvement proposals\n- Run the DEMO tests first | sent back once';
+  assert.equal(await keepImprovements(roles, 'eng/dev', text, proposalSource('run-1', 'build')), 1);
+  assert.deepEqual(got, [['eng/dev', [{ kind: 'lesson', text: 'Run the DEMO tests first', reason: 'sent back once', pack: null }], 'run:run-1:build']]);
+  assert.equal(await keepImprovements(roles, null, text, 's'), 0);
+  assert.equal(await keepImprovements(roles, 'eng/dev', '## Summary\nDone.', 's'), 0);
+  assert.equal(await keepImprovements({ ...roles, proposeImprovements: async () => { throw new Error('db down'); } }, 'eng/dev', text, 's'), 0);
+  assert.equal(await keepImprovements({ getByKey: async () => null, keys: async () => [] }, 'eng/dev', text, 's'), 0);
 });
