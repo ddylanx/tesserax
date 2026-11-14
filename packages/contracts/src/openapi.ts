@@ -6,6 +6,7 @@ import { moveTaskSchema, projectCardSchema, projectSchema, saveProjectSchema } f
 import { demoRepoResponseSchema, repoRegistrySchema, setTaskWorkplaceSchema } from './repos';
 import { environmentStatusSchema, healthSchema, systemInfoSchema } from './system';
 import { teamActivityQuerySchema, teamActivitySchema } from './team-activity';
+import { contextOverviewSchema, contextPackSchema, decideImprovementSchema, improvementListSchema, improvementQuerySchema, improvementSchema, proposeImprovementSchema, roleContextSchema, roleContextTextSchema, saveContextPackSchema, setRoleContextSchema } from './context';
 import { departmentSchema, roleChangeSchema, roleSchema, saveDepartmentSchema, saveRoleSchema, teamListSchema } from './team';
 import { createLocalTaskSchema, taskDetailSchema, taskListSchema, taskQuerySchema, updateLocalTaskSchema, updateTaskStatusSchema } from './tasks';
 import {
@@ -130,6 +131,15 @@ export const API_ROUTES: ApiRoute[] = [
   { method: 'patch', path: '/team/roles/{id}', tag: 'team', summary: 'Edit a role.', body: saveRoleSchema.partial(), response: roleSchema },
   { method: 'delete', path: '/team/roles/{id}', tag: 'team', summary: 'Delete a role no workflow uses.', response: ok },
   { method: 'get', path: '/team/roles/{id}/changes', tag: 'team', summary: 'Audit trail of a role (hash before and after each change).', response: z.object({ changes: z.array(roleChangeSchema) }) },
+  // context: what each role reads (packs, lessons) and the proposals roles make to do their job better (only the person decides)
+  { method: 'get', path: '/team/context', tag: 'team', summary: 'Context packs and, per role, what it reads now, what it could read, what it may not, and its size against the limit.', response: contextOverviewSchema },
+  { method: 'put', path: '/team/context/packs/{slug}', tag: 'team', summary: 'Create or replace a context pack.', body: saveContextPackSchema, response: contextPackSchema },
+  { method: 'delete', path: '/team/context/packs/{slug}', tag: 'team', summary: 'Delete a context pack.', response: ok },
+  { method: 'get', path: '/team/context/roles/{id}', tag: 'team', summary: 'One role: what it reads, and the exact context text a step of that role is sent.', response: roleContextTextSchema },
+  { method: 'put', path: '/team/context/roles/{id}', tag: 'team', summary: 'Set the packs switched on for a role (inside each pack\'s audience).', body: setRoleContextSchema, response: roleContextSchema },
+  { method: 'get', path: '/team/improvements', tag: 'team', summary: 'Improvement proposals of the roles (lessons, context requests), newest first.', query: improvementQuerySchema, response: improvementListSchema },
+  { method: 'post', path: '/team/roles/{id}/improvements', tag: 'team', summary: 'Propose an improvement for a role (waits for the person).', body: proposeImprovementSchema, response: improvementSchema },
+  { method: 'post', path: '/team/improvements/{id}/decision', tag: 'team', summary: 'Approve, reject or retire a proposal (the person only).', body: decideImprovementSchema, response: improvementSchema },
   { method: 'get', path: '/team/activity', tag: 'team', summary: 'What each role is doing now and did in the last hours: active steps, last step, counts; steps waiting for the person.', query: teamActivityQuerySchema, response: teamActivitySchema },
 
   // repos

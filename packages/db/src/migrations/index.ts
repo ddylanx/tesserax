@@ -14,6 +14,7 @@ import * as m012 from './012_mcp_policy';
 import * as m013 from './013_node_model';
 import * as m014 from './014_team';
 import * as m015 from './015_step_report';
+import * as m016 from './016_context';
 
 /** Ordered list of migrations. Add new files here; names sort lexically. */
 export const migrations: Record<string, Migration> = {
@@ -32,5 +33,6 @@ export const migrations: Record<string, Migration> = {
   '013_node_model': m013,
   '014_team': m014,
   '015_step_report': m015,
+  '016_context': m016,
 };
 
