@@ -1,6 +1,7 @@
 import { createRootRoute, createRoute, createRouter, redirect } from '@tanstack/react-router';
 import { Layout } from './layout';
 import { AgentsPage } from './routes/agents';
+import { ContextPage, type ContextView } from './routes/context';
 import { InboxPage } from './routes/inbox';
 import { McpPage } from './routes/mcp';
 import { MetricsPage } from './routes/metrics';
@@ -49,6 +50,15 @@ const teamRoute = createRoute({
   validateSearch: (s: Record<string, unknown>): { view?: 'live' } => ({ view: s.view === 'live' ? 'live' : undefined }),
   component: TeamPage,
 });
+const contextRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/context',
+  validateSearch: (s: Record<string, unknown>): { view?: ContextView; role?: string } => ({
+    view: s.view === 'matrix' || s.view === 'improve' ? s.view : undefined,
+    role: typeof s.role === 'string' && s.role ? s.role : undefined,
+  }),
+  component: ContextPage,
+});
 const metricsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/metrics', component: MetricsPage });
 const tasksRoute = createRoute({ getParentRoute: () => rootRoute, path: '/tasks', component: TasksPage });
 const agentsRoute = createRoute({ getParentRoute: () => rootRoute, path: '/agents', component: AgentsPage });
@@ -58,7 +68,7 @@ const projectDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: 
 const systemRoute = createRoute({ getParentRoute: () => rootRoute, path: '/system', component: SystemPage });
 
 export const router = createRouter({
-  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, teamRoute, metricsRoute, inboxRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
+  routeTree: rootRoute.addChildren([indexRoute, projectsRoute, projectDetailRoute, runsRoute, runDetailRoute, workflowsRoute, workflowEditorRoute, skillsRoute, teamRoute, contextRoute, metricsRoute, inboxRoute, tasksRoute, reposRoute, agentsRoute, mcpRoute, systemRoute]),
 });
 
 declare module '@tanstack/react-router' {

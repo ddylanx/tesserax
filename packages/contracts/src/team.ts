@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { containsSecretToken } from './redact';
 import { AGENT_EXECUTORS, AI_ENGINES, ROLE_KEY_PATTERN } from './workflow';
+import type { ImprovementSink } from './context';
 
 /**
  * Team: departments group roles; a role is a reusable sub agent setup (prompt, engine, model, skills, tools, MCP) that a
@@ -15,7 +16,7 @@ export const ROLE_TOOL_ALLOWLIST = [
 ] as const;
 export type RoleTool = (typeof ROLE_TOOL_ALLOWLIST)[number];
 
-export const ROLE_LIMITS = { maxBudgetUsd: 20, timeoutSeconds: 7200, prompt: 20_000, skills: 20, tools: 50, mcpServers: 20, mission: 300, briefItems: 10, briefItem: 200 } as const;
+export const ROLE_LIMITS = { maxBudgetUsd: 20, timeoutSeconds: 7200, prompt: 20_000, skills: 20, tools: 50, mcpServers: 20, mission: 300, briefItems: 10, briefItem: 200, contextPacks: 50 } as const;
 
 export const teamSlugSchema = z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/, 'lowercase letters, digits and -, at most 40');
 export const roleKeySchema = z.string().regex(ROLE_KEY_PATTERN, 'a role key like engineering/backend-dev');
@@ -62,6 +63,8 @@ export const roleConfigSchema = z
     inputsNeeded: briefList,
     /** Language of the step's report (its headings and text). */
     reportLanguage: z.enum(REPORT_LANGUAGES).default('en'),
+    /** Slugs of the context packs switched on for this role (Context page). Packs pinned to the role are always on and not listed. */
+    context: z.array(teamSlugSchema).max(ROLE_LIMITS.contextPacks).optional(),
   })
   .strict()
   .superRefine(noSecret('The config'));
@@ -108,6 +111,8 @@ export const roleSchema = z.object({
   problems: z.array(z.string()),
   /** Ids of the workflows whose nodes name this role. */
   usedBy: z.array(z.string()),
+  /** Text of the context packs the role uses now (Context page). Only RoleLookup.getByKey fills it; lists leave it out. */
+  contextText: z.string().optional(),
 });
 export type Role = z.infer<typeof roleSchema>;
 
@@ -146,7 +151,7 @@ export const roleChangeSchema = z.object({
 export type RoleChange = z.infer<typeof roleChangeSchema>;
 
 /** What the workflow engine uses; provided under the token ROLE_LOOKUP (@tesserax/core). */
-export interface RoleLookup {
+export interface RoleLookup extends Partial<ImprovementSink> {
   /** null when no role has that key. */
   getByKey(key: string): Promise<Role | null>;
   /** Keys of every role (enabled or not). */

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LOCAL_TASK_TYPES, type MetricsReport, type Project, type ProjectCard, type Role, type TaskDetailDto, type TeamActivity, type TeamList, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
+import { LOCAL_TASK_TYPES, type ContextOverview, type Improvement, type MetricsReport, type Project, type ProjectCard, type Role, type TaskDetailDto, type TeamActivity, type TeamList, type TaskList, type WorkflowDefinition, type WorkflowRunDetail, type WorkflowRunList } from '@tesserax/contracts';
 import type { Api } from './api';
 import { clip, runDetail, runSummary, tail, taskDetail, taskSummary } from './summaries';
 
@@ -271,6 +271,33 @@ export const TOOLS: ToolDef[] = [
   },
 
   {
+    name: 'get_role_context',
+    title: 'Get what a role reads',
+    kind: 'read',
+    description: 'What a role is sent besides its own prompt: the context packs it reads now, the ones it could ask for, how many lessons the person approved, its proposals (waiting, approved, rejected) and its size against the limit. Packs outside the role\'s audience are not named.',
+    input: { role: z.string().min(3).max(81).describe('Role key "<department>/<role>".') },
+    async run({ api, web }, a) {
+      const key = (a.role as string).trim().toLowerCase();
+      const o = await api.get<ContextOverview>('/team/context');
+      const r = o.roles.find(x => x.key === key);
+      if (!r) throw new Error(`No role "${key}". Roles: ${o.roles.map(x => x.key).join(', ') || 'none'}.`);
+      const pack = (slug: string) => {
+        const p = o.packs.find(x => x.slug === slug);
+        return { pack: slug, name: p?.name ?? slug, about: p?.description ?? '', chars: p?.chars ?? 0 };
+      };
+      const { improvements } = await api.get<{ improvements: Improvement[] }>('/team/improvements', { role: key });
+      return {
+        role: key,
+        reading: r.using.map(pack),
+        canAskFor: r.available.map(pack),
+        chars: { ...r.chars, overLimit: r.overLimit },
+        lessons: improvements.filter(i => i.kind === 'lesson' && i.status === 'approved').map(i => i.text),
+        proposals: improvements.filter(i => i.status === 'proposed' || i.status === 'rejected').map(i => ({ kind: i.kind, text: i.text, pack: i.pack, status: i.status, note: i.note || undefined })),
+        link: `${web}/context?role=${encodeURIComponent(key)}`,
+      };
+    },
+  },
+  {
     name: 'team_activity',
     title: 'What the team is doing',
     kind: 'read',
@@ -339,6 +366,28 @@ export const TOOLS: ToolDef[] = [
     async run({ api }, a) {
       const id = await resolveTaskId(api, a.task as string);
       return taskSummary(await api.send<TaskDetailDto>('PATCH', `/tasks/${id}/status`, { statusCategory: a.status }));
+    },
+  },
+  {
+    name: 'propose_improvement',
+    title: 'Propose an improvement for a role',
+    kind: 'act',
+    description: 'Record how a role could do its job better: a lesson (one rule, with what happened) or a request for a context pack it was not given. It only waits on the Context page: the person approves or rejects it there, and there is no tool to decide. Do not repeat a proposal the person rejected.',
+    input: {
+      role: z.string().min(3).max(81).describe('Role key "<department>/<role>".'),
+      text: z.string().min(3).max(600).describe('The rule, in one or two sentences; for a context request, what is needed from the pack.'),
+      reason: z.string().max(1000).optional().describe('What happened that led to it (a review comment, a mistake, a gap).'),
+      pack: z.string().max(40).optional().describe('Context request only: the pack slug from get_role_context → canAskFor.'),
+    },
+    async run({ api, web }, a) {
+      const key = (a.role as string).trim().toLowerCase();
+      const t = await api.get<TeamList>('/team');
+      const r = t.roles.find(x => x.key === key);
+      if (!r) throw new Error(`No role "${key}". Roles: ${t.roles.map(x => x.key).join(', ') || 'none'}.`);
+      const saved = await api.send<Improvement>('POST', `/team/roles/${r.id}/improvements`, {
+        kind: a.pack ? 'context' : 'lesson', text: a.text, reason: a.reason ?? '', pack: a.pack ?? null, source: 'mcp',
+      });
+      return { id: saved.id, role: key, kind: saved.kind, status: saved.status, waitingFor: 'the person, on the Context page', link: `${web}/context?view=improve` };
     },
   },
   {

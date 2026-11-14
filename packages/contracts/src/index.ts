@@ -9,6 +9,7 @@ export * from './projects';
 export * from './board';
 export * from './project-scope';
 export * from './team';
+export * from './context';
 export * from './team-activity';
 export * from './report';
 export * from './redact';

@@ -2,6 +2,9 @@ import { type DynamicModule, Module } from '@nestjs/common';
 import type { ProjectDirectory, WorkflowUsage } from '@tesserax/contracts';
 import { DB, PROJECT_DIRECTORY, ROLE_LOOKUP, WORKFLOW_USAGE } from '@tesserax/core';
 import type { Db } from '@tesserax/db';
+import { ContextController } from './context.controller';
+import { KyselyContextRepo } from './context.repo';
+import { ContextService } from './context.service';
 import { TeamController } from './team.controller';
 import { KyselyTeamRepo } from './team.repo';
 import { TeamService } from './team.service';
@@ -21,7 +24,7 @@ export class TeamModule {
     return {
       module: TeamModule,
       global: true,
-      controllers: [TeamController],
+      controllers: [TeamController, ContextController],
       providers: [
         { provide: WORKFLOW_USAGE, useValue: options.workflowUsage },
         {
@@ -29,9 +32,11 @@ export class TeamModule {
           useFactory: (db: Db, usage: WorkflowUsage, projects: ProjectDirectory) => new TeamService(new KyselyTeamRepo(db), usage, projects),
           inject: [DB, WORKFLOW_USAGE, PROJECT_DIRECTORY],
         },
-        { provide: ROLE_LOOKUP, useExisting: TeamService },
+        { provide: ContextService, useFactory: (db: Db, team: TeamService) => new ContextService(new KyselyContextRepo(db), team), inject: [DB, TeamService] },
+        // a role by key comes with its context (packs + approved lessons), and takes the proposals a step ends with
+        { provide: ROLE_LOOKUP, useExisting: ContextService },
       ],
-      exports: [TeamService, ROLE_LOOKUP],
+      exports: [TeamService, ContextService, ROLE_LOOKUP],
     };
   }
 }

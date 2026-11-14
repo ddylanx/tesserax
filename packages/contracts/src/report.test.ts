@@ -67,3 +67,26 @@ test('the last block wins and copied hints are ignored; the instruction has the 
   assert.ok(reportInstruction('vi').includes('## Cần quyết định'));
   assert.ok(reportInstruction().includes('## Decision needed'));
 });
+
+test('improvement proposals: rules with a reason, a context request, capped per step', () => {
+  const text = [
+    '## Summary', 'Done.',
+    '## Confidence', 'high',
+    '## Improvement proposals',
+    '(optional, at most 3 lines, each "- <a rule> | <what happened>")',
+    '- Check the DEMO price table against the signed quote before writing numbers | the owner sent the page back for an old price',
+    '- context: pricing-notes | the task asked for a price I was not given',
+    '* None',
+    '1. Ask before renaming a public field',
+    '- a fourth one that is dropped',
+  ].join('\n');
+  const r = parseStepReport(text);
+  assert.equal(r.confidence, 'high');
+  assert.deepEqual(r.improvements, [
+    { kind: 'lesson', text: 'Check the DEMO price table against the signed quote before writing numbers', reason: 'the owner sent the page back for an old price', pack: null },
+    { kind: 'context', text: 'the task asked for a price I was not given', reason: 'the task asked for a price I was not given', pack: 'pricing-notes' },
+    { kind: 'lesson', text: 'Ask before renaming a public field', reason: '', pack: null },
+  ]);
+  assert.deepEqual(parseStepReport('## Summary\nx\n## Đề xuất cải tiến\nKhông có').improvements, []);
+  assert.match(reportInstruction('vi'), /## Đề xuất cải tiến/);
+});

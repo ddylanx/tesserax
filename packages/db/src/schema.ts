@@ -111,6 +111,38 @@ export interface TeamRolesTable {
   updated_at: Generated<Date>;
 }
 
+/** A piece of project knowledge roles can read (Context page). */
+export interface TeamContextPacksTable {
+  id: Generated<string>;
+  slug: string;
+  name: string;
+  description: Generated<string>;
+  body: Generated<string>;
+  source: Generated<string>;
+  audience: ColumnType<unknown, unknown | undefined, unknown>; // role keys, null = every role
+  pinned: Generated<boolean>;
+  position: Generated<number>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+/** What a role proposes to do its job better; a person approves, rejects or retires it. */
+export interface TeamImprovementsTable {
+  id: Generated<string>;
+  role_id: string;
+  role_key: string;
+  kind: Generated<string>; // 'lesson' | 'context'
+  text: string;
+  reason: Generated<string>;
+  pack: string | null;
+  source: Generated<string>;
+  status: Generated<string>; // 'proposed' | 'approved' | 'rejected' | 'retired'
+  note: Generated<string>;
+  fingerprint: string;
+  created_at: Generated<Date>;
+  decided_at: Date | null;
+}
+
 /** Audit trail of role edits (create / update / delete). */
 export interface TeamRoleChangesTable {
   id: Generated<string>;
@@ -333,6 +365,8 @@ export interface Database {
   team_departments: TeamDepartmentsTable;
   team_roles: TeamRolesTable;
   team_role_changes: TeamRoleChangesTable;
+  team_context_packs: TeamContextPacksTable;
+  team_improvements: TeamImprovementsTable;
 }
 
 export type ProjectRow = Selectable<ProjectsTable>;
@@ -355,5 +389,7 @@ export type McpPolicyUpdate = Updateable<McpPolicyTable>;
 export type TeamDepartmentRow = Selectable<TeamDepartmentsTable>;
 export type TeamRoleRow = Selectable<TeamRolesTable>;
 export type TeamRoleChangeRow = Selectable<TeamRoleChangesTable>;
+export type TeamContextPackRow = Selectable<TeamContextPacksTable>;
+export type TeamImprovementRow = Selectable<TeamImprovementsTable>;
 export type McpToolCacheRow = Selectable<McpToolCacheTable>;
 export type NewMcpToolCache = Insertable<McpToolCacheTable>;

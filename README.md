@@ -57,6 +57,7 @@ The later gates (spec, result) work the same way. When the run is done, score it
 - **Node**: one step. Types include `ai.step`, `agent.run`, `check.command`, `ai.review`, `human.gate` and `evaluate`. See [node types](docs/workflows.md#node-types).
 - **Skill**: a Markdown prompt in `skills/<name>/SKILL.md` that a node uses. Each node run records the skill's hash. See [writing a skill](CONTRIBUTING.md#writing-a-skill).
 - **Role**: a reusable sub agent setup (prompt, engine, model, skills, tools, MCP request) on the **Team** page, grouped in departments. A node names it as `department/role`; whatever the node sets itself wins. See [spec 0006](docs/specs/0006-team-roles.md).
+- **Context**: what a role reads besides its prompt, on the **Context** page: context packs switched per role (and packs a role may never read), plus lessons. A role proposes how to do its job better at the end of a step; nothing changes until you approve it. See [spec 0007](docs/specs/0007-context.md).
 - **Gate**: a point where the run waits for you. See [gates](docs/workflows.md#gates-score-and-loops).
 - **Agent**: the tool that implements the change: Claude Code, Gemini CLI, Antigravity CLI, or your IDE. It works in a worktree, commits locally and never pushes. See [agents](docs/agents.md).
 

@@ -14,6 +14,8 @@ export interface AppliedRole {
   skills: string[];
   /** "## Your role" section (mission, when to use, not for, inputs needed); '' when the role has no descriptor. */
   brief: string;
+  /** Context packs the role reads and its approved lessons (Context page); '' when it has none. */
+  context: string;
   reportLanguage: ReportLanguage;
 }
 
@@ -53,7 +55,7 @@ export function applyRole(raw: Record<string, unknown>, role: Role, nodeType: st
   }
   return {
     config,
-    role: { key: role.key, title: role.title, prompt: prompt.data, hash: role.hash, skills: rc.skills, brief: roleBrief(rc), reportLanguage: rc.reportLanguage },
+    role: { key: role.key, title: role.title, prompt: prompt.data, hash: role.hash, skills: rc.skills, brief: roleBrief(rc), context: role.contextText ?? '', reportLanguage: rc.reportLanguage },
   };
 }
 
@@ -64,6 +66,8 @@ export interface RoleSnapshot {
   hash: string;
   prompt: string;
   config: Record<string, unknown>;
+  /** The role's context text at that time (packs + approved lessons). */
+  context?: string;
 }
 
 /**
@@ -76,7 +80,7 @@ export async function snapshotRoles(lookup: RoleLookup | undefined, def: Pick<Wo
   const out: Record<string, RoleSnapshot> = {};
   for (const key of keys) {
     const r = lookup ? await lookup.getByKey(key) : null;
-    if (r) out[key] = { title: r.title, enabled: r.enabled, hash: r.hash, prompt: r.prompt, config: r.config };
+    if (r) out[key] = { title: r.title, enabled: r.enabled, hash: r.hash, prompt: r.prompt, config: r.config, ...(r.contextText ? { context: r.contextText } : {}) };
   }
   return out;
 }
@@ -90,7 +94,7 @@ export function runRoleLookup(runVars: unknown, live: RoleLookup | undefined): R
       const s = snap[key];
       if (!s) return null;
       const [dept = '', slug = ''] = key.split('/');
-      return { id: `snapshot:${key}`, key, departmentId: dept, slug, title: s.title, enabled: s.enabled, prompt: s.prompt, config: s.config, position: 0, hash: s.hash, problems: [], usedBy: [] };
+      return { id: `snapshot:${key}`, key, departmentId: dept, slug, title: s.title, enabled: s.enabled, prompt: s.prompt, config: s.config, position: 0, hash: s.hash, problems: [], usedBy: [], contextText: s.context ?? '' };
     },
     keys: async () => Object.keys(snap),
   };

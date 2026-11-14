@@ -206,3 +206,36 @@ test('team_activity puts every role in, idle when it has nothing, with run links
   assert.deepEqual(out.waitingForYou.map(s => s.step), ['You review']);
   assert.equal(tool('team_activity').kind, 'read');
 });
+
+test('get_role_context lists what a role reads; propose_improvement only records a proposal (nothing decides it here)', async () => {
+  const role = { id: 'r1', key: 'qa/reviewer', departmentId: 'd1' };
+  const overview = {
+    packs: [{ slug: 'facts', name: 'Facts', description: 'DEMO facts', chars: 120 }, { slug: 'style', name: 'Style', description: '', chars: 80 }, { slug: 'money', name: 'Money', description: '', chars: 50 }],
+    roles: [{ key: 'qa/reviewer', using: ['facts'], available: ['style'], blocked: ['money'], chars: { prompt: 10, context: 130, limit: 60000 }, overLimit: false }],
+  };
+  const improvements = [
+    { kind: 'lesson', text: 'Read the DEMO spec first', status: 'approved', pack: null, note: '' },
+    { kind: 'lesson', text: 'Skip small diffs', status: 'rejected', pack: null, note: 'never skip' },
+  ];
+  const calls: { method: string; path: string; body?: unknown }[] = [];
+  const ctx = {
+    web: 'http://127.0.0.1:5180',
+    api: {
+      get: async (path: string) => (path === '/team/context' ? overview : path === '/team/improvements' ? { improvements } : { departments: [], roles: [role] }),
+      send: async (method: string, path: string, body?: unknown) => (calls.push({ method, path, body }), { id: 'i1', kind: 'context', status: 'proposed' }),
+    },
+  } as never;
+  const out = (await tool('get_role_context').run(ctx, { role: 'QA/Reviewer' })) as { reading: { pack: string }[]; canAskFor: { pack: string }[]; lessons: string[]; proposals: { status: string; note?: string }[] };
+  assert.deepEqual(out.reading.map(p => p.pack), ['facts']);
+  assert.deepEqual(out.canAskFor.map(p => p.pack), ['style']);
+  assert.ok(!JSON.stringify(out).includes('money'), 'a pack outside the audience is not named');
+  assert.deepEqual(out.lessons, ['Read the DEMO spec first']);
+  assert.deepEqual(out.proposals.map(p => [p.status, p.note]), [['rejected', 'never skip']]);
+
+  const saved = (await tool('propose_improvement').run(ctx, { role: 'qa/reviewer', text: 'needs the style rules', pack: 'style' })) as { status: string };
+  assert.equal(saved.status, 'proposed');
+  assert.deepEqual(calls, [{ method: 'POST', path: '/team/roles/r1/improvements', body: { kind: 'context', text: 'needs the style rules', reason: '', pack: 'style', source: 'mcp' } }]);
+  assert.equal(tool('propose_improvement').kind, 'act');
+  assert.equal(tool('get_role_context').kind, 'read');
+  assert.ok(!TOOLS.some(t => /improvement/.test(t.name) && t.kind === 'decide'), 'no tool decides on a proposal');
+});
